@@ -36,13 +36,9 @@ const isDark = computed(() => theme.global.current.value.dark)
     <template #content>
       <div class="landing-view">
         <!-- Loading State -->
-        <v-container
-          v-if="loading"
-          class="d-flex justify-center align-center"
-          style="min-height: 50vh"
-        >
-          <v-progress-circular color="primary" indeterminate size="64" />
-        </v-container>
+        <v-container v-if="loading" class="d-flex justify-center align-center" style="min-height: 60vh;">
+        <v-progress-circular color="primary" indeterminate size="48" />
+      </v-container>
 
         <!-- Error State -->
         <v-container
