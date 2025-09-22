@@ -18,12 +18,14 @@ export const individualNavItems: NavigationItem[] = [
   {
     title: 'Home',
     icon: 'mdi-home',
-    route: '/home'
+    route: '/home',
+    permission: 'app.home.access'
   },
   {
     title: 'Profiles',
     icon: 'mdi-account',
-    route: '/profiles'
+    route: '/profiles',
+    permission: 'app.profiles.access'
   }
 ]
 

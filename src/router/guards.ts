@@ -24,7 +24,7 @@ export const authGuard = async (to: RouteLocationNormalized, from: RouteLocation
   }
 
   // Check role-based page access for authenticated users on protected routes
-  if (isLoggedIn && to.meta.requiresAuth && to.path !== "/home") {
+  if (isLoggedIn && to.meta.requiresAuth) {
     try {
       const authStore = useAuthUserStore();
       const pagesStore = useUserPagesStore();
@@ -52,16 +52,28 @@ export const authGuard = async (to: RouteLocationNormalized, from: RouteLocation
 
             if (!isPageAllowed) {
               console.log('Access denied for path:', to.path, 'Role ID:', userRoleId);
-              return next("/forbidden"); // Redirect to forbidden page if access denied
+              // For critical pages like /home, redirect to a default allowed page if it exists
+              // Otherwise redirect to forbidden page
+              if (to.path === "/home" && allowedPages.length > 0) {
+                console.log('Redirecting to first allowed page:', allowedPages[0]);
+                return next(allowedPages[0]);
+              }
+              return next("/forbidden");
             }
           } else {
-            // No pages defined for this role - redirect to forbidden page
+            // No pages defined for this role
             console.log('No pages configured for role ID:', userRoleId);
-            return next("/forbidden");
+            // For /home route, if no pages are configured, allow access as fallback
+            if (to.path === "/home") {
+              console.log('Allowing access to /home as fallback when no pages configured');
+            } else {
+              return next("/forbidden");
+            }
           }
         } else {
           console.log('No role ID found in user metadata');
           // If no role ID, allow access but log the issue
+          // This maintains backward compatibility for users without roles
         }
       }
     } catch (error) {
