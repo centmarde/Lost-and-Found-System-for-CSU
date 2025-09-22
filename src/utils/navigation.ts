@@ -21,9 +21,9 @@ export const individualNavItems: NavigationItem[] = [
     route: '/home'
   },
   {
-    title: 'Profile',
+    title: 'Profiles',
     icon: 'mdi-account',
-    route: '/profile'
+    route: '/profiles'
   }
 ]
 
