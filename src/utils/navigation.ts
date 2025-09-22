@@ -49,7 +49,7 @@ export const navigationConfig: NavigationGroup[] = [
       {
         title: 'Role Pages',
         icon: 'mdi-account-key',
-        route: '/admin/rolepages',
+        route: '/admin/roles',
         permission: 'admin.roles.manage'
       }
     ]

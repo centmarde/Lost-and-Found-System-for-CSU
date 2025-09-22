@@ -11,6 +11,7 @@ import DashboardView from '@/pages/admin/DashboardView.vue';
 import ProfilesView from '@/pages/ProfilesView.vue';
 
 import UserManagement from '@/pages/admin/UserManagement.vue';
+import RolePagesView from '@/pages/admin/RolePagesView.vue';
 // TODO: Add these components when they're created
 // import UserManagementView from '@/pages/admin/UserManagementView.vue';
 // import RolePagesView from '@/pages/admin/RolePagesView.vue';
@@ -45,6 +46,11 @@ const routes = setupLayouts([
   {
     path: '/admin/users',
     component: UserManagement,
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/admin/roles',
+    component: RolePagesView,
     meta: { requiresAuth: true }
   },
 
