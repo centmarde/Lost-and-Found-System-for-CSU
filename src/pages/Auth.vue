@@ -1,4 +1,3 @@
-
 <script setup lang="ts">
 import { ref, onMounted, computed } from "vue";
 import { useRouter, useRoute } from "vue-router";
@@ -97,10 +96,11 @@ onMounted(async () => {
   }
 });
 
-// This page uses the default layout and doesn't require authentication
+// Computed property to detect dark mode
+const isDarkMode = computed(() => {
+  return document.body.getAttribute('data-theme') === 'dark';
+});
 </script>
-
-
 
 <template>
 
@@ -131,26 +131,24 @@ onMounted(async () => {
   <!-- Main Content -->
   <v-row v-if="!themeLoading && !authPageLoading && authPageData" class="fill-height" align="center" no-gutters>
     <!-- Form Section -->
-
     <v-col
       cols="12"
       lg="5"
       class="bg-primary d-flex align-center justify-center fill-height"
       :order="formSectionOrder"
     >
-
       <div class="w-100" style="max-width: 500px">
-         <!-- Back to Home Button (static) -->
-            <v-btn
-              variant="text"
-              color="light"
-              size="small"
-              class="ma-2"
-              @click="navigateHome"
-            >
-              <v-icon start size="small">mdi-arrow-left</v-icon>
-              Back to Home
-            </v-btn>
+        <!-- Back to Home Button (static) -->
+        <v-btn
+          variant="text"
+          color="light"
+          size="small"
+          class="ma-2"
+          @click="navigateHome"
+        >
+          <v-icon start size="small">mdi-arrow-left</v-icon>
+          Back to Home
+        </v-btn>
         <!-- Auth Form Container -->
         <v-fade-transition mode="out-in">
           <div v-if="isLoginMode" key="login">
@@ -165,11 +163,9 @@ onMounted(async () => {
         <v-card class="mt-4" variant="text">
           <v-card-text class="text-center">
             <v-divider class="mb-4" />
-
             <div class="text-body-2 text-medium-emphasis mb-2 white-text">
               Or continue with
             </div>
-
             <!-- Social Login Options (static) -->
             <v-row no-gutters justify="center">
               <v-col cols="auto">
@@ -198,7 +194,7 @@ onMounted(async () => {
               </v-col>
             </v-row>
 
-                <div class="text-caption text-medium-emphasis mt-2 white-text">
+            <div class="text-caption text-medium-emphasis mt-2 white-text">
               Social login coming soon
             </div>
           </v-card-text>
@@ -207,7 +203,6 @@ onMounted(async () => {
         <!-- Toggle Mode Button (static) -->
         <v-card class="mx-auto mt-2" variant="text">
           <v-card-actions class="justify-center">
-
             <v-btn
               variant="text"
               color="light"
@@ -217,12 +212,9 @@ onMounted(async () => {
               <v-icon start>mdi-swap-horizontal</v-icon>
               Switch to {{ isLoginMode ? "Register" : "Login" }}
             </v-btn>
-
           </v-card-actions>
-
         </v-card>
       </div>
-
     </v-col>
 
     <!-- Quote Section -->
@@ -237,28 +229,40 @@ onMounted(async () => {
           mdi-format-quote-open
         </v-icon>
 
-        <div class="text-h4 font-weight-light mb-6 text-primary">
+        <div
+          class="text-h4 font-weight-light mb-6"
+          :class="{'text-white': isDarkMode, 'text-primary': !isDarkMode}"
+        >
           {{ authPageData.quote.text }}
         </div>
 
-        <div class="text-h6 text-primary opacity-75">
+        <div
+          class="text-h6 opacity-75"
+          :class="{'text-white': isDarkMode, 'text-primary': !isDarkMode}"
+        >
           — {{ authPageData.quote.author }}
           <span v-if="authPageData.quote.source" class="text-caption">
             ({{ authPageData.quote.source }})
           </span>
         </div>
 
-        <div v-if="authPageData.quote.motivationalText" class="text-body-1 text-primary opacity-75">
+        <div
+          v-if="authPageData.quote.motivationalText"
+          class="text-body-1 opacity-75"
+          :class="{'text-white': isDarkMode, 'text-primary': !isDarkMode}"
+        >
           {{ authPageData.quote.motivationalText }}
         </div>
       </v-card-text>
-
     </v-col>
   </v-row>
 </template>
 
 <style scoped>
 .white-text {
-  color: white !important; 
+  color: white !important;
+}
+.text-primary {
+  color: var(--v-primary-base) !important; /* Primary color for light mode */
 }
 </style>
