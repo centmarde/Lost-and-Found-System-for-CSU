@@ -218,19 +218,19 @@
               class="me-4"
             >
               <v-btn
-              :loading="isLoadingTheme"
-              size="large"
-              variant="text"
-              rounded="xl"
-              :aria-label="themeTooltip"
-              class="text-white"
-              @click="toggleTheme"
-              >
-              <v-icon :icon="themeIcon" color="white" />
-              <v-tooltip activator="parent" location="bottom">
-                {{ themeTooltip }}
-              </v-tooltip>
-              </v-btn>
+            :icon="themeIcon"
+            variant="text"
+            size="default"
+            rounded="pill"
+            class="theme-toggle mx-2"
+            :loading="isLoadingTheme"
+            @click="toggleTheme"
+          >
+            <v-icon :icon="themeIcon" />
+            <v-tooltip activator="parent" location="bottom">
+              {{ themeTooltip }}
+            </v-tooltip>
+          </v-btn>
             </v-badge>
 
 
@@ -393,6 +393,16 @@
 .v-app-bar .text-caption,
 .v-chip.text-white {
   color: white !important;
+}
+
+/* Theme Toggle */
+.theme-toggle {
+  transition: all 0.3s ease;
+}
+
+.theme-toggle:hover {
+  background: rgba(var(--v-theme-primary), 0.08);
+  transform: rotate(180deg);
 }
 
 /* Force all button text and icons to be white */
