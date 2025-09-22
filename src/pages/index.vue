@@ -100,17 +100,7 @@ const openGithub = () => window.open('https://github.com', '_blank', 'noopener,n
                   </v-btn>
                 </div>
 
-                <!-- Stats -->
-                <v-row class="mt-12 animate-fade-in delay-3" justify="center">
-                  <v-col v-for="stat in [
-                    { number: '50K+', label: 'Downloads' },
-                    { number: '4.9★', label: 'Rating' },
-                    { number: '24/7', label: 'Support' }
-                  ]" :key="stat.label" cols="4" sm="2" class="text-center">
-                    <div class="text-h5 font-weight-bold text-primary">{{ stat.number }}</div>
-                    <div class="text-caption text-medium-emphasis">{{ stat.label }}</div>
-                  </v-col>
-                </v-row>
+               
               </v-col>
             </v-row>
           </v-container>
