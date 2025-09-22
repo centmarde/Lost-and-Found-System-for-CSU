@@ -66,21 +66,25 @@ export const useAuthUserStore = defineStore("authUser", () => {
   }
 
   async function registerUser(
-    email: string,
+   email: string,
     password: string,
-    username: string
+    username: string,
+    roleId: number,
+    full_name?: string,
+    student_number?: string,
+    organization_id?: number
   ) {
     loading.value = true;
     try {
-      const { data: signUpData, error: signUpError } = await supabase.auth.signUp(
-        {
-          email,
-          password,
-          options: {
-            data: {
-              full_name: username,
-            }
+      const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            full_name: username,
+            role: roleId,
           }
+        }
         }
       );
 
