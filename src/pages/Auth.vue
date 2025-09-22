@@ -166,7 +166,7 @@ onMounted(async () => {
           <v-card-text class="text-center">
             <v-divider class="mb-4" />
 
-            <div class="text-body-2 text-medium-emphasis mb-2">
+            <div class="text-body-2 text-medium-emphasis mb-2 white-text">
               Or continue with
             </div>
 
@@ -198,7 +198,7 @@ onMounted(async () => {
               </v-col>
             </v-row>
 
-                <div class="text-caption text-medium-emphasis mt-2">
+                <div class="text-caption text-medium-emphasis mt-2 white-text">
               Social login coming soon
             </div>
           </v-card-text>
@@ -256,3 +256,9 @@ onMounted(async () => {
     </v-col>
   </v-row>
 </template>
+
+<style scoped>
+.white-text {
+  color: white !important; /* The !important forces the color to be applied */
+}
+</style>
