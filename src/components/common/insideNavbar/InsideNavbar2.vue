@@ -134,10 +134,10 @@
         </template>
 
         <div class="d-flex flex-column">
-          <span class="text-h6 font-weight-bold ">
+          <span class="text-h6 font-weight-bold text-white">
             {{ navbarConfig.title }}
           </span>
-          <span class="text-caption text-medium-emphasis">
+          <span class="text-caption text-white">
             Modern Design
           </span>
         </div>
@@ -163,9 +163,10 @@
                 variant="text"
                 rounded="xl"
                 :aria-label="themeTooltip"
+                class="text-white"
                 @click="toggleTheme"
               >
-                <v-icon :icon="themeIcon" />
+                <v-icon :icon="themeIcon" color="white" />
                 <v-tooltip activator="parent" location="bottom">
                   {{ themeTooltip }}
                 </v-tooltip>
@@ -180,9 +181,10 @@
               rounded="xl"
               color="error"
               aria-label="Logout"
+              class="text-white"
               @click="handleLogout"
             >
-              <v-icon icon="mdi-logout" />
+              <v-icon icon="mdi-logout" color="white" />
               <v-tooltip activator="parent" location="bottom">
                 Logout
               </v-tooltip>
@@ -192,11 +194,13 @@
 
         <!-- Mobile Menu Button -->
         <v-btn
-          class="d-md-none"
+          class="d-md-none text-white"
           icon="mdi-menu"
           variant="text"
           @click="drawer = !drawer"
-        />
+        >
+          <v-icon icon="mdi-menu" color="white" />
+        </v-btn>
       </template>
     </v-app-bar>
 
@@ -251,10 +255,10 @@
           </template>
         </template>
 
-        <v-list-item-title class="text-h6 font-weight-bold text-primary">
+        <v-list-item-title class="text-h6 font-weight-bold text-white">
           {{ navbarConfig.title }}
         </v-list-item-title>
-        <v-list-item-subtitle class="text-caption">
+        <v-list-item-subtitle class="text-caption text-white">
           Modern Design
         </v-list-item-subtitle>
       </v-list-item>
@@ -268,7 +272,7 @@
           :title="themeTooltip"
           :prepend-icon="themeIcon"
           rounded="xl"
-          class="ma-2"
+          class="ma-2 text-white"
           @click="toggleTheme"
         />
 
@@ -277,7 +281,7 @@
           title="Logout"
           prepend-icon="mdi-logout"
           rounded="xl"
-          class="ma-2"
+          class="ma-2 text-white"
           color="error"
           @click="handleLogout"
         />
@@ -309,6 +313,29 @@
   ) !important;
   backdrop-filter: blur(10px);
   border-bottom: 1px solid rgba(var(--v-theme-primary), 0.2);
+}
+
+/* Force all text to be white */
+.v-app-bar .text-white,
+.v-app-bar .text-h6,
+.v-app-bar .text-caption {
+  color: white !important;
+}
+
+/* Force all button text and icons to be white */
+.v-app-bar .v-btn,
+.v-app-bar .v-btn .v-btn__content,
+.v-app-bar .v-icon {
+  color: white !important;
+}
+
+/* Ensure navigation drawer text is white */
+.v-navigation-drawer .text-white,
+.v-navigation-drawer .v-list-item-title,
+.v-navigation-drawer .v-list-item-subtitle,
+.v-navigation-drawer .v-list-item,
+.v-navigation-drawer .v-icon {
+  color: white !important;
 }
 
 /* Smooth drawer animation */

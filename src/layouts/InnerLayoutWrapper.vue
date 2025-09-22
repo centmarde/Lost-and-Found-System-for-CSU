@@ -1,5 +1,21 @@
+
+<script lang="ts" setup>
+  import { onMounted } from 'vue'
+
+  import Sidebar from '@/components/common/sideBar/Sidebar.vue'
+  import { useLandingController } from '@/controller/landingController'
+
+  const { data, fetchLandingData } = useLandingController()
+
+  onMounted(async () => {
+    await fetchLandingData()
+  })
+</script>
+
 <template>
   <v-app>
+
+    <Sidebar/>
     <!-- Dynamic Navbar Selection -->
     <InsideNavbar1
       v-if="data?.ui?.navbarComponent === '1'"
@@ -34,18 +50,6 @@
   </v-app>
 </template>
 
-<script lang="ts" setup>
-  import { onMounted } from 'vue'
-
-
-  import { useLandingController } from '@/controller/landingController'
-
-  const { data, fetchLandingData } = useLandingController()
-
-  onMounted(async () => {
-    await fetchLandingData()
-  })
-</script>
 
 <style scoped>
   /* Layout-specific styles can be added here */

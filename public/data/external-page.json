@@ -148,7 +148,7 @@
     "title": "Welcome to CSU Lost & Found System",
     "subtitle": "Access your digital lost and found platform",
     "layout": {
-      "quotePosition": "right"
+      "quotePosition": "left"
     },
     "quote": {
       "text": "What is lost can always be found again, but what is found may be lost forever if not claimed.",
