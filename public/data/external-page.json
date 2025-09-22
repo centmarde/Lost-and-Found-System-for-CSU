@@ -1,7 +1,7 @@
 {
-  "title": "Vue 3 + Vuetify 3 Thesis Template",
-  "description": "A modern, reusable thesis template built with Vue 3 and Vuetify 3, featuring TypeScript and zero-config development with extensive plugin automation.",
-  "subtitle": "Streamline Your Academic Writing with Modern Web Technologies",
+  "title": "Lost and Found System for CSU",
+  "description": "A comprehensive digital platform for managing lost and found items at Caraga State University, replacing manual processes with efficient digital tracking and enhanced visibility for students and staff.",
+  "subtitle": "Modernizing Campus Lost and Found Services with Digital Solutions",
   "backgroundImage": {
     "src": "/images/markup.png",
     "alt": "Abstract academic background with geometric patterns",
@@ -13,46 +13,46 @@
   },
   "features": [
     {
-      "title": "Zero-Config Development",
-      "description": "File-based auto-generation for pages, components, and layouts with minimal configuration required.",
-      "icon": "mdi-cog-outline"
+      "title": "Enhanced Visibility",
+      "description": "Campus-wide digital bulletin system that makes lost items searchable and visible to all students and staff, eliminating the need for physical visits to the guardhouse.",
+      "icon": "mdi-eye-outline"
     },
     {
-      "title": "Modern Vue 3 Stack",
-      "description": "Built on Vue 3 Composition API with TypeScript, Pinia state management, and Vuetify 3 components.",
-      "icon": "mdi-vuejs"
+      "title": "Digital Tracking System",
+      "description": "Comprehensive item logging with timestamps, locations, and detailed descriptions replacing manual logbooks with efficient digital records.",
+      "icon": "mdi-map-marker-check"
     },
     {
-      "title": "Authentication Ready",
-      "description": "Supabase integration with reactive authentication state and user management.",
+      "title": "Reduced Social Hesitation",
+      "description": "Anonymous browsing capabilities and user-friendly interface that encourages students to check for their belongings without embarrassment.",
       "icon": "mdi-account-check"
     },
     {
-      "title": "Responsive Design",
-      "description": "Mobile-first approach with Vuetify's Material Design components and responsive layouts.",
-      "icon": "mdi-responsive"
+      "title": "Complete Traceability",
+      "description": "Advanced analytics and reporting features for administrators to track patterns, generate statistics, and make informed policy decisions.",
+      "icon": "mdi-chart-line"
     }
   ],
   "version": "1.0.0",
-  "author": "Thesis Template Team",
-  "lastUpdated": "2025-09-03",
+  "author": "CSU Development Team",
+  "lastUpdated": "2025-09-22",
   "theme": {
-    "primaryColor": "#556B2F",
+    "primaryColor": "#231942",
     "secondaryColor": "#DCDCDC"
   },
   "ui": {
     "showNavbar": true,
     "showFooter": true,
     "_comment": "Select the navbar component to use: 1, 2, 3, or 4",
-    "navbarComponent": "4",
+    "navbarComponent": "2",
     "_footerComment": "Select the footer component to use: 1 or 2",
     "footerComponent": "1",
     "navbar": {
-      "title": "Thesis Template",
-      "icon": "mdi-school",
+      "title": "Lost & Found CSU",
+      "icon": "mdi-magnify",
       "logo": {
         "src": "/src/assets/logo.svg",
-        "alt": "Thesis Template Logo",
+        "alt": "CSU Lost and Found Logo",
         "width": 32,
         "height": 32
       },
@@ -83,11 +83,11 @@
       }
     },
     "footer": {
-      "companyName": "Thesis Template",
-      "tagline": "Modern academic writing made simple",
-      "icon": "mdi-school",
+      "companyName": "CSU Lost & Found",
+      "tagline": "Connecting lost items with their owners",
+      "icon": "mdi-magnify",
       "color": "grey-darken-3",
-      "copyright": "Thesis Template Team. All rights reserved.",
+      "copyright": "Caraga State University. All rights reserved.",
       "socialLinks": [
         {
           "platform": "github",
@@ -122,43 +122,43 @@
       ],
       "thesisTeam": {
         "enabled": true,
-        "title": "Thesis Team",
-        "subtitle": "Meet the minds behind your academic success",
+        "title": "Development Team",
+        "subtitle": "Meet the team behind CSU's digital lost and found solution",
         "members": [
           {
-            "name": "Dr. Sarah Johnson",
-            "role": "Lead Researcher",
-            "avatar": "/images/team/sarah.jpg"
+            "name": "Security Office",
+            "role": "System Administrator",
+            "avatar": "/images/team/security.jpg"
           },
           {
-            "name": "Prof. Michael Chen",
-            "role": "Academic Advisor",
-            "avatar": "/images/team/michael.jpg"
+            "name": "IT Support",
+            "role": "Technical Support",
+            "avatar": "/images/team/it.jpg"
           },
           {
-            "name": "Emma Rodriguez",
-            "role": "Writing Specialist",
-            "avatar": "/images/team/emma.jpg"
+            "name": "Student Affairs",
+            "role": "Service Coordinator",
+            "avatar": "/images/team/affairs.jpg"
           }
         ]
       }
     }
   },
   "authPage": {
-    "title": "Welcome to Your Academic Journey",
-    "subtitle": "Access your thesis template workspace",
+    "title": "Welcome to CSU Lost & Found System",
+    "subtitle": "Access your digital lost and found platform",
     "layout": {
       "quotePosition": "right"
     },
     "quote": {
-      "text": "The best time to plant a tree was 20 years ago. The second best time is now.",
-      "author": "Chinese Proverb",
-      "source": "Ancient Wisdom",
-      "motivationalText": "Start your journey today. Every great achievement begins with a single step forward."
+      "text": "What is lost can always be found again, but what is found may be lost forever if not claimed.",
+      "author": "Lost & Found Wisdom",
+      "source": "Campus Life",
+      "motivationalText": "Every lost item has a story. Help us reunite belongings with their owners through our digital platform."
     },
     "backgroundImage": {
       "src": "/images/auth-background.jpg",
-      "alt": "Academic workspace with books and laptop",
+      "alt": "University campus with students and lost items",
       "overlay": {
         "enabled": true,
         "color": "rgba(85, 107, 47, 0.05)",
