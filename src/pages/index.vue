@@ -99,8 +99,6 @@ const openGithub = () => window.open('https://github.com', '_blank', 'noopener,n
                     View on GitHub
                   </v-btn>
                 </div>
-
-               
               </v-col>
             </v-row>
           </v-container>
