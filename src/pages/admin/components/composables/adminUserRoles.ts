@@ -1,7 +1,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useUserRolesStore, type Role, type CreateRoleData, type UpdateRoleData } from '@/stores/roles'
 import { useUserPagesStore } from '@/stores/pages'
-import { navigationConfig } from '@/utils/navigation'
+import { navigationConfig, individualNavItems } from '@/utils/navigation'
 import { useToast } from 'vue-toastification'
 
 export function useAdminUserRoles() {
@@ -91,6 +91,17 @@ export function useAdminUserRoles() {
         const routeSet = new Set<string>()
 
         // Build mapping from navigation config and collect routes
+        // Process individual navigation items
+        individualNavItems.forEach(item => {
+          if (item.route) {
+            routeSet.add(item.route)
+            if (item.permission) {
+              permissionToRouteMap[item.permission] = item.route
+            }
+          }
+        })
+
+        // Process grouped navigation items
         navigationConfig.forEach(group => {
           group.children.forEach(item => {
             if (item.route) {

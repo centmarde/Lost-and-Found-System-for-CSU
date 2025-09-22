@@ -1,7 +1,7 @@
 import { ref, watch } from 'vue'
 import { useUserRolesStore } from '@/stores/roles'
 import { useUserPagesStore } from '@/stores/pages'
-import { navigationConfig } from '@/utils/navigation'
+import { navigationConfig, individualNavItems } from '@/utils/navigation'
 
 export function useRoleEditFetchDialog() {
   const rolesStore = useUserRolesStore()
@@ -54,7 +54,15 @@ export function useRoleEditFetchDialog() {
   const routesToPermissions = (routes: string[]): string[] => {
     const routeToPermissionMap: Record<string, string> = {}
 
-    // Build mapping from navigation config
+    // Build mapping from individual navigation items
+    individualNavItems.forEach(item => {
+      if (item.route) {
+        // Use permission if available, otherwise use the route itself
+        routeToPermissionMap[item.route] = item.permission || item.route
+      }
+    })
+
+    // Build mapping from grouped navigation config
     navigationConfig.forEach(group => {
       group.children.forEach(item => {
         if (item.route) {
@@ -77,7 +85,17 @@ export function useRoleEditFetchDialog() {
     const permissionToRouteMap: Record<string, string> = {}
     const routeSet = new Set<string>()
 
-    // Build mapping from navigation config and collect routes
+    // Build mapping from individual navigation items
+    individualNavItems.forEach(item => {
+      if (item.route) {
+        routeSet.add(item.route)
+        if (item.permission) {
+          permissionToRouteMap[item.permission] = item.route
+        }
+      }
+    })
+
+    // Build mapping from grouped navigation config and collect routes
     navigationConfig.forEach(group => {
       group.children.forEach(item => {
         if (item.route) {

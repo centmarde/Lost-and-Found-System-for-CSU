@@ -17,9 +17,41 @@ export const authGuard = async (to: RouteLocationNormalized, from: RouteLocation
     return next("/auth");
   }
 
-  // If user is authenticated and trying to access public/auth pages, redirect to dashboard
+  // If user is authenticated and trying to access public/auth pages, redirect to appropriate page
   if (isLoggedIn && publicPages.includes(to.path)) {
-    /*  toast.info("You are already logged in. Redirecting to home."); */
+    /*  toast.info("You are already logged in. Redirecting to appropriate page."); */
+    try {
+      const authStore = useAuthUserStore();
+      const pagesStore = useUserPagesStore();
+
+      // Get current user data to access role ID from metadata
+      const currentUserResult = await authStore.getCurrentUser();
+
+      if (currentUserResult.user) {
+        const userRoleId = currentUserResult.user.user_metadata?.role;
+
+        if (userRoleId) {
+          // Fetch pages accessible by this role
+          const rolePages = await pagesStore.fetchRolePagesByRoleId(userRoleId);
+
+          if (rolePages && rolePages.length > 0) {
+            // Check if /home is in the allowed pages
+            const allowedPages = rolePages.map(rolePage => rolePage.pages).filter(Boolean);
+
+            if (allowedPages.includes("/home")) {
+              return next("/home");
+            } else {
+              // If /home is not accessible, redirect to forbidden page
+              return next("/forbidden");
+            }
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error checking role-based access for redirect:', error);
+    }
+
+    // Fallback to /home if role check fails
     return next("/home");
   }
 
@@ -52,23 +84,12 @@ export const authGuard = async (to: RouteLocationNormalized, from: RouteLocation
 
             if (!isPageAllowed) {
               console.log('Access denied for path:', to.path, 'Role ID:', userRoleId);
-              // For critical pages like /home, redirect to a default allowed page if it exists
-              // Otherwise redirect to forbidden page
-              if (to.path === "/home" && allowedPages.length > 0) {
-                console.log('Redirecting to first allowed page:', allowedPages[0]);
-                return next(allowedPages[0]);
-              }
               return next("/forbidden");
             }
           } else {
             // No pages defined for this role
             console.log('No pages configured for role ID:', userRoleId);
-            // For /home route, if no pages are configured, allow access as fallback
-            if (to.path === "/home") {
-              console.log('Allowing access to /home as fallback when no pages configured');
-            } else {
-              return next("/forbidden");
-            }
+            return next("/forbidden");
           }
         } else {
           console.log('No role ID found in user metadata');
