@@ -30,6 +30,41 @@ export const useAuthUserStore = defineStore("authUser", () => {
   const userEmail = computed(() => userData.value?.email || null);
   const userName = computed(() => userData.value?.user_metadata?.full_name || userData.value?.email || null);
 
+  async function getCurrentUser() {
+    loading.value = true;
+    try {
+      const { data: { user }, error } = await supabase.auth.getUser();
+
+      if (error) {
+        return { error };
+      }
+
+      if (!user) {
+        return { error: new Error("No authenticated user") };
+      }
+
+      const userData = {
+        id: user.id,
+        email: user.email,
+        created_at: user.created_at,
+        user_metadata: user.user_metadata,
+        app_metadata: user.app_metadata,
+      };
+
+      // Log user role ID from metadata
+      const roleId = user.user_metadata?.role;
+      console.log('getCurrentUser - User Role ID from metadata:', roleId);
+      console.log('getCurrentUser - Full user metadata:', user.user_metadata);
+
+      return { user: userData };
+    } catch (error) {
+      console.error("Error fetching current user:", error);
+      return { error };
+    } finally {
+      loading.value = false;
+    }
+  }
+
   async function registerUser(
     email: string,
     password: string,
@@ -172,6 +207,7 @@ export const useAuthUserStore = defineStore("authUser", () => {
     signIn,
     signOut,
     initializeAuth,
+    getCurrentUser,
   };
 });
 
