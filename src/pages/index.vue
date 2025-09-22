@@ -53,16 +53,7 @@ const openGithub = () => window.open('https://github.com', '_blank', 'noopener,n
           <v-container class="hero-content">
             <v-row justify="center" align="center" class="text-center">
               <v-col cols="12" md="10" lg="8">
-                <!-- Badge -->
-                <v-chip
-                  color="primary" 
-                  variant="tonal" 
-                  size="small"
-                  class="mb-6 animate-fade-in"
-                  prepend-icon="mdi-new-box"
-                >
-                  New Release Available
-                </v-chip>
+               
 
                 <!-- Main Title -->
                 <h1 class="hero-title mb-6 animate-slide-up">

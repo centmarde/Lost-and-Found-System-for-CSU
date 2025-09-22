@@ -259,6 +259,6 @@ onMounted(async () => {
 
 <style scoped>
 .white-text {
-  color: white !important; /* The !important forces the color to be applied */
+  color: white !important; 
 }
 </style>
