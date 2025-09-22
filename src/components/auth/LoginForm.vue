@@ -57,9 +57,9 @@
 
         <v-row no-gutters>
           <v-col cols="12" class="text-center">
-            <span class="text-body-2 text-medium-emphasis">
-              Don't have an account?
-            </span>
+           <span class="text-body-2 text-medium-emphasis white-text">
+    Don't have an account?
+  </span>
             <v-btn
               variant="text"
               size="small"
@@ -174,3 +174,8 @@ defineExpose({
   resetForm,
 });
 </script>
+<style scoped>
+.white-text {
+  color: white !important; 
+}
+</style>
