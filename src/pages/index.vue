@@ -120,11 +120,6 @@ const isDark = computed(() => theme.global.current.value.dark)
             </v-row>
           </v-container>
         </v-sheet>
-
-       
-
-        
-
         
       </div>
     </template>
