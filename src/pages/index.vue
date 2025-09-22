@@ -1,39 +1,34 @@
 <script lang="ts" setup>
-  import { onMounted } from 'vue'
-  import { useLandingController } from '@/controller/landingController'
-  import OuterLayoutWrapper from '@/layouts/OuterLayoutWrapper.vue'
+import { onMounted, computed } from 'vue'
+import { useLandingController } from '@/controller/landingController'
+import { useTheme } from 'vuetify'
+import OuterLayoutWrapper from '@/layouts/OuterLayoutWrapper.vue'
 
-  const { data, loading, error, fetchLandingData } = useLandingController()
+const { data, loading, error, fetchLandingData } = useLandingController()
+const theme = useTheme()
 
-  onMounted(async () => {
-    await fetchLandingData()
+onMounted(async () => {
+  await fetchLandingData()
+})
+
+const scrollToFeatures = () => {
+  document.querySelector('#features')?.scrollIntoView({ 
+    behavior: 'smooth', 
+    block: 'start' 
+  })
+}
+
+const openGithub = () => window.open('https://github.com', '_blank', 'noopener,noreferrer')
+const openDocumentation = () => window.open('https://vuetifyjs.com/', '_blank', 'noopener,noreferrer')
+
+const formatDate = (dateString: string) => 
+  new Date(dateString).toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
   })
 
-  function scrollToFeatures () {
-    const element = document.querySelector('#features')
-    if (element) {
-      element.scrollIntoView({
-        behavior: 'smooth',
-        block: 'start',
-      })
-    }
-  }
-
-  function openGithub () {
-    window.open('https://github.com', '_blank', 'noopener,noreferrer')
-  }
-
-  function openDocumentation () {
-    window.open('https://vuetifyjs.com/', '_blank', 'noopener,noreferrer')
-  }
-
-  function formatDate (dateString: string) {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-    })
-  }
+const isDark = computed(() => theme.global.current.value.dark)
 </script>
 
 <template>
