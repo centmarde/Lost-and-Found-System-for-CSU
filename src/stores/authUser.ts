@@ -158,44 +158,6 @@ export const useAuthUserStore = defineStore("authUser", () => {
   }
 
 
-  // Get user data by ID using Supabase API
-  async function getUser(userId?: string) {
-    loading.value = true;
-    try {
-      // Use the current user's ID if no userId is provided
-      const targetUserId = userId || userData.value?.id;
-
-      if (!targetUserId) {
-        return { error: new Error("No user ID provided") };
-      }
-
-      const { data: { user }, error } = await supabaseAdmin.auth.admin.getUserById(targetUserId);
-
-      if (error) {
-        return { error };
-      }
-
-      if (!user) {
-        return { error: new Error("User not found") };
-      }
-
-      return {
-        user: {
-          id: user.id,
-          email: user.email,
-          created_at: user.created_at,
-          user_metadata: user.user_metadata,
-          app_metadata: user.app_metadata,
-        }
-      };
-    } catch (error) {
-      console.error("Error fetching user:", error);
-      return { error };
-    } finally {
-      loading.value = false;
-    }
-  }
-
   // Get current authenticated user
   async function getCurrentUser() {
     loading.value = true;
@@ -243,18 +205,11 @@ export const useAuthUserStore = defineStore("authUser", () => {
         return { error: authError };
       }
 
-      // Get all students from the students table to merge additional info
-     /*  const { data: studentsData, error: studentsError } = await supabaseAdmin
-        .from("students")
-        .select("*"); */
 
-     /*  if (studentsError) {
-        console.warn("Could not fetch students data:", studentsError);
-      } */
 
       // Merge auth users with student data
       const allUsers = authData.users.map(user => {
-        //const studentInfo = studentsData?.find(student => student.user_id === user.id);
+
 
         return {
           id: user.id,
@@ -300,6 +255,7 @@ export const useAuthUserStore = defineStore("authUser", () => {
     signOut,
     initializeAuth,
     getCurrentUser,
+    getAllUsers,
   };
 });
 

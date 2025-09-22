@@ -8,6 +8,9 @@ import NotFound from '@/pages/NotFound.vue';
 import ForbiddenView from '@/pages/ForbiddenView.vue';
 
 import DashboardView from '@/pages/admin/DashboardView.vue';
+import ProfilesView from '@/pages/ProfilesView.vue';
+
+import UserManagement from '@/pages/admin/UserManagement.vue';
 // TODO: Add these components when they're created
 // import UserManagementView from '@/pages/admin/UserManagementView.vue';
 // import RolePagesView from '@/pages/admin/RolePagesView.vue';
@@ -34,6 +37,18 @@ const routes = setupLayouts([
     component: DashboardView,
     meta: { requiresAuth: true }
   },
+  {
+    path: '/profiles',
+    component: ProfilesView,
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/admin/users',
+    component: UserManagement,
+    meta: { requiresAuth: true }
+  },
+
+
   // TODO: Uncomment when components are created
   // {
   //   path: '/usermanagement',
