@@ -180,7 +180,7 @@ const handleLogout = async () => {
       <v-list-item class="pa-4">
         <v-list-item-content>
           <v-list-item-subtitle class="text-caption grey--text text-center">
-            LCO Management System v1.0
+           CSU LOST AND FOUND v1.0
           </v-list-item-subtitle>
         </v-list-item-content>
       </v-list-item>
