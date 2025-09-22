@@ -41,21 +41,12 @@ const isDark = computed(() => theme.global.current.value.dark)
       </v-container>
 
         <!-- Error State -->
-        <v-container
-          v-else-if="error"
-          class="d-flex justify-center align-center"
-          style="min-height: 50vh"
-        >
-          <v-alert
-            color="error"
-            icon="mdi-alert-circle"
-            type="error"
-            variant="tonal"
-          >
-            <v-alert-title>Failed to load content</v-alert-title>
-            {{ error }}
-          </v-alert>
-        </v-container>
+        <v-container v-else-if="error" class="d-flex justify-center align-center" style="min-height: 60vh;">
+        <v-alert color="error" variant="tonal" max-width="500">
+          <template #title>Something went wrong</template>
+          {{ error }}
+        </v-alert>
+      </v-container>
 
         <!-- Content -->
         <div v-else-if="data">
