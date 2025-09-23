@@ -81,83 +81,43 @@ const filteredItems = computed(() => {
 })
 
 const fetchDashboardStats = async () => {
-  loading.value = true
+  loading.value = true;
   try {
-    // Fetch items stats
+    // Fetch all items
     const { data: itemsData, error: itemsError } = await supabase
       .from('items')
       .select('*')
-      .order('created_at', { ascending: false })
+      .order('created_at', { ascending: false });
 
     if (itemsError) {
-      console.error('Error fetching items:', itemsError)
-      return
+      console.error('Error fetching items:', itemsError);
+      return;
     }
 
-    items.value = itemsData || []
+    // Ensure items is always an array
+    items.value = itemsData || [];
 
-    // Calculate stats from items data
-    const totalItems = itemsData?.length || 0
-    const lostItems = itemsData?.filter(item => item.status === 'lost').length || 0
-    const foundItems = itemsData?.filter(item => item.status === 'found').length || 0
-    const resolvedItems = itemsData?.filter(item => item.claimed_by !== null).length || 0
+    // Calculate stats
+    const totalItems = items.value.length;
+    const lostItems = items.value.filter(item => item.status === 'lost').length;
+    const foundItems = items.value.filter(item => item.status === 'found').length;
+    const resolvedItems = items.value.filter(item => item.claimed_by !== null).length; // Check if 'claimed_by' is not null
 
-    // Get current authenticated user count (approximate)
-    const { data: { session } } = await supabase.auth.getSession()
-    const currentUserCount = session ? 1 : 0 
-
-    // Fetch conversations count
-    const { count: conversationsCount, error: conversationsError } = await supabase
-      .from('conversations')
-      .select('*', { count: 'exact', head: true })
-
-    if (conversationsError) {
-      console.error('Error fetching conversations count:', conversationsError)
-    }
-
-    // Fetch messages count
-    const { count: messagesCount, error: messagesError } = await supabase
-      .from('messages')
-      .select('*', { count: 'exact', head: true })
-
-    if (messagesError) {
-      console.error('Error fetching messages count:', messagesError)
-    }
-
-    // Fetch recent activity - simplified without user joins
-    const { data: recentItems, error: recentError } = await supabase
-      .from('items')
-      .select('*')
-      .order('created_at', { ascending: false })
-      .limit(5)
-
-    if (recentError) {
-      console.error('Error fetching recent activity:', recentError)
-    }
-
-    stats.value.totalItems = totalItems
-    stats.value.lostItems = lostItems
-    stats.value.foundItems = foundItems
-    stats.value.resolvedItems = resolvedItems
-    stats.value.totalUsers = currentUserCount 
-    stats.value.totalConversations = conversationsCount || 0
-    stats.value.totalMessages = messagesCount || 0
-
-    stats.value.recentActivity = (recentItems || []).map((item: any) => ({
-      id: item.id.toString(),
-      type: item.claimed_by ? 'claimed' : item.status,
-      title: item.title,
-      user: 'User', 
-      timestamp: item.created_at,
-      status: item.claimed_by ? 'Claimed' : 'Active'
-    }))
+    // Update each field individually (keeps type-safe with DashboardStats)
+    stats.value.totalItems = totalItems;
+    stats.value.lostItems = lostItems;
+    stats.value.foundItems = foundItems;
+    stats.value.resolvedItems = resolvedItems;
 
   } catch (error) {
-    console.error('Error fetching dashboard data:', error)
+    console.error('Error fetching dashboard data:', error);
   } finally {
-    loading.value = false
+    loading.value = false;
   }
-}
+};
+
+
+
 
 const postMissingItem = async () => {
   if (!newItemForm.value.title || !newItemForm.value.description) {
@@ -222,16 +182,12 @@ const markAsClaimed = async (itemId: number) => {
   try {
     const { error } = await supabase
       .from('items')
-      .update({ claimed_by: 'claimed' }) // Mark the item as claimed with a generic value, like 'claimed'
+      .update({ status: 'claimed' })   // ✅ change status to claimed
       .eq('id', itemId);
 
-    if (error) {
-      throw error;
-    }
+    if (error) throw error;
 
-    // Refresh dashboard data to reflect changes
     await fetchDashboardStats();
-
   } catch (error) {
     console.error('Error marking item as claimed:', error);
     alert('Error updating item status');
@@ -240,26 +196,18 @@ const markAsClaimed = async (itemId: number) => {
   }
 };
 
-
-
-
-
 const markAsUnclaimed = async (itemId: number) => {
   updatingItems.value.add(itemId);
 
   try {
     const { error } = await supabase
       .from('items')
-      .update({ claimed: false })  // Mark as unclaimed with a boolean flag
+      .update({ status: 'lost' })   // ✅ revert back to lost
       .eq('id', itemId);
 
-    if (error) {
-      throw error;
-    }
+    if (error) throw error;
 
-    // Refresh dashboard data to reflect changes
     await fetchDashboardStats();
-
   } catch (error) {
     console.error('Error marking item as unclaimed:', error);
     alert('Error updating item status');
@@ -274,10 +222,9 @@ const getTotalUsersCount = async () => {
     const { data: items } = await supabase
       .from('items')
       .select('user_id')
-      .not('user_id', 'is', null) // Ensure the user_id is not null (only users who have interacted)
+      .not('user_id', 'is', null)
     
     if (items) {
-      // Filter and return the number of unique user_ids that have posted or interacted with items
       const uniqueActiveUserIds = new Set(items.map(item => item.user_id))
       return uniqueActiveUserIds.size
     }
@@ -288,7 +235,6 @@ const getTotalUsersCount = async () => {
     return 0
   }
 }
-
 
 const getActivityColor = (type: string) => {
   switch (type) {
@@ -485,27 +431,28 @@ onMounted(async () => {
                       <v-card-actions class="pt-0">
                         <v-spacer />
                         <v-btn
-                          v-if="!item.claimed_by"
-                          color="success"
-                          variant="flat"
-                          size="small"
-                          prepend-icon="mdi-check"
-                          @click="markAsClaimed(item.id)"
-                          :loading="updatingItems.has(item.id)"
-                        >
-                          Mark as Claimed
-                        </v-btn>
-                        <v-btn
-                          v-else
-                          color="warning"
-                          variant="outlined"
-                          size="small"
-                          prepend-icon="mdi-undo"
-                          @click="markAsUnclaimed(item.id)"
-                          :loading="updatingItems.has(item.id)"
-                        >
-                          Mark as Unclaimed
-                        </v-btn>
+  v-if="!item.claimed_by"
+  color="success"
+  variant="flat"
+  size="small"
+  prepend-icon="mdi-check"
+  @click="markAsClaimed(item.id)"
+  :loading="updatingItems.has(item.id)"
+>
+  Mark as Claimed
+</v-btn>
+<v-btn
+  v-else
+  color="warning"
+  variant="outlined"
+  size="small"
+  prepend-icon="mdi-undo"
+  @click="markAsUnclaimed(item.id)"
+  :loading="updatingItems.has(item.id)"
+>
+  Mark as Unclaimed
+</v-btn>
+
                       </v-card-actions>
                     </v-card>
                   </v-col>
