@@ -3,7 +3,7 @@ import { ref, onMounted, computed } from 'vue'
 import { createClient } from '@supabase/supabase-js'
 import InnerLayoutWrapper from '@/layouts/InnerLayoutWrapper.vue'
 import ItemCard from '@/pages/admin/components/ItemCard.vue'
-import '@/assets/styles/dashboardview.css'
+import '@/styles/dashboardview.css'
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
 const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY
@@ -75,7 +75,7 @@ const filteredItems = computed(() => {
   }
 
   const query = searchQuery.value.toLowerCase().trim()
-  return items.value.filter(item => 
+  return items.value.filter(item =>
     (item.title?.toLowerCase().includes(query)) ||
     (item.description?.toLowerCase().includes(query)) ||
     (item.status?.toLowerCase().includes(query))
@@ -149,19 +149,19 @@ const postMissingItem = async () => {
   }
 
   postingItem.value = true
-  
+
   try {
     // Get current user (if authenticated)
     const { data: { user } } = await supabase.auth.getUser()
-    
+
     const insertData = {
       title: newItemForm.value.title,
       description: newItemForm.value.description,
       status: newItemForm.value.status,
-      user_id: user?.id || null, 
+      user_id: user?.id || null,
       claimed_by: null
     }
-    
+
     const { data, error } = await supabase
       .from('items')
       .insert([insertData])
@@ -178,22 +178,22 @@ const postMissingItem = async () => {
       status: 'lost'
     }
     showPostDialog.value = false
-    
+
     // Refresh dashboard data
     await fetchDashboardStats()
-    
+
     console.log('Item posted successfully:', data)
-    
+
   } catch (error) {
     console.error('Error posting item:', error)
     let errorMessage = 'An unknown error occurred'
-    
+
     if (error && typeof error === 'object' && 'message' in error) {
       errorMessage = String(error.message)
     } else if (typeof error === 'string') {
       errorMessage = error
     }
-    
+
     alert(`Error posting item: ${errorMessage}`)
   } finally {
     postingItem.value = false
@@ -246,12 +246,12 @@ const getTotalUsersCount = async () => {
       .from('items')
       .select('user_id')
       .not('user_id', 'is', null)
-    
+
     if (items) {
       const uniqueActiveUserIds = new Set(items.map(item => item.user_id))
       return uniqueActiveUserIds.size
     }
-    
+
     return 0
   } catch (error) {
     console.error('Error getting active user count:', error)
@@ -283,11 +283,11 @@ const formatTimestamp = (timestamp: string) => {
   const date = new Date(timestamp)
   const now = new Date()
   const diff = now.getTime() - date.getTime()
-  
+
   const minutes = Math.floor(diff / 60000)
   const hours = Math.floor(diff / 3600000)
   const days = Math.floor(diff / 86400000)
-  
+
   if (minutes < 60) return `${minutes} minutes ago`
   if (hours < 24) return `${hours} hours ago`
   return `${days} days ago`
@@ -347,7 +347,7 @@ onMounted(async () => {
                 <div class="text-subtitle-1 text-grey-darken-1">Total Items</div>
               </v-card>
             </v-col>
-            
+
             <v-col cols="12" md="3" sm="6">
               <v-card class="pa-4 text-center stat-card" elevation="2">
                 <v-icon size="48" color="error" class="mb-2">mdi-alert-circle</v-icon>
@@ -355,7 +355,7 @@ onMounted(async () => {
                 <div class="text-subtitle-1 text-grey-darken-1">Lost Items</div>
               </v-card>
             </v-col>
-            
+
             <v-col cols="12" md="3" sm="6">
               <v-card class="pa-4 text-center stat-card" elevation="2">
                 <v-icon size="48" color="success" class="mb-2">mdi-check-circle</v-icon>
@@ -363,7 +363,7 @@ onMounted(async () => {
                 <div class="text-subtitle-1 text-grey-darken-1">Found Items</div>
               </v-card>
             </v-col>
-            
+
             <v-col cols="12" md="3" sm="6">
               <v-card class="pa-4 text-center stat-card" elevation="2">
                 <v-icon size="48" color="info" class="mb-2">mdi-handshake</v-icon>
@@ -491,15 +491,15 @@ onMounted(async () => {
                         <v-icon :icon="getActivityIcon(activity.type)" color="white" />
                       </v-avatar>
                     </template>
-                    
+
                     <v-list-item-title class="font-weight-medium">
                       {{ activity.title }}
                     </v-list-item-title>
                     <v-list-item-subtitle>
-                      {{ activity.type.charAt(0).toUpperCase() + activity.type.slice(1) }} 
+                      {{ activity.type.charAt(0).toUpperCase() + activity.type.slice(1) }}
                       by {{ activity.user }} • {{ activity.status }}
                     </v-list-item-subtitle>
-                    
+
                     <template #append>
                       <div class="text-caption text-grey-darken-1">
                         {{ formatTimestamp(activity.timestamp) }}
@@ -519,7 +519,7 @@ onMounted(async () => {
               <v-icon class="me-2">mdi-plus-circle</v-icon>
               Post Missing Item
             </v-card-title>
-            
+
             <v-card-text>
               <v-form @submit.prevent="postMissingItem">
                 <v-select
@@ -532,7 +532,7 @@ onMounted(async () => {
                   variant="outlined"
                   class="mb-3"
                 />
-                
+
                 <v-text-field
                   v-model="newItemForm.title"
                   label="Item Title"
@@ -541,7 +541,7 @@ onMounted(async () => {
                   placeholder="e.g., iPhone 13, Blue Backpack, Student ID"
                   class="mb-3"
                 />
-                
+
                 <v-textarea
                   v-model="newItemForm.description"
                   label="Item Description"
@@ -550,7 +550,7 @@ onMounted(async () => {
                   placeholder="Detailed description including color, brand, location found/lost, distinguishing features..."
                   rows="4"
                 />
-                
+
                 <v-alert
                   type="info"
                   variant="tonal"
@@ -563,11 +563,11 @@ onMounted(async () => {
                 </v-alert>
               </v-form>
             </v-card-text>
-            
+
             <v-card-actions>
               <v-spacer />
-              <v-btn 
-                variant="text" 
+              <v-btn
+                variant="text"
                 @click="showPostDialog = false"
                 :disabled="postingItem"
               >

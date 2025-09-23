@@ -5,7 +5,7 @@ import { useTheme } from 'vuetify'
 import OuterLayoutWrapper from '@/layouts/OuterLayoutWrapper.vue'
 
 // Import external CSS
-import '@/assets/styles/landing.css';
+import '@/styles/landing.css';
 
 const { data, loading, error, fetchLandingData } = useLandingController()
 const theme = useTheme()
