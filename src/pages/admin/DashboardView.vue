@@ -2,6 +2,7 @@
 import { ref, onMounted, computed } from 'vue'
 import { createClient } from '@supabase/supabase-js'
 import InnerLayoutWrapper from '@/layouts/InnerLayoutWrapper.vue'
+import '@/assets/styles/dashboardview.css'
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
 const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY
@@ -654,47 +655,3 @@ onMounted(async () => {
   </InnerLayoutWrapper>
 </template>
 
-<style scoped>
-.dashboard {
-  padding: 24px;
-  max-width: 1400px;
-  margin: 0 auto;
-}
-
-.stat-card {
-  transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
-}
-
-.stat-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0,0,0,0.15) !important;
-}
-
-.item-card {
-  transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
-  border-radius: 12px;
-}
-
-.item-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(0,0,0,0.15) !important;
-}
-
-.items-container {
-  max-height: 600px;
-  overflow-y: auto;
-  overflow-x: hidden;
-}
-
-.v-card {
-  border-radius: 12px;
-}
-
-.v-chip {
-  font-weight: 600;
-}
-
-.gap-2 {
-  gap: 8px;
-}
-</style>
