@@ -71,43 +71,57 @@ const filteredItems = computed(() => {
   if (!searchQuery.value.trim()) {
     return items.value
   }
-  
+
   const query = searchQuery.value.toLowerCase().trim()
   return items.value.filter(item => 
-    item.title.toLowerCase().includes(query) ||
-    item.description.toLowerCase().includes(query) ||
-    item.status.toLowerCase().includes(query)
+    (item.title?.toLowerCase().includes(query)) ||
+    (item.description?.toLowerCase().includes(query)) ||
+    (item.status?.toLowerCase().includes(query))
   )
 })
+
 
 const fetchDashboardStats = async () => {
   loading.value = true;
   try {
-    // Fetch all items
+    // Fetch items with user info (if you have a users table)
     const { data: itemsData, error: itemsError } = await supabase
-      .from('items')
-      .select('*')
-      .order('created_at', { ascending: false });
+  .from('items')
+  .select('id, title, description, status, claimed_by, user_id, created_at')
+  .order('created_at', { ascending: false })
+  .limit(10);
+
 
     if (itemsError) {
       console.error('Error fetching items:', itemsError);
       return;
     }
 
-    // Ensure items is always an array
     items.value = itemsData || [];
 
     // Calculate stats
     const totalItems = items.value.length;
     const lostItems = items.value.filter(item => item.status === 'lost').length;
-    const foundItems = items.value.filter(item => item.status === 'found').length;
-    const resolvedItems = items.value.filter(item => item.claimed_by !== null).length; // Check if 'claimed_by' is not null
+      const foundItems = items.value.filter(
+        item => item.status === 'found' || item.status === 'claimed'
+      ).length;
+      const resolvedItems = items.value.filter(item => item.status === 'claimed').length;
 
-    // Update each field individually (keeps type-safe with DashboardStats)
+    // Update stats
     stats.value.totalItems = totalItems;
     stats.value.lostItems = lostItems;
     stats.value.foundItems = foundItems;
     stats.value.resolvedItems = resolvedItems;
+
+    // ✅ Build recent activity list
+    stats.value.recentActivity = items.value.map(item => ({
+      id: String(item.id),
+      type: item.status === 'found' ? 'resolved' : item.status,
+      title: item.title,
+      user: item.user_id || 'Unknown User',
+      timestamp: item.created_at,
+      status: item.status === 'found' ? 'Claimed' : item.status
+    }));
 
   } catch (error) {
     console.error('Error fetching dashboard data:', error);
@@ -115,9 +129,6 @@ const fetchDashboardStats = async () => {
     loading.value = false;
   }
 };
-
-
-
 
 const postMissingItem = async () => {
   if (!newItemForm.value.title || !newItemForm.value.description) {
