@@ -7,14 +7,14 @@ import { useToast } from 'vue-toastification'
 export type RolePage = {
   id: number
   created_at: string
-  role_id: number | null
-  pages: string | null
+  role_id: number
+  pages: string
 }
 
 export type RolePageWithRole = RolePage & {
   roles?: {
     id: number
-    title: string | null
+    title: string
   }
 }
 

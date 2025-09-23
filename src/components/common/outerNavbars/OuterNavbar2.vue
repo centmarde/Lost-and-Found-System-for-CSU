@@ -7,7 +7,7 @@ import { useDisplay } from 'vuetify'
 import './CSS/outerNavbar2.css'
 
 interface Props {
-  config?: UIConfig | null
+  config?: UIConfig
 }
 
 const props = defineProps<Props>()

@@ -9,7 +9,7 @@ interface Props {
   isDialogOpen: boolean
   isDeleteDialogOpen: boolean
   isEditing: boolean
-  selectedRole: Role | null
+  selectedRole: Role | undefined
   formData: CreateRoleData
   loading: boolean
 
@@ -226,7 +226,7 @@ const handleDelete = () => {
                       <template #prepend>
                         <v-checkbox
                           :model-value="child.selected"
-                          @update:model-value="(value: boolean | null) => togglePermission(child.permission || child.route, !!value)"
+                          @update:model-value="(value: boolean | null) => togglePermission(child.permission || child.route, value ?? false)"
                           hide-details
                           density="compact"
                           class="mr-2"

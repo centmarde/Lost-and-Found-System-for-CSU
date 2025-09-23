@@ -10,7 +10,7 @@
         {{ getItemStatusText(item) }}
       </v-chip>
     </v-card-title>
-    
+
     <v-card-text>
       <p class="text-body-2 mb-3">{{ item.description }}</p>
       <div class="d-flex align-center text-caption text-grey-darken-1">
@@ -18,7 +18,7 @@
         {{ formatDate(item.created_at) }}
       </div>
     </v-card-text>
-    
+
     <v-card-actions class="pt-0">
       <v-spacer />
       <v-btn
@@ -53,8 +53,8 @@ interface Item {
   title: string
   description: string
   status: 'lost' | 'found'
-  user_id: string | null
-  claimed_by: string | null
+  user_id: string
+  claimed_by: string
   created_at: string
 }
 

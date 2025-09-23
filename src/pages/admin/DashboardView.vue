@@ -14,8 +14,8 @@ interface Item {
   title: string
   description: string
   status: 'lost' | 'found'
-  user_id: string | null
-  claimed_by: string | null
+  user_id: string
+  claimed_by: string
   created_at: string
 }
 

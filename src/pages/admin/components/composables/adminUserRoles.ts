@@ -13,7 +13,7 @@ export function useAdminUserRoles() {
   const isDialogOpen = ref(false)
   const isDeleteDialogOpen = ref(false)
   const isEditing = ref(false)
-  const selectedRole = ref<Role | null>(null)
+  const selectedRole = ref<Role | undefined>(undefined)
   const searchQuery = ref('')
 
   // Form data
@@ -37,7 +37,7 @@ export function useAdminUserRoles() {
   // Actions
   const openCreateDialog = () => {
     isEditing.value = false
-    selectedRole.value = null
+    selectedRole.value = undefined
     formData.value = { title: '' }
     isDialogOpen.value = true
   }
@@ -58,7 +58,7 @@ export function useAdminUserRoles() {
   const closeDialog = () => {
     isDialogOpen.value = false
     isDeleteDialogOpen.value = false
-    selectedRole.value = null
+    selectedRole.value = undefined
     formData.value = { title: '' }
     userRolesStore.clearError()
   }
@@ -67,7 +67,7 @@ export function useAdminUserRoles() {
     if (!isFormValid.value) return
 
     let success = false
-    let targetRoleId: number | null = null
+    let targetRoleId: number | undefined = undefined
     const hasPermissions = selectedPermissions.length > 0
 
     if (isEditing.value && selectedRole.value) {
@@ -80,7 +80,7 @@ export function useAdminUserRoles() {
       // Create new role (silent if permissions are being saved)
       const createdRole = await userRolesStore.createRole(formData.value, hasPermissions)
       success = !!createdRole
-      targetRoleId = createdRole?.id || null
+      targetRoleId = createdRole?.id
     }
 
     // If role operation was successful and we have a role ID, save permissions
