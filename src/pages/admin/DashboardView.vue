@@ -222,7 +222,7 @@ const markAsClaimed = async (itemId: number) => {
   try {
     const { error } = await supabase
       .from('items')
-      .update({ claimed_at: new Date().toISOString() })  // Mark the item as claimed with timestamp
+      .update({ claimed_by: 'claimed' }) // Mark the item as claimed with a generic value, like 'claimed'
       .eq('id', itemId);
 
     if (error) {
@@ -239,6 +239,7 @@ const markAsClaimed = async (itemId: number) => {
     updatingItems.value.delete(itemId);
   }
 };
+
 
 
 
@@ -632,7 +633,6 @@ onMounted(async () => {
                   v-model="newItemForm.status"
                   :items="[
                     { title: 'Lost Item', value: 'lost' },
-                    { title: 'Found Item', value: 'found' }
                   ]"
                   label="Item Type"
                   prepend-inner-icon="mdi-tag"
