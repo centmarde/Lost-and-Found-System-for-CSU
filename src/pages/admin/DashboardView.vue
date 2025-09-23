@@ -528,20 +528,7 @@ onMounted(async () => {
               </v-card>
 
               <!-- Admin Note -->
-              <v-card class="pa-4" elevation="2">
-                <v-card-title class="text-h6 font-weight-bold mb-3">
-                  <v-icon class="me-2">mdi-chat</v-icon>
-                  Realtime Chat System
-                </v-card-title>
-                <v-card-text class="pa-0">
-                  <p class="text-body-2 mb-2">
-                    Students can start realtime chats to prove ownership of items.
-                  </p>
-                  <p class="text-body-2 text-grey-darken-1">
-                    They describe item details for verification before claiming.
-                  </p>
-                </v-card-text>
-              </v-card>
+              
             </v-col>
           </v-row>
 
