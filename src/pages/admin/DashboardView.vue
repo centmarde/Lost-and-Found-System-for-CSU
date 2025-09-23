@@ -84,13 +84,11 @@ const filteredItems = computed(() => {
 const fetchDashboardStats = async () => {
   loading.value = true;
   try {
-    // Fetch items with user info (if you have a users table)
+    // Fetch items (remove .limit first so we don’t miss data)
     const { data: itemsData, error: itemsError } = await supabase
-  .from('items')
-  .select('id, title, description, status, claimed_by, user_id, created_at')
-  .order('created_at', { ascending: false })
-  .limit(10);
-
+      .from('items')
+      .select('id, title, description, status, claimed_by, user_id, created_at')
+      .order('created_at', { ascending: false });
 
     if (itemsError) {
       console.error('Error fetching items:', itemsError);
@@ -102,10 +100,17 @@ const fetchDashboardStats = async () => {
     // Calculate stats
     const totalItems = items.value.length;
     const lostItems = items.value.filter(item => item.status === 'lost').length;
-      const foundItems = items.value.filter(
-        item => item.status === 'found' || item.status === 'claimed'
-      ).length;
-      const resolvedItems = items.value.filter(item => item.status === 'claimed').length;
+
+    // ✅ Found = all items marked as found
+    const foundItems = items.value.filter(item => item.status === 'found').length;
+
+    // ✅ Resolved = found + claimed_by not null/empty
+    const resolvedItems = items.value.filter(
+      item =>
+        item.status === 'found' &&
+        item.claimed_by !== null &&
+        item.claimed_by !== ''
+    ).length;
 
     // Update stats
     stats.value.totalItems = totalItems;
@@ -116,19 +121,27 @@ const fetchDashboardStats = async () => {
     // ✅ Build recent activity list
     stats.value.recentActivity = items.value.map(item => ({
       id: String(item.id),
-      type: item.status === 'found' ? 'resolved' : item.status,
+      type:
+        item.status === 'lost'
+          ? 'lost'
+          : item.claimed_by !== null && item.claimed_by !== ''
+          ? 'resolved'
+          : 'found',
       title: item.title,
       user: item.user_id || 'Unknown User',
       timestamp: item.created_at,
-      status: item.status === 'found' ? 'Claimed' : item.status
+      status:
+        item.claimed_by !== null && item.claimed_by !== ''
+          ? 'Claimed'
+          : item.status,
     }));
-
   } catch (error) {
     console.error('Error fetching dashboard data:', error);
   } finally {
     loading.value = false;
   }
 };
+
 
 const postMissingItem = async () => {
   if (!newItemForm.value.title || !newItemForm.value.description) {
