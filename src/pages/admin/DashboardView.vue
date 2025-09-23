@@ -1,11 +1,21 @@
 <script lang="ts" setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { createClient } from '@supabase/supabase-js'
 import InnerLayoutWrapper from '@/layouts/InnerLayoutWrapper.vue'
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
 const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY
 const supabase = createClient(supabaseUrl, supabaseKey)
+
+interface Item {
+  id: number
+  title: string
+  description: string
+  status: 'lost' | 'found'
+  user_id: string | null
+  claimed_by: string | null
+  created_at: string
+}
 
 interface DashboardStats {
   totalItems: number
@@ -34,6 +44,8 @@ interface NewItemForm {
 const loading = ref(true)
 const postingItem = ref(false)
 const showPostDialog = ref(false)
+const searchQuery = ref('')
+const updatingItems = ref<Set<number>>(new Set())
 
 const stats = ref<DashboardStats>({
   totalItems: 0,
@@ -46,36 +58,53 @@ const stats = ref<DashboardStats>({
   recentActivity: []
 })
 
+const items = ref<Item[]>([])
+
 const newItemForm = ref<NewItemForm>({
   title: '',
   description: '',
   status: 'lost'
 })
 
+// Computed property for filtered items based on search
+const filteredItems = computed(() => {
+  if (!searchQuery.value.trim()) {
+    return items.value
+  }
+  
+  const query = searchQuery.value.toLowerCase().trim()
+  return items.value.filter(item => 
+    item.title.toLowerCase().includes(query) ||
+    item.description.toLowerCase().includes(query) ||
+    item.status.toLowerCase().includes(query)
+  )
+})
+
 const fetchDashboardStats = async () => {
   loading.value = true
   try {
     // Fetch items stats
-    const { data: items, error: itemsError } = await supabase
+    const { data: itemsData, error: itemsError } = await supabase
       .from('items')
       .select('*')
+      .order('created_at', { ascending: false })
 
     if (itemsError) {
       console.error('Error fetching items:', itemsError)
       return
     }
 
+    items.value = itemsData || []
+
     // Calculate stats from items data
-    const totalItems = items?.length || 0
-    const lostItems = items?.filter(item => item.status === 'lost').length || 0
-    const foundItems = items?.filter(item => item.status === 'found').length || 0
-    const resolvedItems = items?.filter(item => item.claimed_by !== null).length || 0
+    const totalItems = itemsData?.length || 0
+    const lostItems = itemsData?.filter(item => item.status === 'lost').length || 0
+    const foundItems = itemsData?.filter(item => item.status === 'found').length || 0
+    const resolvedItems = itemsData?.filter(item => item.claimed_by !== null).length || 0
 
     // Get current authenticated user count (approximate)
     const { data: { session } } = await supabase.auth.getSession()
     const currentUserCount = session ? 1 : 0 
-
-   
 
     // Fetch conversations count
     const { count: conversationsCount, error: conversationsError } = await supabase
@@ -114,7 +143,6 @@ const fetchDashboardStats = async () => {
     stats.value.totalConversations = conversationsCount || 0
     stats.value.totalMessages = messagesCount || 0
 
-   
     stats.value.recentActivity = (recentItems || []).map((item: any) => ({
       id: item.id.toString(),
       type: item.claimed_by ? 'claimed' : item.status,
@@ -188,24 +216,78 @@ const postMissingItem = async () => {
   }
 }
 
+const markAsClaimed = async (itemId: number) => {
+  updatingItems.value.add(itemId);
+
+  try {
+    const { error } = await supabase
+      .from('items')
+      .update({ claimed_at: new Date().toISOString() })  // Mark the item as claimed with timestamp
+      .eq('id', itemId);
+
+    if (error) {
+      throw error;
+    }
+
+    // Refresh dashboard data to reflect changes
+    await fetchDashboardStats();
+
+  } catch (error) {
+    console.error('Error marking item as claimed:', error);
+    alert('Error updating item status');
+  } finally {
+    updatingItems.value.delete(itemId);
+  }
+};
+
+
+
+
+const markAsUnclaimed = async (itemId: number) => {
+  updatingItems.value.add(itemId);
+
+  try {
+    const { error } = await supabase
+      .from('items')
+      .update({ claimed: false })  // Mark as unclaimed with a boolean flag
+      .eq('id', itemId);
+
+    if (error) {
+      throw error;
+    }
+
+    // Refresh dashboard data to reflect changes
+    await fetchDashboardStats();
+
+  } catch (error) {
+    console.error('Error marking item as unclaimed:', error);
+    alert('Error updating item status');
+  } finally {
+    updatingItems.value.delete(itemId);
+  }
+};
+
 
 const getTotalUsersCount = async () => {
   try {
     const { data: items } = await supabase
       .from('items')
       .select('user_id')
+      .not('user_id', 'is', null) // Ensure the user_id is not null (only users who have interacted)
     
     if (items) {
-      const uniqueUserIds = new Set(items.filter(item => item.user_id).map(item => item.user_id))
-      return uniqueUserIds.size
+      // Filter and return the number of unique user_ids that have posted or interacted with items
+      const uniqueActiveUserIds = new Set(items.map(item => item.user_id))
+      return uniqueActiveUserIds.size
     }
     
     return 0
   } catch (error) {
-    console.error('Error getting user count:', error)
+    console.error('Error getting active user count:', error)
     return 0
   }
 }
+
 
 const getActivityColor = (type: string) => {
   switch (type) {
@@ -227,6 +309,16 @@ const getActivityIcon = (type: string) => {
   }
 }
 
+const getItemStatusColor = (item: Item) => {
+  if (item.claimed_by) return 'success'
+  return item.status === 'lost' ? 'error' : 'info'
+}
+
+const getItemStatusText = (item: Item) => {
+  if (item.claimed_by) return 'Claimed'
+  return item.status === 'lost' ? 'Lost' : 'Found'
+}
+
 const formatTimestamp = (timestamp: string) => {
   const date = new Date(timestamp)
   const now = new Date()
@@ -239,6 +331,16 @@ const formatTimestamp = (timestamp: string) => {
   if (minutes < 60) return `${minutes} minutes ago`
   if (hours < 24) return `${hours} hours ago`
   return `${days} days ago`
+}
+
+const formatDate = (timestamp: string) => {
+  return new Date(timestamp).toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  })
 }
 
 onMounted(async () => {
@@ -322,11 +424,136 @@ onMounted(async () => {
           </v-row>
 
           <v-row>
-            
+            <!-- Search and Items Section -->
+            <v-col cols="12" lg="8">
+              <!-- Search Bar -->
+              <v-card class="pa-4 mb-4" elevation="2">
+                <v-text-field
+                  v-model="searchQuery"
+                  label="Search Items"
+                  prepend-inner-icon="mdi-magnify"
+                  variant="outlined"
+                  placeholder="Search by title, description, or status..."
+                  clearable
+                  hide-details
+                />
+              </v-card>
 
-            <!-- System Stats -->
+              <!-- Items Cards -->
+              <div class="items-container">
+                <div v-if="filteredItems.length === 0" class="text-center py-8">
+                  <v-icon size="64" color="grey-lighten-1">
+                    {{ searchQuery ? 'mdi-magnify' : 'mdi-inbox' }}
+                  </v-icon>
+                  <div class="text-h6 text-grey-darken-1 mt-2">
+                    {{ searchQuery ? 'No items found' : 'No items posted yet' }}
+                  </div>
+                  <div class="text-body-2 text-grey-darken-1">
+                    {{ searchQuery ? 'Try adjusting your search terms' : 'Posted items will appear here' }}
+                  </div>
+                </div>
+
+                <v-row v-else>
+                  <v-col
+                    v-for="item in filteredItems"
+                    :key="item.id"
+                    cols="12"
+                    md="6"
+                    class="mb-3"
+                  >
+                    <v-card class="item-card h-100" elevation="2">
+                      <v-card-title class="d-flex justify-space-between align-start">
+                        <div class="text-h6 font-weight-bold">{{ item.title }}</div>
+                        <v-chip
+                          :color="getItemStatusColor(item)"
+                          size="small"
+                          variant="flat"
+                        >
+                          {{ getItemStatusText(item) }}
+                        </v-chip>
+                      </v-card-title>
+                      
+                      <v-card-text>
+                        <p class="text-body-2 mb-3">{{ item.description }}</p>
+                        <div class="d-flex align-center text-caption text-grey-darken-1">
+                          <v-icon size="16" class="me-1">mdi-clock-outline</v-icon>
+                          {{ formatDate(item.created_at) }}
+                        </div>
+                      </v-card-text>
+                      
+                      <v-card-actions class="pt-0">
+                        <v-spacer />
+                        <v-btn
+                          v-if="!item.claimed_by"
+                          color="success"
+                          variant="flat"
+                          size="small"
+                          prepend-icon="mdi-check"
+                          @click="markAsClaimed(item.id)"
+                          :loading="updatingItems.has(item.id)"
+                        >
+                          Mark as Claimed
+                        </v-btn>
+                        <v-btn
+                          v-else
+                          color="warning"
+                          variant="outlined"
+                          size="small"
+                          prepend-icon="mdi-undo"
+                          @click="markAsUnclaimed(item.id)"
+                          :loading="updatingItems.has(item.id)"
+                        >
+                          Mark as Unclaimed
+                        </v-btn>
+                      </v-card-actions>
+                    </v-card>
+                  </v-col>
+                </v-row>
+              </div>
+            </v-col>
+
+            <!-- Quick Stats and Info -->
             <v-col cols="12" lg="4">
-              
+              <!-- Quick Summary -->
+              <v-card class="pa-4 mb-4" elevation="2">
+                <v-card-title class="text-h6 font-weight-bold mb-4">
+                  <v-icon class="me-2">mdi-chart-donut</v-icon>
+                  Quick Summary
+                </v-card-title>
+                <div class="d-flex justify-center align-center mb-4">
+                  <v-progress-circular
+                    :model-value="stats.totalItems > 0 ? (stats.resolvedItems / stats.totalItems) * 100 : 0"
+                    size="120"
+                    width="12"
+                    color="success"
+                  >
+                    <span class="text-h5 font-weight-bold">
+                      {{ stats.totalItems > 0 ? Math.round((stats.resolvedItems / stats.totalItems) * 100) : 0 }}%
+                    </span>
+                  </v-progress-circular>
+                </div>
+                <div class="text-center text-subtitle-2 text-grey-darken-1">Resolution Rate</div>
+              </v-card>
+
+              <!-- System Stats -->
+              <v-card class="pa-4 mb-4" elevation="2">
+                <v-card-title class="text-h6 font-weight-bold mb-4">
+                  <v-icon class="me-2">mdi-database</v-icon>
+                  System Stats
+                </v-card-title>
+                <div class="d-flex justify-space-between align-center mb-3">
+                  <span class="text-body-1">Active Users</span>
+                  <v-chip color="primary" variant="flat">{{ stats.totalUsers }}</v-chip>
+                </div>
+                <div class="d-flex justify-space-between align-center mb-3">
+                  <span class="text-body-1">Conversations</span>
+                  <v-chip color="secondary" variant="flat">{{ stats.totalConversations }}</v-chip>
+                </div>
+                <div class="d-flex justify-space-between align-center">
+                  <span class="text-body-1">Messages</span>
+                  <v-chip color="info" variant="flat">{{ stats.totalMessages }}</v-chip>
+                </div>
+              </v-card>
 
               <!-- Admin Note -->
               <v-card class="pa-4" elevation="2">
@@ -483,6 +710,21 @@ onMounted(async () => {
 .stat-card:hover {
   transform: translateY(-2px);
   box-shadow: 0 4px 12px rgba(0,0,0,0.15) !important;
+}
+
+.item-card {
+  transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+  border-radius: 12px;
+}
+
+.item-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(0,0,0,0.15) !important;
+}
+
+.items-container {
+  max-height: 600px;
+  overflow-y: auto;
 }
 
 .v-card {
