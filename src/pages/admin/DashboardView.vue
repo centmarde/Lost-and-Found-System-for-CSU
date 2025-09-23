@@ -1,6 +1,11 @@
 <script lang="ts" setup>
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted } from 'vue'
+import { createClient } from '@supabase/supabase-js'
 import InnerLayoutWrapper from '@/layouts/InnerLayoutWrapper.vue'
+
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
+const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY
+const supabase = createClient(supabaseUrl, supabaseKey)
 
 interface DashboardStats {
   totalItems: number
@@ -47,62 +52,82 @@ const newItemForm = ref<NewItemForm>({
   status: 'lost'
 })
 
-const formRules = {
-  title: [(v: string) => !!v || 'Item title is required'],
-  description: [(v: string) => !!v || 'Item description is required']
-}
-
-// API functions - replace these with your actual API calls
 const fetchDashboardStats = async () => {
+  loading.value = true
   try {
-    // Replace with actual API endpoint
-    // const response = await fetch('/api/admin/dashboard-stats')
-    // const data = await response.json()
-    
-    // For now, fetch from your actual endpoints
-    const [itemsRes, usersRes, conversationsRes, messagesRes] = await Promise.all([
-      // fetch('/api/items/stats'),
-      // fetch('/api/users/count'),
-      // fetch('/api/conversations/count'),
-      // fetch('/api/messages/count')
-      
-      // Simulated API calls - replace with actual ones
-      new Promise(resolve => setTimeout(() => resolve({ 
-        total: 0, lost: 0, found: 0, resolved: 0 
-      }), 500)),
-      new Promise(resolve => setTimeout(() => resolve({ count: 0 }), 500)),
-      new Promise(resolve => setTimeout(() => resolve({ count: 0 }), 500)),
-      new Promise(resolve => setTimeout(() => resolve({ count: 0 }), 500))
-    ])
-    
-    // Process actual API responses here
-    // For demo purposes, using sample data
-    stats.value = {
-      totalItems: 0, // itemsRes.total
-      lostItems: 0,  // itemsRes.lost
-      foundItems: 0, // itemsRes.found
-      resolvedItems: 0, // itemsRes.resolved
-      totalUsers: 0, // usersRes.count
-      totalConversations: 0, // conversationsRes.count
-      totalMessages: 0, // messagesRes.count
-      recentActivity: [] // await fetchRecentActivity()
+    // Fetch items stats
+    const { data: items, error: itemsError } = await supabase
+      .from('items')
+      .select('*')
+
+    if (itemsError) {
+      console.error('Error fetching items:', itemsError)
+      return
     }
+
+    // Calculate stats from items data
+    const totalItems = items?.length || 0
+    const lostItems = items?.filter(item => item.status === 'lost').length || 0
+    const foundItems = items?.filter(item => item.status === 'found').length || 0
+    const resolvedItems = items?.filter(item => item.claimed_by !== null).length || 0
+
+    // Get current authenticated user count (approximate)
+    const { data: { session } } = await supabase.auth.getSession()
+    const currentUserCount = session ? 1 : 0 
+
+   
+
+    // Fetch conversations count
+    const { count: conversationsCount, error: conversationsError } = await supabase
+      .from('conversations')
+      .select('*', { count: 'exact', head: true })
+
+    if (conversationsError) {
+      console.error('Error fetching conversations count:', conversationsError)
+    }
+
+    // Fetch messages count
+    const { count: messagesCount, error: messagesError } = await supabase
+      .from('messages')
+      .select('*', { count: 'exact', head: true })
+
+    if (messagesError) {
+      console.error('Error fetching messages count:', messagesError)
+    }
+
+    // Fetch recent activity - simplified without user joins
+    const { data: recentItems, error: recentError } = await supabase
+      .from('items')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(5)
+
+    if (recentError) {
+      console.error('Error fetching recent activity:', recentError)
+    }
+
+    stats.value.totalItems = totalItems
+    stats.value.lostItems = lostItems
+    stats.value.foundItems = foundItems
+    stats.value.resolvedItems = resolvedItems
+    stats.value.totalUsers = currentUserCount 
+    stats.value.totalConversations = conversationsCount || 0
+    stats.value.totalMessages = messagesCount || 0
+
+   
+    stats.value.recentActivity = (recentItems || []).map((item: any) => ({
+      id: item.id.toString(),
+      type: item.claimed_by ? 'claimed' : item.status,
+      title: item.title,
+      user: 'User', 
+      timestamp: item.created_at,
+      status: item.claimed_by ? 'Claimed' : 'Active'
+    }))
+
   } catch (error) {
     console.error('Error fetching dashboard data:', error)
   } finally {
     loading.value = false
-  }
-}
-
-const fetchRecentActivity = async () => {
-  try {
-    // Replace with actual API endpoint
-    // const response = await fetch('/api/items/recent-activity?limit=5')
-    // return await response.json()
-    return []
-  } catch (error) {
-    console.error('Error fetching recent activity:', error)
-    return []
   }
 }
 
@@ -114,43 +139,71 @@ const postMissingItem = async () => {
   postingItem.value = true
   
   try {
-    // Replace with actual API endpoint
-    const response = await fetch('/api/items', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${localStorage.getItem('admin_token')}` // or however you handle auth
-      },
-      body: JSON.stringify({
-        title: newItemForm.value.title,
-        description: newItemForm.value.description,
-        status: newItemForm.value.status,
-        user_id: null, // Posted by admin
-        created_at: new Date().toISOString()
-      })
-    })
-
-    if (response.ok) {
-      // Reset form
-      newItemForm.value = {
-        title: '',
-        description: '',
-        status: 'lost'
-      }
-      showPostDialog.value = false
-      
-      // Refresh dashboard data
-      await fetchDashboardStats()
-      
-      // Show success message
-      console.log('Item posted successfully')
-    } else {
-      throw new Error('Failed to post item')
+    // Get current user (if authenticated)
+    const { data: { user } } = await supabase.auth.getUser()
+    
+    const insertData = {
+      title: newItemForm.value.title,
+      description: newItemForm.value.description,
+      status: newItemForm.value.status,
+      user_id: user?.id || null, 
+      claimed_by: null
     }
+    
+    const { data, error } = await supabase
+      .from('items')
+      .insert([insertData])
+      .select()
+
+    if (error) {
+      throw error
+    }
+
+    // Reset form
+    newItemForm.value = {
+      title: '',
+      description: '',
+      status: 'lost'
+    }
+    showPostDialog.value = false
+    
+    // Refresh dashboard data
+    await fetchDashboardStats()
+    
+    console.log('Item posted successfully:', data)
+    
   } catch (error) {
     console.error('Error posting item:', error)
+    let errorMessage = 'An unknown error occurred'
+    
+    if (error && typeof error === 'object' && 'message' in error) {
+      errorMessage = String(error.message)
+    } else if (typeof error === 'string') {
+      errorMessage = error
+    }
+    
+    alert(`Error posting item: ${errorMessage}`)
   } finally {
     postingItem.value = false
+  }
+}
+
+
+const getTotalUsersCount = async () => {
+  try {
+    const { data: items } = await supabase
+      .from('items')
+      .select('user_id')
+    
+    if (items) {
+      const uniqueUserIds = new Set(items.filter(item => item.user_id).map(item => item.user_id))
+      return uniqueUserIds.size
+    }
+    
+    return 0
+  } catch (error) {
+    console.error('Error getting user count:', error)
+    return 0
   }
 }
 
@@ -175,7 +228,6 @@ const getActivityIcon = (type: string) => {
 }
 
 const formatTimestamp = (timestamp: string) => {
-  // Format timestamp to relative time
   const date = new Date(timestamp)
   const now = new Date()
   const diff = now.getTime() - date.getTime()
@@ -189,8 +241,11 @@ const formatTimestamp = (timestamp: string) => {
   return `${days} days ago`
 }
 
-onMounted(() => {
-  fetchDashboardStats()
+onMounted(async () => {
+  await fetchDashboardStats()
+  // Get more accurate user count
+  const userCount = await getTotalUsersCount()
+  stats.value.totalUsers = userCount
 })
 </script>
 
@@ -200,7 +255,7 @@ onMounted(() => {
       <div class="dashboard">
         <div class="d-flex justify-space-between align-center mb-6">
           <h1 class="text-h4 font-weight-bold text-primary">
-            University Lost & Found Dashboard
+            CSU Lost & Found Dashboard
           </h1>
           <div class="d-flex gap-2">
             <v-btn
@@ -267,65 +322,24 @@ onMounted(() => {
           </v-row>
 
           <v-row>
-            <!-- Chart Section -->
-            <v-col cols="12" lg="8">
-              <v-card class="pa-4" elevation="2">
-                <v-card-title class="text-h6 font-weight-bold mb-4">
-                  <v-icon class="me-2">mdi-chart-pie</v-icon>
-                  Items Overview
-                </v-card-title>
-                <div class="d-flex justify-center align-center" style="height: 300px;">
-                  <div class="text-center">
-                    <v-progress-circular
-                      :model-value="stats.totalItems > 0 ? (stats.resolvedItems / stats.totalItems) * 100 : 0"
-                      size="200"
-                      width="20"
-                      color="success"
-                      class="mb-4"
-                    >
-                      <span class="text-h4 font-weight-bold">
-                        {{ stats.totalItems > 0 ? Math.round((stats.resolvedItems / stats.totalItems) * 100) : 0 }}%
-                      </span>
-                    </v-progress-circular>
-                    <div class="text-subtitle-1 text-grey-darken-1">Resolution Rate</div>
-                  </div>
-                </div>
-              </v-card>
-            </v-col>
+            
 
             <!-- System Stats -->
             <v-col cols="12" lg="4">
-              <v-card class="pa-4 mb-4" elevation="2">
-                <v-card-title class="text-h6 font-weight-bold mb-4">
-                  <v-icon class="me-2">mdi-database</v-icon>
-                  System Stats
-                </v-card-title>
-                <div class="d-flex justify-space-between align-center mb-3">
-                  <span class="text-body-1">Active Users</span>
-                  <v-chip color="primary" variant="flat">{{ stats.totalUsers }}</v-chip>
-                </div>
-                <div class="d-flex justify-space-between align-center mb-3">
-                  <span class="text-body-1">Conversations</span>
-                  <v-chip color="secondary" variant="flat">{{ stats.totalConversations }}</v-chip>
-                </div>
-                <div class="d-flex justify-space-between align-center">
-                  <span class="text-body-1">Messages</span>
-                  <v-chip color="info" variant="flat">{{ stats.totalMessages }}</v-chip>
-                </div>
-              </v-card>
+              
 
               <!-- Admin Note -->
               <v-card class="pa-4" elevation="2">
                 <v-card-title class="text-h6 font-weight-bold mb-3">
-                  <v-icon class="me-2">mdi-information</v-icon>
-                  Admin Process
+                  <v-icon class="me-2">mdi-chat</v-icon>
+                  Realtime Chat System
                 </v-card-title>
                 <v-card-text class="pa-0">
                   <p class="text-body-2 mb-2">
-                    When posting missing items, users can start a realtime chat for ownership verification.
+                    Students can start realtime chats to prove ownership of items.
                   </p>
                   <p class="text-body-2 text-grey-darken-1">
-                    They will describe the item details to verify ownership before claiming.
+                    They describe item details for verification before claiming.
                   </p>
                 </v-card-text>
               </v-card>
@@ -362,7 +376,7 @@ onMounted(() => {
                     </v-list-item-title>
                     <v-list-item-subtitle>
                       {{ activity.type.charAt(0).toUpperCase() + activity.type.slice(1) }} 
-                      {{ activity.user ? `by ${activity.user}` : 'by Admin' }} • {{ activity.status }}
+                      by {{ activity.user }} • {{ activity.status }}
                     </v-list-item-subtitle>
                     
                     <template #append>
@@ -402,7 +416,6 @@ onMounted(() => {
                 <v-text-field
                   v-model="newItemForm.title"
                   label="Item Title"
-                  :rules="formRules.title"
                   prepend-inner-icon="mdi-text"
                   variant="outlined"
                   placeholder="e.g., iPhone 13, Blue Backpack, Student ID"
@@ -412,7 +425,6 @@ onMounted(() => {
                 <v-textarea
                   v-model="newItemForm.description"
                   label="Item Description"
-                  :rules="formRules.description"
                   prepend-inner-icon="mdi-text-long"
                   variant="outlined"
                   placeholder="Detailed description including color, brand, location found/lost, distinguishing features..."
@@ -425,9 +437,9 @@ onMounted(() => {
                   class="mt-3"
                 >
                   <template #prepend>
-                    <v-icon>mdi-information</v-icon>
+                    <v-icon>mdi-chat</v-icon>
                   </template>
-                  Users will be able to start a realtime chat to describe this item for ownership verification.
+                  Students can start a realtime chat to describe this item for ownership verification.
                 </v-alert>
               </v-form>
             </v-card-text>
