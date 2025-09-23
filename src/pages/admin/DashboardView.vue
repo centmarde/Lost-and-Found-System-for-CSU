@@ -2,6 +2,7 @@
 import { ref, onMounted, computed } from 'vue'
 import { createClient } from '@supabase/supabase-js'
 import InnerLayoutWrapper from '@/layouts/InnerLayoutWrapper.vue'
+import ItemCard from '@/pages/admin/components/ItemCard.vue'
 import '@/assets/styles/dashboardview.css'
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
@@ -81,11 +82,10 @@ const filteredItems = computed(() => {
   )
 })
 
-
 const fetchDashboardStats = async () => {
   loading.value = true;
   try {
-    // Fetch items (remove .limit first so we don’t miss data)
+    // Fetch items (remove .limit first so we don't miss data)
     const { data: itemsData, error: itemsError } = await supabase
       .from('items')
       .select('id, title, description, status, claimed_by, user_id, created_at')
@@ -142,7 +142,6 @@ const fetchDashboardStats = async () => {
     loading.value = false;
   }
 };
-
 
 const postMissingItem = async () => {
   if (!newItemForm.value.title || !newItemForm.value.description) {
@@ -241,7 +240,6 @@ const markAsUnclaimed = async (itemId: number) => {
   }
 };
 
-
 const getTotalUsersCount = async () => {
   try {
     const { data: items } = await supabase
@@ -281,16 +279,6 @@ const getActivityIcon = (type: string) => {
   }
 }
 
-const getItemStatusColor = (item: Item) => {
-  if (item.claimed_by) return 'success'
-  return item.status === 'lost' ? 'error' : 'info'
-}
-
-const getItemStatusText = (item: Item) => {
-  if (item.claimed_by) return 'Claimed'
-  return item.status === 'lost' ? 'Lost' : 'Found'
-}
-
 const formatTimestamp = (timestamp: string) => {
   const date = new Date(timestamp)
   const now = new Date()
@@ -303,16 +291,6 @@ const formatTimestamp = (timestamp: string) => {
   if (minutes < 60) return `${minutes} minutes ago`
   if (hours < 24) return `${hours} hours ago`
   return `${days} days ago`
-}
-
-const formatDate = (timestamp: string) => {
-  return new Date(timestamp).toLocaleDateString('en-US', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit'
-  })
 }
 
 onMounted(async () => {
@@ -433,53 +411,12 @@ onMounted(async () => {
                     md="6"
                     class="mb-3"
                   >
-                    <v-card class="item-card h-100" elevation="2">
-                      <v-card-title class="d-flex justify-space-between align-start">
-                        <div class="text-h6 font-weight-bold">{{ item.title }}</div>
-                        <v-chip
-                          :color="getItemStatusColor(item)"
-                          size="small"
-                          variant="flat"
-                        >
-                          {{ getItemStatusText(item) }}
-                        </v-chip>
-                      </v-card-title>
-                      
-                      <v-card-text>
-                        <p class="text-body-2 mb-3">{{ item.description }}</p>
-                        <div class="d-flex align-center text-caption text-grey-darken-1">
-                          <v-icon size="16" class="me-1">mdi-clock-outline</v-icon>
-                          {{ formatDate(item.created_at) }}
-                        </div>
-                      </v-card-text>
-                      
-                      <v-card-actions class="pt-0">
-                        <v-spacer />
-                        <v-btn
-  v-if="!item.claimed_by"
-  color="success"
-  variant="flat"
-  size="small"
-  prepend-icon="mdi-check"
-  @click="markAsClaimed(item.id)"
-  :loading="updatingItems.has(item.id)"
->
-  Mark as Claimed
-</v-btn>
-<v-btn
-  v-else
-  color="warning"
-  variant="outlined"
-  size="small"
-  prepend-icon="mdi-undo"
-  @click="markAsUnclaimed(item.id)"
-  :loading="updatingItems.has(item.id)"
->
-  Mark as Unclaimed
-</v-btn>
-
-                      </v-card-actions>
-                    </v-card>
+                    <ItemCard
+                      :item="item"
+                      :is-updating="updatingItems.has(item.id)"
+                      @mark-as-claimed="markAsClaimed"
+                      @mark-as-unclaimed="markAsUnclaimed"
+                    />
                   </v-col>
                 </v-row>
               </div>
@@ -527,9 +464,6 @@ onMounted(async () => {
                   <v-chip color="info" variant="flat">{{ stats.totalMessages }}</v-chip>
                 </div>
               </v-card>
-
-              <!-- Admin Note -->
-              
             </v-col>
           </v-row>
 
@@ -654,4 +588,3 @@ onMounted(async () => {
     </template>
   </InnerLayoutWrapper>
 </template>
-
