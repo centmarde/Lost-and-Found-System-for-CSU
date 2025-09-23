@@ -4,6 +4,7 @@
 }
 
 .hero-section {
+  padding-top: 15rem;
   min-height: 100vh;
   display: flex;
   align-items: center;

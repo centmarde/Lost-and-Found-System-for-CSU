@@ -5,7 +5,7 @@ import { useTheme } from 'vuetify'
 import OuterLayoutWrapper from '@/layouts/OuterLayoutWrapper.vue'
 
 // Import external CSS
-import '../assets/styles/landing.css';
+import '@/assets/styles/landing.css';
 
 const { data, loading, error, fetchLandingData } = useLandingController()
 const theme = useTheme()
@@ -37,16 +37,16 @@ const openGithub = () => window.open('https://github.com', '_blank', 'noopener,n
       <!-- Main Content -->
       <div v-else-if="data" class="landing-page">
         <!-- Hero Section -->
-        <v-sheet 
+        <v-sheet
           :color="isDark ? 'grey-darken-4' : 'grey-lighten-5'"
           class="hero-section position-relative"
         >
           <!-- Gradient Overlay -->
-          <div 
-            class="gradient-overlay" 
+          <div
+            class="gradient-overlay"
             :class="isDark ? 'gradient-dark' : 'gradient-light'"
           />
-          
+
           <!-- Floating Elements -->
           <div class="floating-elements">
             <div class="float-element element-1" />
@@ -57,18 +57,18 @@ const openGithub = () => window.open('https://github.com', '_blank', 'noopener,n
           <v-container class="hero-content">
             <v-row justify="center" align="center" class="text-center">
               <v-col cols="12" md="10" lg="8">
-               
+
 
                 <!-- Main Title -->
                 <h1 class="hero-title mb-6 animate-slide-up">
                   {{ data.title }}
                 </h1>
-                
+
                 <!-- Subtitle -->
                 <p class="hero-subtitle mb-8 animate-slide-up delay-1">
                   {{ data.description }}
                 </p>
-                
+
                 <!-- CTA Buttons -->
                 <div class="d-flex flex-column flex-sm-row justify-center ga-4 animate-slide-up delay-2">
                   <v-btn
@@ -82,7 +82,7 @@ const openGithub = () => window.open('https://github.com', '_blank', 'noopener,n
                     <v-icon start>mdi-rocket-launch</v-icon>
                     Get Started
                   </v-btn>
-                  
+
                   <v-btn
                     @click="openGithub"
                     variant="outlined"
