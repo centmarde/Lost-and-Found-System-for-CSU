@@ -530,9 +530,9 @@
 /* Features Grid */
 .features-grid {
   display: flex;
-  flex-wrap: nowrap;  /* Prevent wrapping */
-  gap: 1.5rem;  /* Space between the cards */
-  justify-content: space-between; /* Ensure even distribution */
+  flex-wrap: nowrap;
+  gap: 1.5rem; 
+  justify-content: space-between;
 }
 
 /* Card Styling */
@@ -543,12 +543,14 @@
   transition: all 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
   position: relative;
   overflow: hidden;
-  flex: 1 1 22%; /* 4 cards per row, each taking 22% of the width */
-  min-height: 300px;  /* Minimum height for the cards */
+  flex: 1 1 22%; 
+  min-height: 350px;
   height: auto;
+  display: flex;
+  flex-direction: column; 
 }
 
-/* Ensure the "hover" effect and card styling remains intact */
+
 .feature-card::before {
   content: '';
   position: absolute;
@@ -592,6 +594,7 @@
   height: 100%;
   display: flex;
   flex-direction: column;
+  justify-content: space-between; 
 }
 
 .feature-icon-container {
@@ -665,6 +668,7 @@
   background: rgba(var(--v-theme-primary), 0.1) !important;
   transform: translateX(4px);
 }
+
 
 
 /* How It Works Section */
