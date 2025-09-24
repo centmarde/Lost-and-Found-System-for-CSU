@@ -48,6 +48,10 @@
 </template>
 
 <script lang="ts" setup>
+
+import { formatDate } from '@/utils/helpers'
+
+
 interface Item {
   id: number
   title: string
@@ -80,15 +84,6 @@ const getItemStatusText = (item: Item) => {
   return item.status === 'lost' ? 'Lost' : 'Found'
 }
 
-const formatDate = (timestamp: string) => {
-  return new Date(timestamp).toLocaleDateString('en-US', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit'
-  })
-}
 </script>
 
 <style scoped>
