@@ -362,33 +362,34 @@ const openGithub = () => window.open('https://github.com', '_blank', 'noopener,n
               </p>
             </div>
 
-            <div class="process-flow">
-              <div class="process-step">
-                <div class="step-number">1</div>
-                <div class="step-content">
-                  <h3>Report Your Loss</h3>
-                  <p>Provide details about your lost item including photos, location, and description</p>
-                </div>
-                <div class="step-connector"></div>
-              </div>
+           <div class="process-flow">
+  <div class="process-step">
+    <div class="step-number">1</div>
+    <div class="step-content">
+      <h3>Find Your Items</h3>
+      <p>Browse our list of found items to check for any matches with your lost items.</p>
+    </div>
+    <div class="step-connector"></div>
+  </div>
 
-              <div class="process-step">
-                <div class="step-number">2</div>
-                <div class="step-content">
-                  <h3>Smart Matching</h3>
-                  <p>Our AI searches through found items and notifies potential matches</p>
-                </div>
-                <div class="step-connector"></div>
-              </div>
+  <div class="process-step">
+    <div class="step-number">2</div>
+    <div class="step-content">
+      <h3>Report Missing Items</h3>
+      <p>If your item is missing, provide a description of the specific item and its details via chat.</p>
+    </div>
+    <div class="step-connector"></div>
+  </div>
 
-              <div class="process-step">
-                <div class="step-number">3</div>
-                <div class="step-content">
-                  <h3>Secure Reunion</h3>
-                  <p>Connect safely with finders through our verified communication system</p>
-                </div>
-              </div>
-            </div>
+  <div class="process-step">
+    <div class="step-number">3</div>
+    <div class="step-content">
+      <h3>Owner Verification</h3>
+      <p>The owner can describe their lost item for verification based on the description provided.</p>
+    </div>
+  </div>
+</div>
+
           </v-container>
         </section>
 
