@@ -284,62 +284,62 @@
   color: rgb(var(--v-theme-primary));
 }
 
-/* Search Preview */
-.search-preview {
-  margin-bottom: 3rem;
-  opacity: 0;
-  transform: translateY(20px);
-  transition: all 0.8s var(--animation-timing) 0.5s;
-}
+  /* Search Preview */
+  .search-preview {
+    margin-bottom: 3rem;
+    opacity: 0;
+    transform: translateY(20px);
+    transition: all 0.8s var(--animation-timing) 0.5s;
+  }
 
-.search-preview.visible {
-  opacity: 1;
-  transform: translateY(0);
-}
+  .search-preview.visible {
+    opacity: 1;
+    transform: translateY(0);
+  }
 
-.search-container {
-  max-width: 600px;
-  margin: 0 auto;
-}
+  .search-container {
+    max-width: 600px;
+    margin: 0 auto;
+  }
 
-.search-input {
-  margin-bottom: 1rem;
-}
+  .search-input {
+    margin-bottom: 1rem;
+  }
 
-.search-input .v-field {
-  background: rgba(var(--v-theme-surface), 0.9);
-  backdrop-filter: blur(20px);
-  border: 2px solid rgba(var(--v-theme-primary), 0.15);
-  box-shadow: 
-    0 8px 32px rgba(var(--v-theme-primary), 0.1),
-    0 4px 16px var(--shadow-light);
-  transition: all 0.3s ease;
-}
+  .search-input .v-field {
+    background: rgba(var(--v-theme-surface), 0.9);
+    backdrop-filter: blur(20px);
+    border: 2px solid rgba(var(--v-theme-primary), 0.15);
+    box-shadow: 
+      0 8px 32px rgba(var(--v-theme-primary), 0.1),
+      0 4px 16px var(--shadow-light);
+    transition: all 0.3s ease;
+  }
 
-.search-input .v-field:hover {
-  border-color: rgba(var(--v-theme-primary), 0.3);
-  transform: translateY(-2px);
-  box-shadow: 
-    0 12px 40px rgba(var(--v-theme-primary), 0.15),
-    0 8px 24px var(--shadow-medium);
-}
+  .search-input .v-field:hover {
+    border-color: rgba(var(--v-theme-primary), 0.3);
+    transform: translateY(-2px);
+    box-shadow: 
+      0 12px 40px rgba(var(--v-theme-primary), 0.15),
+      0 8px 24px var(--shadow-medium);
+  }
 
-.search-btn {
-  box-shadow: 0 4px 16px rgba(var(--v-theme-primary), 0.3);
-  transition: all 0.3s ease;
-}
+  .search-btn {
+    box-shadow: 0 4px 16px rgba(var(--v-theme-primary), 0.3);
+    transition: all 0.3s ease;
+  }
 
-.search-btn:hover {
-  box-shadow: 0 6px 24px rgba(var(--v-theme-primary), 0.4);
-  transform: translateY(-1px);
-}
+  .search-btn:hover {
+    box-shadow: 0 6px 24px rgba(var(--v-theme-primary), 0.4);
+    transform: translateY(-1px);
+  }
 
-.search-suggestions {
-  display: flex;
-  justify-content: center;
-  gap: 0.5rem;
-  flex-wrap: wrap;
-}
+  .search-suggestions {
+    display: flex;
+    justify-content: left;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+  }
 
 
 

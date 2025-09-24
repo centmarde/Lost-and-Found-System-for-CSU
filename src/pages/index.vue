@@ -167,30 +167,35 @@ onMounted(() => {
                       </v-text-field>
                       
                       <!-- Search suggestions -->
-                      <div class="search-suggestions">
-                        <v-chip-group>
-                          <v-chip size="small" variant="outlined" rounded="xl">
-                            <v-icon start size="16">mdi-cellphone</v-icon>
-                            Phone
-                          </v-chip>
-                          <v-chip size="small" variant="outlined" rounded="xl">
-                            <v-icon start size="16">mdi-key</v-icon>
-                            Keys
-                          </v-chip>
-                          <v-chip size="small" variant="outlined" rounded="xl">
-                            <v-icon start size="16">mdi-wallet</v-icon>
-                            Wallet
-                          </v-chip>
-                          <v-chip size="small" variant="outlined" rounded="xl">
-                            <v-icon start size="16">mdi-laptop</v-icon>
-                            Laptop
-                          </v-chip>
-                          <v-chip size="small" variant="outlined" rounded="xl">
-                            <v-icon start size="16">mdi-notebook</v-icon>
-                            Notebook
-                          </v-chip>
-                        </v-chip-group>
-                      </div>
+<div class="search-suggestions">
+  <v-chip-group>
+    <v-chip size="small" variant="outlined" rounded="xl">
+      <v-icon start size="16">mdi-cellphone</v-icon>
+      Phone
+    </v-chip>
+    <v-chip size="small" variant="outlined" rounded="xl">
+      <v-icon start size="16">mdi-key</v-icon>
+      Keys
+    </v-chip>
+    <v-chip size="small" variant="outlined" rounded="xl">
+      <v-icon start size="16">mdi-wallet</v-icon>
+      Wallet
+    </v-chip>
+    <v-chip size="small" variant="outlined" rounded="xl">
+      <v-icon start size="16">mdi-laptop</v-icon>
+      Laptop
+    </v-chip>
+    <v-chip size="small" variant="outlined" rounded="xl">
+      <v-icon start size="16">mdi-notebook</v-icon>
+      Notebook
+    </v-chip>
+    <!-- Add the 'etc.' or 'Others' chip -->
+    <v-chip size="small" variant="outlined" rounded="xl">
+      <v-icon start size="16">mdi-dots-horizontal</v-icon>
+      Others
+    </v-chip>
+  </v-chip-group>
+</div>
                     </div>
                   </div>
                 </div>
