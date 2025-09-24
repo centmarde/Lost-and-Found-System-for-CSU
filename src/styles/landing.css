@@ -529,9 +529,13 @@
 
 /* Features Grid */
 .features-grid {
-  gap: 1.5rem;
+  display: flex;
+  flex-wrap: nowrap;  /* Prevent wrapping */
+  gap: 1.5rem;  /* Space between the cards */
+  justify-content: space-between; /* Ensure even distribution */
 }
 
+/* Card Styling */
 .feature-card {
   background: rgba(var(--v-theme-surface), 0.9) !important;
   backdrop-filter: blur(20px);
@@ -539,9 +543,12 @@
   transition: all 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
   position: relative;
   overflow: hidden;
-  height: 100%;
+  flex: 1 1 22%; /* 4 cards per row, each taking 22% of the width */
+  min-height: 300px;  /* Minimum height for the cards */
+  height: auto;
 }
 
+/* Ensure the "hover" effect and card styling remains intact */
 .feature-card::before {
   content: '';
   position: absolute;
@@ -658,6 +665,7 @@
   background: rgba(var(--v-theme-primary), 0.1) !important;
   transform: translateX(4px);
 }
+
 
 /* How It Works Section */
 .how-it-works-section {
