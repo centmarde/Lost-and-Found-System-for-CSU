@@ -6,7 +6,7 @@
   import { useTheme } from '@/composables/useTheme'
 
   interface Props {
-    config?: UIConfig | null
+    config?: UIConfig
   }
 
   const props = defineProps<Props>()

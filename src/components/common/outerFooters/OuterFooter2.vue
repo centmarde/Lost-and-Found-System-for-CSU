@@ -3,7 +3,7 @@ import type { UIConfig } from "@/controller/landingController";
 import { computed } from "vue";
 
 interface Props {
-  config?: UIConfig | null;
+  config?: UIConfig;
 }
 
 const props = defineProps<Props>();

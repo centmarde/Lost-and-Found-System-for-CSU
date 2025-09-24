@@ -1,229 +1,218 @@
 <script lang="ts" setup>
-  import { onMounted } from 'vue'
-  import { useLandingController } from '@/controller/landingController'
-  import OuterLayoutWrapper from '@/layouts/OuterLayoutWrapper.vue'
+import { onMounted, computed, ref } from "vue";
+import { useLandingController } from "@/controller/landingController";
+import { useTheme } from "vuetify";
+import OuterLayoutWrapper from "@/layouts/OuterLayoutWrapper.vue";
 
-  const { data, loading, error, fetchLandingData } = useLandingController()
+// Import external CSS
+import "@/styles/landing.css";
 
-  onMounted(async () => {
-    await fetchLandingData()
-  })
+const { data, loading, error, fetchLandingData } = useLandingController();
+const theme = useTheme();
+const isDark = computed(() => theme.global.current.value.dark);
 
-  function scrollToFeatures () {
-    const element = document.querySelector('#features')
-    if (element) {
-      element.scrollIntoView({
-        behavior: 'smooth',
-        block: 'start',
-      })
+// Animation states
+const isVisible = ref(false);
+const searchText = ref("");
+const placeholderIndex = ref(0);
+const typedText = ref("");
+const currentFeature = ref(0);
+
+const placeholders = [
+  "Lost your student ID?",
+  "Missing wallet?",
+  "Can't find your laptop?",
+  "Lost your notes?",
+  "Missing phone?",
+];
+
+onMounted(() => {
+  fetchLandingData();
+
+  setTimeout(() => {
+    isVisible.value = true;
+  }, 100);
+
+  // Rotating placeholder animation
+  setInterval(() => {
+    placeholderIndex.value = (placeholderIndex.value + 1) % placeholders.length;
+  }, 3500);
+
+  // Typewriter effect for hero subtitle
+  const subtitle =
+    "Helping CSU students reunite with their lost belongings through technology and community";
+  let i = 0;
+  const typeWriter = () => {
+    if (i < subtitle.length) {
+      typedText.value += subtitle.charAt(i);
+      i++;
+      setTimeout(typeWriter, 50);
     }
-  }
-
-  function openGithub () {
-    window.open('https://github.com', '_blank', 'noopener,noreferrer')
-  }
-
-  function openDocumentation () {
-    window.open('https://vuetifyjs.com/', '_blank', 'noopener,noreferrer')
-  }
-
-  function formatDate (dateString: string) {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-    })
-  }
+  };
+  setTimeout(typeWriter, 1500);
+});
 </script>
 
 <template>
   <OuterLayoutWrapper>
     <template #content>
-      <div class="landing-view">
-        <!-- Loading State -->
-        <v-container
-          v-if="loading"
-          class="d-flex justify-center align-center"
-          style="min-height: 50vh"
-        >
-          <v-progress-circular color="primary" indeterminate size="64" />
-        </v-container>
+      <!-- Loading State -->
+      <v-container v-if="loading" class="loading-wrapper">
+        <div class="loading-content">
+          <div class="search-animation">
+            <v-icon size="60" color="primary" class="search-icon"
+              >mdi-magnify</v-icon
+            >
+            <div class="pulse-rings">
+              <div class="pulse-ring"></div>
+              <div class="pulse-ring delay-1"></div>
+              <div class="pulse-ring delay-2"></div>
+            </div>
+          </div>
+          <h2 class="loading-text">Searching for your content...</h2>
+          <div class="loading-bar">
+            <div class="loading-progress"></div>
+          </div>
+        </div>
+      </v-container>
 
-        <!-- Error State -->
-        <v-container
-          v-else-if="error"
-          class="d-flex justify-center align-center"
-          style="min-height: 50vh"
-        >
-          <v-alert
-            color="error"
-            icon="mdi-alert-circle"
-            type="error"
-            variant="tonal"
-          >
-            <v-alert-title>Failed to load content</v-alert-title>
-            {{ error }}
-          </v-alert>
-        </v-container>
+      <!-- Error State -->
+      <v-alert v-else-if="error" type="error" class="error-state" rounded="lg">
+        <template #prepend>
+          <v-icon size="large">mdi-alert-circle</v-icon>
+        </template>
+        <div>
+          <h3 class="text-h6 mb-2">Oops! Something went missing</h3>
+          <p>{{ error }}</p>
+        </div>
+      </v-alert>
 
-        <!-- Content -->
-        <div v-else-if="data">
-          <!-- Hero Section -->
-          <section class="hero-section">
-            <v-container>
-              <v-row align="center" class="min-height-screen" justify="center">
-                <v-col cols="12" lg="8" md="10">
-                  <div class="text-center">
-                    <h1 class="text-h2 text-md-h1 font-weight-bold mb-4">
-                      {{ data.title }}
+      <!-- Main Content -->
+      <div v-else-if="data" class="landing-page">
+        <!-- Hero Section -->
+        <section class="hero-section">
+          <div class="hero-background">
+            <!-- Animated particles -->
+            <div class="particles">
+              <div
+                v-for="i in 20"
+                :key="`particle-${i}`"
+                class="particle"
+                :style="{
+                  left: Math.random() * 100 + '%',
+                  animationDelay: Math.random() * 20 + 's',
+                  animationDuration: 15 + Math.random() * 10 + 's',
+                }"
+              ></div>
+            </div>
+
+            <!-- Gradient mesh -->
+            <div class="gradient-mesh">
+              <div class="mesh-gradient mesh-1"></div>
+              <div class="mesh-gradient mesh-2"></div>
+              <div class="mesh-gradient mesh-3"></div>
+            </div>
+          </div>
+
+          <v-container class="hero-container" fluid>
+            <v-row align="center" justify="center" class="hero-row">
+              <v-col cols="12" lg="10" xl="8">
+                <div class="hero-content">
+                  <!-- Badge -->
+                  <div class="hero-badge" :class="{ visible: isVisible }">
+                    <v-chip
+                      size="large"
+                      rounded="xl"
+                      color="primary"
+                      variant="tonal"
+                    >
+                      <v-icon start>mdi-trending-up</v-icon>
+                      Lost & Found CSU
+                    </v-chip>
+                  </div>
+
+                  <!-- Main Title -->
+                  <div class="hero-title-section">
+                    <h1 class="hero-title" :class="{ visible: isVisible }">
+                      <span class="title-highlight">Lost Something?</span><br />
+                      <span class="title-main">We'll Help You Find It</span>
                     </h1>
 
-                    <h2 class="text-h4 text-md-h3 text-grey-darken-1 mb-6">
-                      {{ data.subtitle }}
-                    </h2>
-
-                    <p class="text-h6 text-md-h5 text-grey-darken-2 mb-8">
-                      {{ data.description }}
-                    </p>
-
-                    <div
-                      class="d-flex flex-column flex-sm-row gap-4 justify-center"
-                    >
-                      <v-btn
-                        class="text-none"
-                        color="primary"
-                        size="x-large"
-                        variant="elevated"
-                        @click="scrollToFeatures"
-                      >
-                        <v-icon class="me-2" icon="mdi-rocket-launch" />
-                        Explore Features
-                      </v-btn>
-
-                      <v-btn
-                        class="text-none"
-                        color="primary"
-                        size="x-large"
-                        variant="outlined"
-                        @click="openGithub"
-                      >
-                        <v-icon class="me-2" icon="mdi-github" />
-                        View Source
-                      </v-btn>
+                    <div class="title-decoration">
+                      <div class="decoration-line"></div>
+                      <v-icon color="primary" size="24">mdi-diamond</v-icon>
+                      <div class="decoration-line"></div>
                     </div>
                   </div>
-                </v-col>
-              </v-row>
-            </v-container>
-          </section>
 
-          <!-- Features Section -->
-          <section id="features" class="features-section py-16">
-            <v-container>
-              <div class="text-center mb-12">
-                <h2 class="text-h3 font-weight-bold mb-4">Key Features</h2>
-                <p class="text-h6 text-grey-darken-1">
-                  Everything you need for modern academic writing
-                </p>
-              </div>
+                  <!-- Animated Subtitle -->
+                  <p class="hero-subtitle" :class="{ visible: isVisible }">
+                    {{ typedText }}<span class="cursor">|</span>
+                  </p>
 
-              <v-row>
-                <v-col
-                  v-for="(feature, index) in data.features"
-                  :key="index"
-                  cols="12"
-                  lg="3"
-                  md="6"
-                >
-                  <v-card class="h-100" elevation="2" hover>
-                    <v-card-text class="text-center pa-6">
-                      <v-avatar class="mb-4" color="primary" size="64">
-                        <v-icon color="on-primary" :icon="feature.icon" size="32" />
-                      </v-avatar>
-
-                      <h3 class="text-h5 font-weight-bold mb-3">
-                        {{ feature.title }}
-                      </h3>
-
-                      <p class="text-body-1 text-grey-darken-1">
-                        {{ feature.description }}
-                      </p>
-                    </v-card-text>
-                  </v-card>
-                </v-col>
-              </v-row>
-            </v-container>
-          </section>
-
-          <!-- About Section -->
-          <section id="about" class="about-section py-16 bg-grey-lighten-4">
-            <v-container>
-              <v-row align="center" justify="center">
-                <v-col cols="12" lg="8" md="10">
-                  <div class="text-center">
-                    <h2 class="text-h3 font-weight-bold mb-6">
-                      About This Template
-                    </h2>
-
-                    <div class="pa-8" elevation="4">
-                      <v-row align="center">
-                        <v-col cols="12" md="8">
-                          <h3 class="text-h4 font-weight-bold mb-4">
-                            Version {{ data.version }}
-                          </h3>
-                          <p class="text-h6 text-grey-darken-1 mb-4">
-                            Created by {{ data.author }}
-                          </p>
-                          <p class="text-body-1 text-grey-darken-2">
-                            Last updated: {{ formatDate(data.lastUpdated) }}
-                          </p>
-                        </v-col>
-
-                        <v-col cols="12" md="4">
+                  <!-- Interactive Search Preview -->
+                  <div class="search-preview" :class="{ visible: isVisible }">
+                    <!-- <div class="search-container">
+                      <v-text-field
+                        v-model="searchText"
+                        :placeholder="placeholders[placeholderIndex]"
+                        prepend-inner-icon="mdi-magnify"
+                        append-inner-icon="mdi-microphone"
+                        variant="solo"
+                        rounded="xl"
+                        hide-details
+                        class="search-input"
+                        readonly
+                      >
+                        <template #append>
                           <v-btn
-                            block
-                            class="text-none"
                             color="primary"
-                            size="large"
-                            variant="elevated"
-                            @click="openDocumentation"
+                            rounded="xl"
+                            class="search-btn"
                           >
-                            <v-icon class="me-2" icon="mdi-book-open" />
-                            Documentation
+                            Search
                           </v-btn>
-                        </v-col>
-                      </v-row>
-                    </div>
+                        </template>
+                      </v-text-field>
+
+                     
+                      <div class="search-suggestions">
+                        <v-chip-group>
+                          <v-chip size="small" variant="outlined" rounded="xl">
+                            <v-icon start size="16">mdi-cellphone</v-icon>
+                            Phone
+                          </v-chip>
+                          <v-chip size="small" variant="outlined" rounded="xl">
+                            <v-icon start size="16">mdi-key</v-icon>
+                            Keys
+                          </v-chip>
+                          <v-chip size="small" variant="outlined" rounded="xl">
+                            <v-icon start size="16">mdi-wallet</v-icon>
+                            Wallet
+                          </v-chip>
+                          <v-chip size="small" variant="outlined" rounded="xl">
+                            <v-icon start size="16">mdi-laptop</v-icon>
+                            Laptop
+                          </v-chip>
+                          <v-chip size="small" variant="outlined" rounded="xl">
+                            <v-icon start size="16">mdi-notebook</v-icon>
+                            Notebook
+                          </v-chip>
+                     
+                          <v-chip size="small" variant="outlined" rounded="xl">
+                            <v-icon start size="16">mdi-dots-horizontal</v-icon>
+                            Others
+                          </v-chip>
+                        </v-chip-group>
+                      </div>
+                    </div> -->
                   </div>
-                </v-col>
-              </v-row>
-            </v-container>
-          </section>
-        </div>
+                </div>
+              </v-col>
+            </v-row>
+          </v-container>
+        </section>
       </div>
     </template>
   </OuterLayoutWrapper>
 </template>
-
-<style scoped>
-
-.min-height-screen {
-  min-height: calc(100vh - 64px);
-}
-
-.features-section {
-  background: white;
-}
-
-.about-section {
-  background: #fafafa;
-}
-
-.gap-4 {
-  gap: 1rem;
-}
-
-.landing-view {
-  min-height: 100vh;
-}
-</style>

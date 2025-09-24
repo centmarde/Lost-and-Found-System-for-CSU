@@ -7,7 +7,7 @@
   import { useAuthUserStore } from '@/stores/authUser'
 
   interface Props {
-    config?: UIConfig | null
+    config?: UIConfig
   }
 
   const props = defineProps<Props>()

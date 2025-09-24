@@ -18,12 +18,14 @@ export const individualNavItems: NavigationItem[] = [
   {
     title: 'Home',
     icon: 'mdi-home',
-    route: '/home'
+    route: '/home',
+    permission: 'app.home.access'
   },
   {
     title: 'Profiles',
     icon: 'mdi-account',
-    route: '/profiles'
+    route: '/profiles',
+    permission: 'app.profiles.access'
   }
 ]
 
@@ -49,7 +51,7 @@ export const navigationConfig: NavigationGroup[] = [
       {
         title: 'Role Pages',
         icon: 'mdi-account-key',
-        route: '/admin/rolepages',
+        route: '/admin/roles',
         permission: 'admin.roles.manage'
       }
     ]

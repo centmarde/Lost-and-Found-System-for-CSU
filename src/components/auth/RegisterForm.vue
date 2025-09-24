@@ -269,7 +269,7 @@ defineExpose({
 
         <v-row no-gutters>
           <v-col cols="12" class="text-center">
-            <span class="text-body-2 text-medium-emphasis">
+            <span class="text-body-2 text-medium-emphasis white-text">
               Already have an account?
             </span>
             <v-btn
@@ -288,3 +288,8 @@ defineExpose({
   </v-card-text>
 </template>
 
+<style scoped>
+.white-text {
+  color: white !important; 
+}
+</style>
