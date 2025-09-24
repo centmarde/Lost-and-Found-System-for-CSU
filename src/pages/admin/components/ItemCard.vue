@@ -1,3 +1,42 @@
+<script lang="ts" setup>
+
+import { formatDate } from '@/utils/helpers'
+
+
+interface Item {
+  id: number
+  title: string
+  description: string
+  status: 'lost' | 'found'
+  user_id: string
+  claimed_by: string
+  created_at: string
+}
+
+interface Props {
+  item: Item
+  isUpdating: boolean
+}
+
+defineProps<Props>()
+
+defineEmits<{
+  markAsClaimed: [id: number]
+  markAsUnclaimed: [id: number]
+}>()
+
+const getItemStatusColor = (item: Item) => {
+  if (item.claimed_by) return 'success'
+  return item.status === 'lost' ? 'error' : 'info'
+}
+
+const getItemStatusText = (item: Item) => {
+  if (item.claimed_by) return 'Claimed'
+  return item.status === 'lost' ? 'Lost' : 'Found'
+}
+
+</script>
+
 <template>
   <v-card class="item-card h-100" elevation="2">
     <v-card-title class="d-flex justify-space-between align-start">
@@ -47,44 +86,7 @@
   </v-card>
 </template>
 
-<script lang="ts" setup>
 
-import { formatDate } from '@/utils/helpers'
-
-
-interface Item {
-  id: number
-  title: string
-  description: string
-  status: 'lost' | 'found'
-  user_id: string
-  claimed_by: string
-  created_at: string
-}
-
-interface Props {
-  item: Item
-  isUpdating: boolean
-}
-
-defineProps<Props>()
-
-defineEmits<{
-  markAsClaimed: [id: number]
-  markAsUnclaimed: [id: number]
-}>()
-
-const getItemStatusColor = (item: Item) => {
-  if (item.claimed_by) return 'success'
-  return item.status === 'lost' ? 'error' : 'info'
-}
-
-const getItemStatusText = (item: Item) => {
-  if (item.claimed_by) return 'Claimed'
-  return item.status === 'lost' ? 'Lost' : 'Found'
-}
-
-</script>
 
 <style scoped>
 .item-card {
