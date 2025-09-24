@@ -19,49 +19,11 @@ const typedText = ref('')
 const currentFeature = ref(0)
 
 const placeholders = [
-  'Lost your phone?', 
+  'Lost your student ID?', 
   'Missing wallet?', 
-  'Can\'t find keys?', 
-  'Lost jewelry?',
-  'Missing laptop?'
-]
-
-const features = [
-  {
-    icon: 'mdi-alert-circle-outline',
-    title: 'Report Lost Items',
-    description: 'Quick and easy reporting with detailed descriptions and location tracking',
-    color: 'error',
-    stats: '2,847 reports'
-  },
-  {
-    icon: 'mdi-treasure-chest',
-    title: 'Found Items Registry',
-    description: 'Comprehensive database of found items with smart matching algorithms',
-    color: 'success',
-    stats: '1,923 found'
-  },
-  {
-    icon: 'mdi-account-group',
-    title: 'Community Network',
-    description: 'Connect with local community members to increase recovery chances',
-    color: 'primary',
-    stats: '15K+ members'
-  },
-  {
-    icon: 'mdi-shield-check',
-    title: 'Secure Verification',
-    description: 'Identity verification and secure communication to prevent fraud',
-    color: 'warning',
-    stats: '99.9% secure'
-  }
-]
-
-const stats = [
-  { number: '12,847', label: 'Items Reported', icon: 'mdi-file-document-outline' },
-  { number: '9,234', label: 'Successfully Reunited', icon: 'mdi-heart-outline' },
-  { number: '15,000+', label: 'Active Members', icon: 'mdi-account-group-outline' },
-  { number: '98%', label: 'Success Rate', icon: 'mdi-chart-line' }
+  'Can\'t find your laptop?', 
+  'Lost your notes?',
+  'Missing phone?'
 ]
 
 onMounted(() => {
@@ -76,13 +38,8 @@ onMounted(() => {
     placeholderIndex.value = (placeholderIndex.value + 1) % placeholders.length
   }, 3500)
   
-  // Feature carousel
-  setInterval(() => {
-    currentFeature.value = (currentFeature.value + 1) % features.length
-  }, 4000)
-  
   // Typewriter effect for hero subtitle
-  const subtitle = "Reuniting people with their precious belongings through community and technology"
+  const subtitle = "Helping CSU students reunite with their lost belongings through technology and community"
   let i = 0
   const typeWriter = () => {
     if (i < subtitle.length) {
@@ -93,12 +50,6 @@ onMounted(() => {
   }
   setTimeout(typeWriter, 1500)
 })
-
-const scrollToSection = (sectionId: string) => {
-  document.querySelector(`#${sectionId}`)?.scrollIntoView({ behavior: 'smooth' })
-}
-
-const openGithub = () => window.open('https://github.com', '_blank', 'noopener,noreferrer')
 </script>
 
 <template>
@@ -167,7 +118,7 @@ const openGithub = () => window.open('https://github.com', '_blank', 'noopener,n
                   <div class="hero-badge" :class="{ 'visible': isVisible }">
                     <v-chip size="large" rounded="xl" color="primary" variant="tonal">
                       <v-icon start>mdi-trending-up</v-icon>
-                      #1 Lost & Found Platform
+                      Lost & Found CSU
                     </v-chip>
                   </div>
 
@@ -230,205 +181,23 @@ const openGithub = () => window.open('https://github.com', '_blank', 'noopener,n
                             <v-icon start size="16">mdi-wallet</v-icon>
                             Wallet
                           </v-chip>
+                          <v-chip size="small" variant="outlined" rounded="xl">
+                            <v-icon start size="16">mdi-laptop</v-icon>
+                            Laptop
+                          </v-chip>
+                          <v-chip size="small" variant="outlined" rounded="xl">
+                            <v-icon start size="16">mdi-notebook</v-icon>
+                            Notebook
+                          </v-chip>
                         </v-chip-group>
                       </div>
                     </div>
                   </div>
-
-                  <!-- CTA Buttons -->
-                  <div class="cta-section" :class="{ 'visible': isVisible }">
-                    <v-btn
-                      @click="scrollToSection('features')"
-                      size="x-large"
-                      rounded="xl"
-                      color="primary"
-                      class="cta-primary"
-                    >
-                      <v-icon start>mdi-rocket-launch</v-icon>
-                      Get Started
-                      <template #append>
-                        <v-icon>mdi-arrow-right</v-icon>
-                      </template>
-                    </v-btn>
-
-                    <v-btn
-                      @click="scrollToSection('how-it-works')"
-                      size="x-large"
-                      rounded="xl"
-                      variant="outlined"
-                      class="cta-secondary"
-                    >
-                      <v-icon start>mdi-play-circle</v-icon>
-                      How It Works
-                    </v-btn>
-                  </div>
-
-                  <!-- Stats Preview -->
-                  <div class="stats-preview" :class="{ 'visible': isVisible }">
-                    <v-row class="stats-row">
-                      <v-col v-for="stat in stats.slice(0, 3)" :key="stat.label" cols="4">
-                        <div class="stat-item">
-                          <div class="stat-number">{{ stat.number }}</div>
-                          <div class="stat-label">{{ stat.label }}</div>
-                        </div>
-                      </v-col>
-                    </v-row>
-                  </div>
-
                 </div>
               </v-col>
             </v-row>
-          </v-container>
-
-          <!-- Scroll indicator -->
-          <div class="scroll-indicator" :class="{ 'visible': isVisible }">
-            <v-btn 
-              @click="scrollToSection('features')" 
-              icon 
-              variant="text" 
-              class="scroll-btn"
-            >
-              <v-icon class="bounce">mdi-chevron-down</v-icon>
-            </v-btn>
-          </div>
+          </v-container>  
         </section>
-
-        <!-- Features Section -->
-        <section id="features" class="features-section">
-          <v-container>
-            <div class="section-header">
-              <div class="section-badge">
-                <v-chip color="primary" variant="tonal" rounded="xl">
-                  <v-icon start>mdi-star</v-icon>
-                  Features
-                </v-chip>
-              </div>
-              <h2 class="section-title">Powerful Tools for Recovery</h2>
-              <p class="section-subtitle">
-                Everything you need to report, search, and recover lost items efficiently
-              </p>
-            </div>
-
-            <!-- Feature Cards Grid -->
-            <v-row class="features-grid">
-              <v-col v-for="(feature, index) in features" :key="feature.title" 
-                cols="12" sm="6" lg="3">
-                <v-card 
-                  class="feature-card" 
-                  :class="{ 'featured': index === currentFeature }"
-                  rounded="xl" 
-                  elevation="0"
-                >
-                  <v-card-text class="feature-content">
-                    <div class="feature-icon-container">
-                      <div class="feature-icon-wrapper" :class="`color-${feature.color}`">
-                        <v-icon :color="feature.color" size="32">{{ feature.icon }}</v-icon>
-                      </div>
-                      <div class="feature-stats">{{ feature.stats }}</div>
-                    </div>
-                    
-                    <h3 class="feature-title">{{ feature.title }}</h3>
-                    <p class="feature-description">{{ feature.description }}</p>
-                    
-                    <v-btn 
-                      variant="text" 
-                      :color="feature.color"
-                      class="feature-btn"
-                      rounded="lg"
-                    >
-                      Learn More
-                      <v-icon end>mdi-arrow-right</v-icon>
-                    </v-btn>
-                  </v-card-text>
-                </v-card>
-              </v-col>
-            </v-row>
-          </v-container>
-        </section>
-
-        <!-- How It Works Section -->
-        <section id="how-it-works" class="how-it-works-section">
-          <v-container>
-            <div class="section-header">
-              <div class="section-badge">
-                <v-chip color="success" variant="tonal" rounded="xl">
-                  <v-icon start>mdi-lightbulb</v-icon>
-                  Process
-                </v-chip>
-              </div>
-              <h2 class="section-title">How It Works</h2>
-              <p class="section-subtitle">
-                Simple steps to reunite with your belongings
-              </p>
-            </div>
-
-           <div class="process-flow">
-  <div class="process-step">
-    <div class="step-number">1</div>
-    <div class="step-content">
-      <h3>Find Your Items</h3>
-      <p>Browse our list of found items to check for any matches with your lost items.</p>
-    </div>
-    <div class="step-connector"></div>
-  </div>
-
-  <div class="process-step">
-    <div class="step-number">2</div>
-    <div class="step-content">
-      <h3>Report Missing Items</h3>
-      <p>If your item is missing, provide a description of the specific item and its details via chat.</p>
-    </div>
-    <div class="step-connector"></div>
-  </div>
-
-  <div class="process-step">
-    <div class="step-number">3</div>
-    <div class="step-content">
-      <h3>Owner Verification</h3>
-      <p>The owner can describe their lost item for verification based on the description provided.</p>
-    </div>
-  </div>
-</div>
-
-          </v-container>
-        </section>
-
-        <!-- CTA Section -->
-        <section class="final-cta-section">
-          <v-container>
-            <div class="cta-content">
-              <div class="cta-icon">
-                <v-icon size="64" color="primary">mdi-heart</v-icon>
-              </div>
-              <h2 class="cta-title">Ready to Find What's Lost?</h2>
-              <p class="cta-description">
-                Join thousands of people who have successfully recovered their belongings
-              </p>
-              <div class="cta-buttons">
-                <v-btn 
-                  size="x-large" 
-                  rounded="xl" 
-                  color="primary"
-                  class="cta-main"
-                >
-                  Start Your Search
-                  <v-icon end>mdi-magnify</v-icon>
-                </v-btn>
-                <v-btn 
-                  @click="openGithub"
-                  size="large" 
-                  rounded="xl" 
-                  variant="outlined"
-                  class="cta-github"
-                >
-                  <v-icon start>mdi-github</v-icon>
-                  View Source
-                </v-btn>
-              </div>
-            </div>
-          </v-container>
-        </section>
-
       </div>
     </template>
   </OuterLayoutWrapper>
