@@ -7,7 +7,7 @@ import { useToast } from 'vue-toastification'
 export type Role = {
   id: number
   created_at: string
-  title: string | null
+  title: string
 }
 
 export type CreateRoleData = {
@@ -21,7 +21,7 @@ export type UpdateRoleData = {
 export type RoleWithPages = Role & {
   role_pages?: {
     id: number
-    pages: string | null
+    pages: string
   }[]
 }
 

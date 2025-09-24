@@ -59,7 +59,7 @@ const fetchUsers = async () => {
       toast.error('Failed to load users')
     } else if (result.users) {
       users.value = result.users
-      toast.success(`Loaded ${result.users.length} users`)
+      //toast.success(`Loaded ${result.users.length} users`)
     }
   } catch (err) {
     error.value = 'An unexpected error occurred'

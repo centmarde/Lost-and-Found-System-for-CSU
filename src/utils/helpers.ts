@@ -57,3 +57,18 @@ export function getUserDisplayName(userData: {
 
   return 'User';
 }
+
+/**
+ * Formats a date string into a human-readable format
+ * @param dateString - The date string to format
+ * @returns A formatted date string in 'MMM d, yyyy, h:mm AM/PM' format
+ */
+export function formatDate(dateString: string): string {
+  return new Date(dateString).toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  });
+}

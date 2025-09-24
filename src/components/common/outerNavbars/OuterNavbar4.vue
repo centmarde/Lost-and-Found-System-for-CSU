@@ -6,7 +6,7 @@
   import { useDisplay } from 'vuetify'
 
   interface Props {
-    config?: UIConfig | null
+    config?: UIConfig
   }
 
   const props = defineProps<Props>()
