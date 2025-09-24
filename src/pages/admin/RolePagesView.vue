@@ -2,6 +2,7 @@
 import { useAdminUserRoles } from './components/composables/adminUserRoles'
 import InnerLayoutWrapper from '@/layouts/InnerLayoutWrapper.vue'
 import AdminUserRolesDialog from './components/dialogs/AdminUserRolesDialog.vue'
+import { formatDate } from '@/utils/helpers'
 
 const {
   // Store state
@@ -32,16 +33,6 @@ const {
   clearError
 } = useAdminUserRoles()
 
-// Format date helper
-const formatDate = (dateString: string) => {
-  return new Date(dateString).toLocaleDateString('en-US', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit'
-  })
-}
 </script>
 
 <template>
