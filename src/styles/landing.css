@@ -271,7 +271,7 @@
   margin-right: auto;
   opacity: 0;
   transform: translateY(20px);
-  transition: all 0.8s var(--animation-timing) 0.3s;
+  transition: all 0.8s var(--animation-timing);
 }
 
 .hero-subtitle.visible {

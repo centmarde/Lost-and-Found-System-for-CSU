@@ -170,7 +170,7 @@ function scrollToSection(sectionId: string) {
       <template #append>
         <div class="d-none d-lg-flex align-center ga-2">
           <!-- Navigation Links -->
-          <v-btn
+          <!-- <v-btn
             v-for="item in navbarConfig.navigationItems"
             :key="item.label"
             variant="text"
@@ -180,7 +180,7 @@ function scrollToSection(sectionId: string) {
             @click="handleNavigation(item)"
           >
             {{ item.label }}
-          </v-btn>
+          </v-btn> -->
 
           <!-- Theme Toggle -->
           <v-btn
