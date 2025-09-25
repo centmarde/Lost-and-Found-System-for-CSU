@@ -16,6 +16,44 @@ interface Props {
 
 defineProps<Props>()
 
+const headers = [
+  {
+    title: 'Type',
+    align: 'start' as const,
+    sortable: true,
+    key: 'type',
+    width: '100px'
+  },
+  {
+    title: 'Item',
+    align: 'start' as const,
+    sortable: true,
+    key: 'title',
+    width: '300px'
+  },
+  {
+    title: 'User',
+    align: 'start' as const,
+    sortable: true,
+    key: 'user',
+    width: '150px'
+  },
+  {
+    title: 'Status',
+    align: 'start' as const,
+    sortable: true,
+    key: 'status',
+    width: '120px'
+  },
+  {
+    title: 'Time',
+    align: 'end' as const,
+    sortable: true,
+    key: 'timestamp',
+    width: '120px'
+  }
+]
+
 const getActivityColor = (type: string) => {
   switch (type) {
     case 'lost': return 'error'
@@ -59,38 +97,66 @@ const formatTimestamp = (timestamp: string) => {
           <v-icon class="me-2">mdi-clock-outline</v-icon>
           Recent Activity
         </v-card-title>
-        <div v-if="stats.recentActivity.length === 0" class="text-center py-8">
-          <v-icon size="64" color="grey-lighten-1">mdi-inbox</v-icon>
-          <div class="text-h6 text-grey-darken-1 mt-2">No recent activity</div>
-          <div class="text-body-2 text-grey-darken-1">Items and activities will appear here</div>
-        </div>
-        <v-list v-else>
-          <v-list-item
-            v-for="activity in stats.recentActivity"
-            :key="activity.id"
-            class="px-0"
-          >
-            <template #prepend>
-              <v-avatar :color="getActivityColor(activity.type)" size="40">
-                <v-icon :icon="getActivityIcon(activity.type)" color="white" />
-              </v-avatar>
-            </template>
 
-            <v-list-item-title class="font-weight-medium">
-              {{ activity.title }}
-            </v-list-item-title>
-            <v-list-item-subtitle>
-              {{ activity.type.charAt(0).toUpperCase() + activity.type.slice(1) }}
-              by {{ activity.user }} • {{ activity.status }}
-            </v-list-item-subtitle>
+        <v-data-table
+          :headers="headers"
+          :items="stats.recentActivity"
+          :items-per-page="5"
+          :items-per-page-options="[5, 10, 25, 50]"
+          class="elevation-0"
+          no-data-text="No recent activity"
+        >
+          <!-- Type column slot -->
+          <template v-slot:item.type="{ item }">
+            <v-chip
+              :color="getActivityColor(item.type)"
+              variant="flat"
+              size="small"
+              class="text-white"
+            >
+              <v-icon
+                :icon="getActivityIcon(item.type)"
+                start
+                size="16"
+              />
+              {{ item.type.charAt(0).toUpperCase() + item.type.slice(1) }}
+            </v-chip>
+          </template>
 
-            <template #append>
-              <div class="text-caption text-grey-darken-1">
-                {{ formatTimestamp(activity.timestamp) }}
-              </div>
-            </template>
-          </v-list-item>
-        </v-list>
+          <!-- Title column slot -->
+          <template v-slot:item.title="{ item }">
+            <div class="font-weight-medium">
+              {{ item.title }}
+            </div>
+          </template>
+
+          <!-- Status column slot -->
+          <template v-slot:item.status="{ item }">
+            <v-chip
+              variant="outlined"
+              size="small"
+              color="primary"
+            >
+              {{ item.status }}
+            </v-chip>
+          </template>
+
+          <!-- Timestamp column slot -->
+          <template v-slot:item.timestamp="{ item }">
+            <div class="text-caption text-grey-darken-1">
+              {{ formatTimestamp(item.timestamp) }}
+            </div>
+          </template>
+
+          <!-- No data slot -->
+          <template v-slot:no-data>
+            <div class="text-center py-8">
+              <v-icon size="64" color="grey-lighten-1">mdi-inbox</v-icon>
+              <div class="text-h6 text-grey-darken-1 mt-2">No recent activity</div>
+              <div class="text-body-2 text-grey-darken-1">Items and activities will appear here</div>
+            </div>
+          </template>
+        </v-data-table>
       </v-card>
     </v-col>
   </v-row>
