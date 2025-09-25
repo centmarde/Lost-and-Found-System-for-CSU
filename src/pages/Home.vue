@@ -6,6 +6,7 @@ import InnerLayoutWrapper from '@/layouts/InnerLayoutWrapper.vue'
 import MissingItemCard from '@/pages/admin/components/ItemCard.vue' 
 import { supabase } from '@/lib/supabase'
 import { formatDate } from '@/utils/helpers'
+import { useAuthUserStore } from '@/stores/authUser'
 
 interface Item {
   id: number
@@ -64,24 +65,30 @@ const getCurrentUser = async () => {
 const fetchItems = async () => {
   itemsLoading.value = true
   try {
-    // Get admin users first
-    const { data: adminUsers, error: adminError } = await supabase
-      .from('roles')
-      .select('user_id')
-      .eq('role', 'admin')
+    // Get all users using the store method
+    const authStore = useAuthUserStore()
+    const { users, error: usersError } = await authStore.getAllUsers()
 
-    if (adminError) {
-      console.error('Error fetching admin users:', adminError)
+    if (usersError) {
+      console.error('Error fetching users:', usersError)
       toast.error('Failed to load admin users')
       return
     }
 
-    const adminUserIds = adminUsers?.map(admin => admin.user_id) || []
+    // Filter admin users based on role in user_metadata
+    const adminUsers = users?.filter(user => {
+      const roleId = user.user_metadata?.role
+      // Assuming admin role has ID 1, adjust this value as needed
+      return roleId === 1 // or whatever your admin role ID is
+    }) || []
 
-    if (adminUserIds.length === 0) {
+    if (adminUsers.length === 0) {
       items.value = []
       return
     }
+
+    // Extract admin user IDs
+    const adminUserIds = adminUsers.map(admin => admin.id)
 
     // Fetch items posted by admins only
     const { data, error } = await supabase
