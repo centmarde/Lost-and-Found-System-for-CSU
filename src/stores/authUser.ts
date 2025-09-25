@@ -29,6 +29,7 @@ export const useAuthUserStore = defineStore("authUser", () => {
   const isAuthenticated = computed(() => userData.value !== null);
   const userEmail = computed(() => userData.value?.email || null);
   const userName = computed(() => userData.value?.user_metadata?.full_name || userData.value?.email || null);
+  const userRoleId = computed(() => userData.value?.app_metadata?.role || null);
 
 
   async function registerUser(
@@ -369,6 +370,69 @@ export const useAuthUserStore = defineStore("authUser", () => {
     return parseFloat(value) * units[unit];
   }
 
+  // Get role title by role ID (for any user)
+  async function getRoleTitleById(roleId: number) {
+    try {
+      console.log('getRoleTitleById - Fetching role title for ID:', roleId);
+
+      if (!roleId) {
+        console.log('getRoleTitleById - No role ID provided, returning null');
+        return { title: null, error: null };
+      }
+
+      // Fetch the role title from the roles table
+      const { data, error } = await supabase
+        .from('roles')
+        .select('title')
+        .eq('id', roleId)
+        .single();
+
+      if (error) {
+        console.error('getRoleTitleById - Error fetching role title:', error);
+        return { title: null, error };
+      }
+
+      console.log('getRoleTitleById - Successfully fetched role data:', data);
+      console.log('getRoleTitleById - Role title:', data.title);
+      return { title: data.title, error: null };
+    } catch (error) {
+      console.error('getRoleTitleById - Unexpected error:', error);
+      return { title: null, error };
+    }
+  }
+
+  // Get current user's role title
+  async function getCurrentUserRoleTitle() {
+    try {
+      const roleId = userData.value?.user_metadata?.role;
+      console.log('getCurrentUserRoleTitle - Role ID:', roleId);
+
+      if (!roleId) {
+        console.log('getCurrentUserRoleTitle - No role ID found, returning null');
+        return { title: null, error: null };
+      }
+
+      // Fetch the role title from the roles table
+      const { data, error } = await supabase
+        .from('roles')
+        .select('title')
+        .eq('id', roleId)
+        .single();
+
+      if (error) {
+        console.error('getCurrentUserRoleTitle - Error fetching role title:', error);
+        return { title: null, error };
+      }
+
+      console.log('getCurrentUserRoleTitle - Successfully fetched role data:', data);
+      console.log('getCurrentUserRoleTitle - Role title:', data.title);
+      return { title: data.title, error: null };
+    } catch (error) {
+      console.error('getCurrentUserRoleTitle - Unexpected error:', error);
+      return { title: null, error };
+    }
+  }
+
   // Call initialize on store creation
   initializeAuth();
 
@@ -383,6 +447,7 @@ export const useAuthUserStore = defineStore("authUser", () => {
     isAuthenticated,
     userEmail,
     userName,
+    userRoleId,
 
     // Actions
     registerUser,
@@ -395,6 +460,8 @@ export const useAuthUserStore = defineStore("authUser", () => {
     updateUserAppMetadata,
     banUser,
     unbanUser,
+    getRoleTitleById,
+    getCurrentUserRoleTitle,
   };
 });
 
