@@ -1,5 +1,93 @@
+
+<script setup lang="ts">
+import { ref, computed } from 'vue'
+import { useProfilesWidget } from './composables/profilesWidget'
+import { getEmailInitials } from '@/utils/helpers'
+
+// Emits for parent component interactions
+const emit = defineEmits<{
+  'edit-profile': []
+  'view-permissions': []
+  'profile-updated': [data: Record<string, any>]
+}>()
+
+// Use the composable
+const {
+  currentUser,
+  loading,
+  error,
+  userDisplayName,
+  userEmail,
+  userRole,
+  userCreatedAt,
+  hasUserData,
+  fetchCurrentUser,
+  refreshUserData,
+  updateUserMetadata
+} = useProfilesWidget()
+
+// Computed property for email initials
+const userInitials = computed(() => {
+  return getEmailInitials(userEmail.value)
+})
+
+// Form state
+const showUpdateForm = ref(false)
+const updateForm = ref({
+  student_number: '',
+  organization_id: null as number | null,
+  status: 'active'
+})
+
+// Status options
+const statusOptions = [
+  { title: 'Active', value: 'active' },
+  { title: 'Inactive', value: 'inactive' },
+  { title: 'Blocked', value: 'blocked' }
+]
+
+// Toggle update form
+const toggleUpdateForm = () => {
+  showUpdateForm.value = !showUpdateForm.value
+
+  // Reset form when opening
+  if (showUpdateForm.value) {
+    updateForm.value = {
+      student_number: currentUser.value?.user_metadata?.student_number || '',
+      organization_id: currentUser.value?.user_metadata?.organization_id || null,
+      status: currentUser.value?.user_metadata?.status || 'active'
+    }
+  }
+}
+
+// Handle profile update
+const handleUpdateProfile = async () => {
+  // Prepare the data to update
+  const additionalData = {
+    student_number: updateForm.value.student_number,
+    organization_id: updateForm.value.organization_id,
+    status: updateForm.value.status,
+    profile_updated_at: new Date().toISOString(),
+    last_profile_update_source: 'admin_widget',
+    widget_version: '1.0.0'
+  }
+
+  const result = await updateUserMetadata(additionalData)
+
+  if (result.error) {
+    console.error('Failed to update profile:', result.error)
+  } else {
+    console.log('Profile updated successfully')
+    showUpdateForm.value = false // Close form after successful update
+    // Emit event to parent component
+    emit('profile-updated', additionalData)
+  }
+}
+</script>
+
 <template>
-  <v-card
+
+    <v-card
     class="profiles-widget"
     elevation="2"
     rounded="lg"
@@ -56,17 +144,17 @@
       <!-- Profile Content -->
       <div v-else-if="hasUserData" class="profile-content">
         <!-- User Avatar and Name -->
-        <div class="d-flex align-center mb-4">
+        <div class="d-flex flex-column align-center text-center mb-6">
           <v-avatar
-            size="64"
+            size="128"
             color="primary"
-            class="mr-4"
+            class="mb-4 elevation-4"
           >
-            <v-icon size="32" color="white">mdi-account</v-icon>
+            <span class="text-h3 font-weight-bold text-white">{{ userInitials }}</span>
           </v-avatar>
           <div>
-            <h3 class="text-h6 mb-1">{{ userDisplayName }}</h3>
-            <p class="text-body-2 text-medium-emphasis mb-0">{{ userEmail }}</p>
+            <h2 class="text-h4 mb-2 font-weight-medium">{{ userDisplayName }}</h2>
+            <p class="text-h6 text-medium-emphasis mb-0">{{ userEmail }}</p>
           </div>
         </div>
 
@@ -87,74 +175,16 @@
           ></v-list-item>
 
           <v-list-item
-            v-if="currentUser?.id"
-            prepend-icon="mdi-identifier"
-            :title="`ID: ${currentUser.id.substring(0, 8)}...`"
-            :subtitle="`Full ID: ${currentUser.id}`"
+            v-if="currentUser?.user_metadata?.student_number"
+            prepend-icon="mdi-school"
+            :title="`Student Number: ${currentUser.user_metadata.student_number}`"
+            subtitle="Student Identification Number"
           ></v-list-item>
         </v-list>
 
-        <!-- Update Profile Form -->
-        <v-form v-if="showUpdateForm" class="mt-4">
-          <v-text-field
-            v-model="updateForm.student_number"
-            label="Student Number"
-            prepend-icon="mdi-school"
-            variant="outlined"
-            density="compact"
-          ></v-text-field>
 
-          <v-text-field
-            v-model="updateForm.organization_id"
-            label="Organization ID"
-            prepend-icon="mdi-office-building"
-            variant="outlined"
-            density="compact"
-            type="number"
-          ></v-text-field>
 
-          <v-select
-            v-model="updateForm.status"
-            label="Status"
-            :items="statusOptions"
-            prepend-icon="mdi-account-check"
-            variant="outlined"
-            density="compact"
-          ></v-select>
-        </v-form>
 
-        <!-- Quick Actions -->
-        <div class="d-flex gap-2 mt-4">
-          <v-btn
-            variant="outlined"
-            size="small"
-            prepend-icon="mdi-account-edit"
-            @click="toggleUpdateForm"
-          >
-            {{ showUpdateForm ? 'Cancel' : 'Edit Profile' }}
-          </v-btn>
-
-          <v-btn
-            v-if="showUpdateForm"
-            variant="tonal"
-            size="small"
-            prepend-icon="mdi-content-save"
-            @click="handleUpdateProfile"
-            :loading="loading"
-            color="primary"
-          >
-            Save Changes
-          </v-btn>
-
-          <v-btn
-            variant="outlined"
-            size="small"
-            prepend-icon="mdi-shield-account"
-            @click="$emit('view-permissions')"
-          >
-            Permissions
-          </v-btn>
-        </div>
       </div>
 
       <!-- No User Data State -->
@@ -173,101 +203,62 @@
       </div>
     </v-card-text>
   </v-card>
+
 </template>
 
-<script setup lang="ts">
-import { ref } from 'vue'
-import { useProfilesWidget } from './composables/profilesWidget'
-
-// Emits for parent component interactions
-const emit = defineEmits<{
-  'edit-profile': []
-  'view-permissions': []
-  'profile-updated': [data: Record<string, any>]
-}>()
-
-// Use the composable
-const {
-  currentUser,
-  loading,
-  error,
-  userDisplayName,
-  userEmail,
-  userRole,
-  userCreatedAt,
-  hasUserData,
-  fetchCurrentUser,
-  refreshUserData,
-  updateUserMetadata
-} = useProfilesWidget()
-
-// Form state
-const showUpdateForm = ref(false)
-const updateForm = ref({
-  student_number: '',
-  organization_id: null as number | null,
-  status: 'active'
-})
-
-// Status options
-const statusOptions = [
-  { title: 'Active', value: 'active' },
-  { title: 'Inactive', value: 'inactive' },
-  { title: 'Blocked', value: 'blocked' }
-]
-
-// Toggle update form
-const toggleUpdateForm = () => {
-  showUpdateForm.value = !showUpdateForm.value
-
-  // Reset form when opening
-  if (showUpdateForm.value) {
-    updateForm.value = {
-      student_number: currentUser.value?.user_metadata?.student_number || '',
-      organization_id: currentUser.value?.user_metadata?.organization_id || null,
-      status: currentUser.value?.user_metadata?.status || 'active'
-    }
-  }
-}
-
-// Handle profile update
-const handleUpdateProfile = async () => {
-  // Prepare the data to update
-  const additionalData = {
-    student_number: updateForm.value.student_number,
-    organization_id: updateForm.value.organization_id,
-    status: updateForm.value.status,
-    profile_updated_at: new Date().toISOString(),
-    last_profile_update_source: 'admin_widget',
-    widget_version: '1.0.0'
-  }
-
-  const result = await updateUserMetadata(additionalData)
-
-  if (result.error) {
-    console.error('Failed to update profile:', result.error)
-  } else {
-    console.log('Profile updated successfully')
-    showUpdateForm.value = false // Close form after successful update
-    // Emit event to parent component
-    emit('profile-updated', additionalData)
-  }
-}
-</script><style scoped>
+<style scoped>
 .profiles-widget {
-  max-width: 400px;
+  min-height: 400px;
 }
 
 .profile-content {
-  min-height: 200px;
+  min-height: 300px;
+  padding: 8px 0;
 }
 
 .v-list-item {
   padding-left: 0;
   padding-right: 0;
+  margin-bottom: 8px;
 }
 
 .v-avatar {
   flex-shrink: 0;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.v-card-title {
+  padding: 20px 24px 16px;
+}
+
+.v-card-text {
+  padding: 24px;
+}
+
+/* Enhanced list styling */
+.v-list {
+  padding-top: 16px;
+}
+
+.v-list-item {
+  border-radius: 8px;
+  margin-bottom: 4px;
+  transition: background-color 0.2s ease;
+}
+
+.v-list-item:hover {
+  background-color: rgba(0, 0, 0, 0.04);
+}
+
+/* Form styling improvements */
+.v-form {
+  background-color: rgba(0, 0, 0, 0.02);
+  border-radius: 12px;
+  padding: 20px;
+  margin-top: 20px;
+}
+
+.v-text-field, .v-select {
+  margin-bottom: 16px;
 }
 </style>

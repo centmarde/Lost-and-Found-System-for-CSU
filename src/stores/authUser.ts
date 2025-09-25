@@ -39,17 +39,16 @@ export const useAuthUserStore = defineStore("authUser", () => {
   ) {
     loading.value = true;
     try {
+      // First, create the user with only profile data in user_metadata
       const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
         email,
         password,
         options: {
           data: {
             full_name: username,
-            role: roleId,
           }
         }
-        }
-      );
+      });
 
       if (signUpError) {
         return { error: signUpError };
@@ -57,6 +56,27 @@ export const useAuthUserStore = defineStore("authUser", () => {
 
       if (!signUpData.user) {
         return { error: new Error("Signup failed") };
+      }
+
+      // After user creation, update app_metadata with role information (admin only)
+      // This should be done by an admin endpoint or server function
+      // For now, we'll store role in user_metadata, but it should be moved to app_metadata
+      const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(
+        signUpData.user.id,
+        {
+          app_metadata: {
+            role: roleId,
+            permissions: [],
+            status: 'active',
+            created_by: 'system',
+            created_at: new Date().toISOString()
+          }
+        }
+      );
+
+      if (updateError) {
+        console.warn('Failed to set app_metadata:', updateError);
+        // Continue with registration even if app_metadata update fails
       }
 
       return { data: { id: signUpData.user.id, email } };
@@ -177,10 +197,11 @@ export const useAuthUserStore = defineStore("authUser", () => {
         app_metadata: user.app_metadata,
       };
 
-      // Log user role ID from metadata
-      const roleId = user.user_metadata?.role;
-      console.log('getCurrentUser - User Role ID from metadata:', roleId);
-      console.log('getCurrentUser - Full user metadata:', user.user_metadata);
+      // Log user role ID from app_metadata (proper location for roles)
+      const roleId = user.app_metadata?.role;
+      console.log('getCurrentUser - User Role ID from app_metadata:', roleId);
+      console.log('getCurrentUser - Full app_metadata:', user.app_metadata);
+      console.log('getCurrentUser - Full user_metadata:', user.user_metadata);
 
       return { user: userData };
     } catch (error) {
@@ -208,8 +229,8 @@ export const useAuthUserStore = defineStore("authUser", () => {
           id: user.id,
           email: user.email,
           created_at: user.created_at,
-          user_metadata: user.user_metadata,
-          app_metadata: user.app_metadata,
+          raw_user_meta_data: user.user_metadata,
+          raw_app_meta_data: user.app_metadata,
         };
       });
 
@@ -261,6 +282,93 @@ export const useAuthUserStore = defineStore("authUser", () => {
     }
   }
 
+  // Update app metadata (admin only - for roles, permissions, access control)
+  async function updateUserAppMetadata(userId: string, appData: Record<string, any>) {
+    loading.value = true;
+    try {
+      // First, get the current user to preserve existing app_metadata
+      const { data: currentUser, error: getUserError } = await supabaseAdmin.auth.admin.getUserById(userId);
+
+      if (getUserError) {
+        return { error: getUserError };
+      }
+
+      // Merge with existing app_metadata
+      const existingAppMetadata = currentUser.user?.app_metadata || {};
+
+      // Update app metadata using admin client (service role required)
+      const { data, error } = await supabaseAdmin.auth.admin.updateUserById(userId, {
+        app_metadata: {
+          ...existingAppMetadata,
+          ...appData,
+          last_updated: new Date().toISOString(),
+          updated_by: userData.value?.id || 'system'
+        }
+      });
+
+      if (error) {
+        return { error };
+      }
+
+      // If updating current user, refresh local userData
+      if (userData.value?.id === userId) {
+        await initializeAuth();
+      }
+
+      return { data };
+    } catch (error) {
+      console.error("Error updating user app metadata:", error);
+      return { error };
+    } finally {
+      loading.value = false;
+    }
+  }
+
+  // Ban user function (uses app_metadata)
+  async function banUser(userId: string, banDuration: string = '24h', reason?: string) {
+    const banData = {
+      banned: true,
+      ban_duration: banDuration,
+      ban_reason: reason || 'Violation of terms',
+      banned_at: new Date().toISOString(),
+      banned_until: banDuration === 'none' ? null : new Date(Date.now() + parseDuration(banDuration)).toISOString()
+    };
+
+    return await updateUserAppMetadata(userId, banData);
+  }
+
+  // Unban user function
+  async function unbanUser(userId: string) {
+    const unbanData = {
+      banned: false,
+      ban_duration: 'none',
+      ban_reason: null,
+      banned_at: null,
+      banned_until: null,
+      unbanned_at: new Date().toISOString()
+    };
+
+    return await updateUserAppMetadata(userId, unbanData);
+  }
+
+  // Helper function to parse duration strings
+  function parseDuration(duration: string): number {
+    const units: { [key: string]: number } = {
+      'ns': 1e-6,
+      'us': 1e-3, 'µs': 1e-3,
+      'ms': 1,
+      's': 1000,
+      'm': 60000,
+      'h': 3600000
+    };
+
+    const match = duration.match(/^(\d+(?:\.\d+)?)(ns|us|µs|ms|s|m|h)$/);
+    if (!match) return 0;
+
+    const [, value, unit] = match;
+    return parseFloat(value) * units[unit];
+  }
+
   // Call initialize on store creation
   initializeAuth();
 
@@ -284,6 +392,9 @@ export const useAuthUserStore = defineStore("authUser", () => {
     getCurrentUser,
     getAllUsers,
     updateUserMetadata,
+    updateUserAppMetadata,
+    banUser,
+    unbanUser,
   };
 });
 

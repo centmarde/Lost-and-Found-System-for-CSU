@@ -109,6 +109,20 @@ onMounted(() => {
 
 <template>
   <div>
+     <!-- Header Section -->
+    <v-row class="mb-6">
+      <v-col cols="12">
+        <div class="d-flex justify-space-between align-center">
+          <div>
+            <h1 class="text-h3 text-md-h2 font-weight-bold text-primary mb-2">User Management</h1>
+            <p class="text-body-1 text-grey-darken-1">
+              Manage system users and details
+            </p>
+          </div>
+
+        </div>
+      </v-col>
+    </v-row>
     <v-card>
       <v-card-title class="d-flex align-center justify-space-between">
         <div class="text-h5">User Management</div>

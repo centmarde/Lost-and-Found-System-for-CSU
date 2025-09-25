@@ -30,7 +30,23 @@ export function useProfilesWidget() {
 
   const userRole = computed(() => {
     if (!currentUser.value) return null
-    return currentUser.value.user_metadata?.role || null
+    // Role should be in app_metadata, not user_metadata
+    return currentUser.value.app_metadata?.role || null
+  })
+
+  const userStatus = computed(() => {
+    if (!currentUser.value) return null
+    return currentUser.value.app_metadata?.status || 'unknown'
+  })
+
+  const userBanned = computed(() => {
+    if (!currentUser.value) return false
+    return currentUser.value.app_metadata?.banned || false
+  })
+
+  const userPermissions = computed(() => {
+    if (!currentUser.value) return []
+    return currentUser.value.app_metadata?.permissions || []
   })
 
   const userCreatedAt = computed(() => {
@@ -68,7 +84,7 @@ export function useProfilesWidget() {
     await fetchCurrentUser()
   }
 
-  // Update user metadata
+  // Update user profile metadata (user-editable fields)
   const updateUserMetadata = async (additionalData: Record<string, any>) => {
     if (!currentUser.value?.id) {
       error.value = 'No user ID available for update'
@@ -97,6 +113,66 @@ export function useProfilesWidget() {
     }
   }
 
+  // Update user app metadata (admin only - for roles, permissions, bans)
+  const updateUserAppMetadata = async (appData: Record<string, any>) => {
+    if (!currentUser.value?.id) {
+      error.value = 'No user ID available for update'
+      return { error: new Error('No user ID available for update') }
+    }
+
+    loading.value = true
+    error.value = null
+
+    try {
+      const result = await authStore.updateUserAppMetadata(currentUser.value.id, appData)
+
+      if (result.error) {
+        error.value = (result.error as any)?.message || 'Failed to update user app metadata'
+        return { error: result.error }
+      }
+
+      // Refresh user data after successful update
+      await fetchCurrentUser()
+      return { success: true }
+    } catch (err) {
+      error.value = 'An unexpected error occurred during app metadata update'
+      return { error: new Error('An unexpected error occurred during app metadata update') }
+    } finally {
+      loading.value = false
+    }
+  }
+
+  // Ban/Unban user functions
+  const banUser = async (banDuration: string = '24h', reason?: string) => {
+    if (!currentUser.value?.id) return { error: new Error('No user ID available') }
+
+    loading.value = true
+    try {
+      const result = await authStore.banUser(currentUser.value.id, banDuration, reason)
+      if (!result.error) {
+        await fetchCurrentUser()
+      }
+      return result
+    } finally {
+      loading.value = false
+    }
+  }
+
+  const unbanUser = async () => {
+    if (!currentUser.value?.id) return { error: new Error('No user ID available') }
+
+    loading.value = true
+    try {
+      const result = await authStore.unbanUser(currentUser.value.id)
+      if (!result.error) {
+        await fetchCurrentUser()
+      }
+      return result
+    } finally {
+      loading.value = false
+    }
+  }
+
   // Initialize on mount
   onMounted(() => {
     fetchCurrentUser()
@@ -112,12 +188,18 @@ export function useProfilesWidget() {
     userDisplayName,
     userEmail,
     userRole,
+    userStatus,
+    userBanned,
+    userPermissions,
     userCreatedAt,
     hasUserData,
 
     // Methods
     fetchCurrentUser,
     refreshUserData,
-    updateUserMetadata
+    updateUserMetadata,
+    updateUserAppMetadata,
+    banUser,
+    unbanUser
   }
 }

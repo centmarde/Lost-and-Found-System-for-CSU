@@ -29,8 +29,8 @@ onMounted(() => {
         <!-- Page Header -->
         <v-row class="mb-6">
           <v-col cols="12">
-            <div class="text-center">
-              <h1 class="text-h3 font-weight-bold text-primary mb-2">
+            <div class="text-start">
+              <h1 class="text-h3 text-md-h2 font-weight-bold text-primary mb-2">
                 Lost & Found
               </h1>
               <p class="text-h6 text-grey-darken-1">
@@ -121,12 +121,5 @@ onMounted(() => {
 
 .v-card {
   border-radius: 12px;
-}
-
-.text-primary {
-  background: linear-gradient(45deg, #1976d2, #42a5f5);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
 }
 </style>
