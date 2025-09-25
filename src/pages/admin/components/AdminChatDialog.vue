@@ -72,12 +72,27 @@ sendMessage()
 }
 }
 
-const sendMessage = () => {
-  if (newMessage.value.trim()) {
-    emit('send-message', newMessage.value)
+const sendMessage = async () => {
+  if (!newMessage.value.trim() || !selectedConversation.value || !currentUser.value) return
+
+  const { data, error } = await supabase
+    .from('messages')
+    .insert([{
+      conversation_id: selectedConversation.value.id,
+      message: newMessage.value.trim(),
+      user_id: currentUser.value.id
+    }])
+    .select()
+
+  if (error) {
+    console.error('Error sending message:', error)
+  } else {
+    // Push the new message into messages array so it shows instantly
+    messages.value.push(data[0])
     newMessage.value = ''
   }
 }
+
 
 const isMyMessage = (message: Message) => {
 return message.user_id === currentUser.value?.id
