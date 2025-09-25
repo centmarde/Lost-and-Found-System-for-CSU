@@ -223,47 +223,58 @@ const handleOpenConversations = async (item: Item) => {
 const loadAdminConversationsForItem = async (itemId: number) => {
   loadingAdminConversations.value = true
   try {
-    // First, get conversations without trying to join users
+    // Get conversations from your conversations table
     const { data: conversations, error: conversationError } = await supabase
       .from('conversations')
       .select(`
-        *,
-        items:item_id (
-          id,
-          title,
-          description,
-          status
-        )
+        id,
+        item_id,
+        sender_id,
+        receiver_id,
+        created_at
       `)
       .eq('item_id', itemId)
       .order('created_at', { ascending: false })
 
     if (conversationError) throw conversationError
 
-    // Then get user emails separately using the auth store
+    // Get item details separately
+    const { data: itemData, error: itemError } = await supabase
+      .from('items')
+      .select('id, title, description, status')
+      .eq('id', itemId)
+      .single()
+
+    if (itemError) {
+      console.warn('Could not load item details:', itemError)
+    }
+
+    // Get user details using the auth store
     const authStore = useAuthUserStore()
     const { users: allUsers, error: usersError } = await authStore.getAllUsers()
 
     if (usersError) {
       console.warn('Could not load user details:', usersError)
-      // Use conversations without user email details
-      adminConversations.value = conversations?.map(conv => ({
-        ...conv,
-        sender: { id: conv.sender_id, email: 'Unknown User' }
-      })) || []
-    } else {
-      // Map user emails to conversations
-      adminConversations.value = conversations?.map(conv => {
-        const senderUser = allUsers?.find(user => user.id === conv.sender_id)
-        return {
-          ...conv,
-          sender: { 
-            id: conv.sender_id, 
-            email: senderUser?.email || 'Unknown User' 
-          }
-        }
-      }) || []
     }
+
+    // Map all the data together
+    adminConversations.value = conversations?.map(conv => {
+      const senderUser = allUsers?.find(user => user.id === conv.sender_id)
+      return {
+        ...conv,
+        items: itemData || { 
+          id: itemId, 
+          title: 'Unknown Item', 
+          description: '', 
+          status: 'lost' 
+        },
+        sender: { 
+          id: conv.sender_id, 
+          email: senderUser?.email || 'Unknown User' 
+        }
+      }
+    }) || []
+
   } catch (error) {
     console.error('Error loading admin conversations:', error)
     toast.error('Failed to load conversations')
@@ -286,7 +297,14 @@ const loadAdminMessages = async (conversationId: string) => {
   try {
     const { data, error } = await supabase
       .from('messages')
-      .select('*')
+      .select(`
+        id,
+        conversation_id,
+        message,
+        attach_image,
+        created_at,
+        sender_id
+      `)
       .eq('conversation_id', conversationId)
       .order('created_at', { ascending: true })
 
@@ -326,14 +344,28 @@ const sendAdminMessage = async () => {
         {
           conversation_id: selectedAdminConversation.value.id,
           message: messageText,
+          attach_image: null,
           sender_id: user.id
         }
       ])
-      .select()
+      .select(`
+        id,
+        conversation_id,
+        message,
+        attach_image,
+        created_at,
+        sender_id
+      `)
 
     if (error) throw error
 
-    // Message will be added via real-time subscription
+    // Add the message to the local array immediately
+    if (data && data[0]) {
+      adminMessages.value.push(data[0])
+      await nextTick()
+      scrollAdminMessagesToBottom()
+    }
+
   } catch (error) {
     console.error('Error sending admin message:', error)
     toast.error('Failed to send message')
@@ -364,8 +396,23 @@ const loadMessages = async () => {
 
   try {
     messagesLoading.value = true
-    const messagesData = await loadMessagesFromActions(currentConversation.value.id)
-    messages.value = messagesData || []
+    
+    const { data, error } = await supabase
+      .from('messages')
+      .select(`
+        id,
+        conversation_id,
+        message,
+        attach_image,
+        created_at,
+        sender_id
+      `)
+      .eq('conversation_id', currentConversation.value.id)
+      .order('created_at', { ascending: true })
+
+    if (error) throw error
+
+    messages.value = data || []
     
     await nextTick()
     scrollToBottom()
