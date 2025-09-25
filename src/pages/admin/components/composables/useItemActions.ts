@@ -1,3 +1,4 @@
+//useItemActions.ts
 import { ref } from 'vue'
 import { createClient } from '@supabase/supabase-js'
 
@@ -11,22 +12,29 @@ interface NewItemForm {
   status: 'lost' | 'found'
 }
 
-interface Item {
-  id: number
-  title: string
-  description: string
-  status: 'lost' | 'found'
-  user_id: string
-  claimed_by: string
+interface Message {
+  id: string
+  conversation_id: string
+  message: string
+  attach_image: string | null
+  created_at: string
+  sender_id: string
+}
+
+interface Conversation {
+  id: string
+  item_id: number
+  sender_id: string
+  receiver_id: string
   created_at: string
 }
 
-export const useItemActions = (refreshData: () => Promise<void>) => {
+export const useItemActions = (refreshData?: () => Promise<void>) => {
   const postingItem = ref(false)
   const showPostDialog = ref(false)
   const updatingItems = ref<Set<number>>(new Set())
-  const showConversationsDialog = ref(false)
-  const selectedItem = ref<Item | null>(null)
+  const startingConversation = ref<Set<number>>(new Set())
+  
   const newItemForm = ref<NewItemForm>({
     title: '',
     description: '',
@@ -67,7 +75,7 @@ export const useItemActions = (refreshData: () => Promise<void>) => {
       }
       showPostDialog.value = false
 
-      await refreshData()
+      if (refreshData) await refreshData()
 
       console.log('Item posted successfully:', data)
 
@@ -87,69 +95,216 @@ export const useItemActions = (refreshData: () => Promise<void>) => {
     }
   }
 
-  // New function to open conversations dialog
-  const openConversations = (item: Item) => {
-    selectedItem.value = item
-    showConversationsDialog.value = true
+  // Load or create conversation between user and admin
+  const loadOrCreateConversation = async (itemId: number, adminId: string) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      
+      if (!user) {
+        throw new Error('User not authenticated')
+      }
+
+      // Check if conversation already exists
+      const { data: existingConversation, error: checkError } = await supabase
+        .from('conversations')
+        .select('*')
+        .eq('item_id', itemId)
+        .eq('sender_id', user.id)
+        .eq('receiver_id', adminId)
+        .single()
+
+      if (checkError && checkError.code !== 'PGRST116') {
+        throw checkError
+      }
+
+      if (existingConversation) {
+        return { conversation: existingConversation, isNew: false }
+      } else {
+        // Create new conversation
+        const { data: newConversation, error: createError } = await supabase
+          .from('conversations')
+          .insert([
+            {
+              item_id: itemId,
+              sender_id: user.id,
+              receiver_id: adminId
+            }
+          ])
+          .select()
+          .single()
+
+        if (createError) {
+          throw createError
+        }
+
+        return { conversation: newConversation, isNew: true }
+      }
+
+    } catch (error) {
+      console.error('Error loading/creating conversation:', error)
+      throw error
+    }
   }
 
-  // Legacy function - kept for backward compatibility but modified
+  // Load messages for a conversation
+  const loadMessages = async (conversationId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('messages')
+        .select('*')
+        .eq('conversation_id', conversationId)
+        .order('created_at', { ascending: true })
+
+      if (error) throw error
+
+      return data as Message[]
+    } catch (error) {
+      console.error('Error loading messages:', error)
+      throw error
+    }
+  }
+
+  // Send message in conversation
+  const sendMessage = async (conversationId: string, message: string, attachImage?: string) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      
+      if (!user) {
+        throw new Error('User not authenticated')
+      }
+
+      const { data, error } = await supabase
+        .from('messages')
+        .insert([
+          {
+            conversation_id: conversationId,
+            message: message,
+            attach_image: attachImage || null,
+            sender_id: user.id
+          }
+        ])
+        .select()
+
+      if (error) throw error
+
+      return data[0] as Message
+    } catch (error) {
+      console.error('Error sending message:', error)
+      throw error
+    }
+  }
+
+  // Get conversations for current user
+  const getUserConversations = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      
+      if (!user) {
+        throw new Error('User not authenticated')
+      }
+
+      const { data, error } = await supabase
+        .from('conversations')
+        .select(`
+          *,
+          items:item_id (
+            id,
+            title,
+            description,
+            status
+          )
+        `)
+        .or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`)
+        .order('created_at', { ascending: false })
+
+      if (error) throw error
+
+      return data
+    } catch (error) {
+      console.error('Error fetching conversations:', error)
+      throw error
+    }
+  }
+
+  // Subscribe to real-time message updates
+  const subscribeToMessages = (conversationId: string, callback: (message: Message) => void) => {
+    return supabase
+      .channel(`messages:${conversationId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'messages',
+          filter: `conversation_id=eq.${conversationId}`
+        },
+        (payload) => {
+          callback(payload.new as Message)
+        }
+      )
+      .subscribe()
+  }
+
+  // Legacy functions for backward compatibility
   const markAsClaimed = async (itemId: number) => {
-    // This function is now replaced by openConversations
-    // but kept for compatibility with existing code
-    console.warn('markAsClaimed is deprecated, use openConversations instead')
-    updatingItems.value.add(itemId);
+    updatingItems.value.add(itemId)
 
     try {
+      const { data: { user } } = await supabase.auth.getUser()
+
       const { error } = await supabase
         .from('items')
-        .update({ status: 'claimed' })
-        .eq('id', itemId);
+        .update({ 
+          claimed_by: user?.id || null
+        })
+        .eq('id', itemId)
 
-      if (error) throw error;
+      if (error) throw error
 
-      await refreshData();
+      if (refreshData) await refreshData()
     } catch (error) {
-      console.error('Error marking item as claimed:', error);
-      alert('Error updating item status');
+      console.error('Error marking item as claimed:', error)
+      alert('Error updating item status')
     } finally {
-      updatingItems.value.delete(itemId);
+      updatingItems.value.delete(itemId)
     }
-  };
+  }
 
   const markAsUnclaimed = async (itemId: number) => {
-    updatingItems.value.add(itemId);
+    updatingItems.value.add(itemId)
 
     try {
       const { error } = await supabase
         .from('items')
         .update({ 
-          status: 'lost',
-          claimed_by: null 
+          claimed_by: null
         })
-        .eq('id', itemId);
+        .eq('id', itemId)
 
-      if (error) throw error;
+      if (error) throw error
 
-      await refreshData();
+      if (refreshData) await refreshData()
     } catch (error) {
-      console.error('Error marking item as unclaimed:', error);
-      alert('Error updating item status');
+      console.error('Error marking item as unclaimed:', error)
+      alert('Error updating item status')
     } finally {
-      updatingItems.value.delete(itemId);
+      updatingItems.value.delete(itemId)
     }
-  };
+  }
 
   return {
     postingItem,
     showPostDialog,
     updatingItems,
-    showConversationsDialog,
-    selectedItem,
+    startingConversation,
     newItemForm,
     postMissingItem,
-    openConversations,
-    markAsClaimed, // Legacy - kept for compatibility
+    loadOrCreateConversation,
+    loadMessages,
+    sendMessage,
+    getUserConversations,
+    subscribeToMessages,
+    markAsClaimed,
     markAsUnclaimed
   }
 }

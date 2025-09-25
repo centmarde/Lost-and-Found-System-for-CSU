@@ -2,16 +2,15 @@
 import { ref, onMounted, computed } from 'vue'
 import { createClient } from '@supabase/supabase-js'
 import InnerLayoutWrapper from '@/layouts/InnerLayoutWrapper.vue'
-import ItemCard from '@/pages/admin/components/ItemCard.vue'
+import AdminItemCard from '@/pages/admin/components/AdminCard.vue'
 import StatsCards from '@/pages/admin/components/StatsCards.vue'
 import SearchBar from '@/pages/admin/components/SearchBar.vue'
 import SystemStats from '@/pages/admin/components/SystemStats.vue'
 import QuickSummary from '@/pages/admin/components/Summary.vue'
 import RecentActivity from '@/pages/admin/components/RecentActivity.vue'
 import PostItemDialog from '@/pages/admin/components/PostItemDialog.vue'
-import ConversationsDialog from '@/pages/admin/components/ConvoDialog.vue'
 import { useDashboardData } from '@/pages/admin/components/composables/useDashboardData'
-import { useItemActions } from '@/pages/admin/components/composables/useItemActions'
+import { useAdminItemActions } from '@/pages/admin/components/composables/useAdminItems'
 import '@/styles/dashboardview.css'
 
 const {
@@ -26,13 +25,11 @@ const {
   postingItem,
   showPostDialog,
   updatingItems,
-  showConversationsDialog,
-  selectedItem,
   newItemForm,
   postMissingItem,
-  openConversations,
+  markAsClaimed,
   markAsUnclaimed
-} = useItemActions(fetchDashboardStats)
+} = useAdminItemActions(fetchDashboardStats)
 
 const searchQuery = ref('')
 
@@ -48,14 +45,6 @@ const filteredItems = computed(() => {
     (item.status?.toLowerCase().includes(query))
   )
 })
-
-// Handle opening conversations for an item
-const handleOpenConversations = (itemId: number) => {
-  const item = items.value.find(i => i.id === itemId)
-  if (item) {
-    openConversations(item)
-  }
-}
 
 onMounted(async () => {
   await fetchDashboardStats()
@@ -128,10 +117,10 @@ onMounted(async () => {
                     md="6"
                     class="mb-3"
                   >
-                    <ItemCard
+                    <AdminItemCard
                       :item="item"
                       :is-updating="updatingItems.has(item.id)"
-                      @open-conversations="handleOpenConversations"
+                      @mark-as-claimed="markAsClaimed"
                       @mark-as-unclaimed="markAsUnclaimed"
                     />
                   </v-col>
@@ -148,18 +137,11 @@ onMounted(async () => {
           <RecentActivity :stats="stats" />
         </template>
 
-        <!-- Dialogs -->
         <PostItemDialog
           v-model="showPostDialog"
           :posting="postingItem"
           :form="newItemForm"
           @submit="postMissingItem"
-        />
-
-        <ConversationsDialog
-          v-model="showConversationsDialog"
-          :item="selectedItem"
-          @item-claimed="fetchDashboardStats"
         />
       </div>
     </template>
