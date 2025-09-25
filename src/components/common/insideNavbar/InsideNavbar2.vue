@@ -5,6 +5,7 @@
   import { useTheme } from '@/composables/useTheme'
   import { useDisplay } from 'vuetify'
   import { useAuthUserStore } from '@/stores/authUser'
+  import { getEmailInitials } from '@/utils/helpers'
 
   interface Props {
     config?: UIConfig
@@ -19,6 +20,7 @@
 
   // Mobile drawer state
   const drawer = ref(false)
+  const userMenu = ref(false)
 
   // Theme management
   const { toggleTheme: handleToggleTheme, getCurrentTheme, isLoadingTheme } = useTheme()
@@ -65,12 +67,18 @@
     return `Switch to ${currentTheme.value === 'dark' ? 'light' : 'dark'} theme`
   })
 
+  // User initials for avatar
+  const userInitials = computed(() => {
+    return getEmailInitials(authStore.userEmail)
+  })
+
   function toggleTheme () {
     handleToggleTheme()
   }
 
   async function handleLogout () {
     try {
+      userMenu.value = false // Close dropdown menu
       await authStore.signOut()
     } catch (error) {
       console.error('Logout failed:', error)
@@ -173,22 +181,58 @@
               </v-btn>
             </v-badge>
 
-            <!-- Logout Button -->
-            <v-btn
-              :loading="authStore.loading"
-              size="large"
-              variant="text"
-              rounded="xl"
-              color="error"
-              aria-label="Logout"
-              class="text-white"
-              @click="handleLogout"
+            <!-- User Avatar with Dropdown Menu -->
+            <v-menu
+              v-model="userMenu"
+              :close-on-content-click="false"
+              location="bottom end"
+              offset="8"
             >
-              <v-icon icon="mdi-logout" color="white" />
-              <v-tooltip activator="parent" location="bottom">
-                Logout
-              </v-tooltip>
-            </v-btn>
+              <template #activator="{ props }">
+                <v-avatar
+                  v-bind="props"
+                  size="40"
+                  color="primary-lighten-1"
+                  class="text-primary-darken-4 font-weight-bold ml-2 cursor-pointer mx-5"
+                  aria-label="User menu"
+                >
+                  {{ userInitials }}
+                </v-avatar>
+              </template>
+
+              <v-card min-width="200">
+                <v-list>
+                  <!-- User Info -->
+                  <v-list-item>
+                    <template #prepend>
+                      <v-avatar
+                        size="32"
+                        color="primary"
+                        class="text-white font-weight-bold"
+                      >
+                        {{ userInitials }}
+                      </v-avatar>
+                    </template>
+                    <v-list-item-title class="font-weight-medium">
+                      {{ authStore.userName || 'User' }}
+                    </v-list-item-title>
+                    <v-list-item-subtitle class="text-caption">
+                      {{ authStore.userEmail }}
+                    </v-list-item-subtitle>
+                  </v-list-item>
+
+                  <v-divider />
+
+                  <!-- Menu Actions -->
+                  <v-list-item
+                    prepend-icon="mdi-logout"
+                    title="Logout"
+                    :loading="authStore.loading"
+                    @click="handleLogout"
+                  />
+                </v-list>
+              </v-card>
+            </v-menu>
           </div>
         </div>
 
@@ -215,51 +259,20 @@
       <!-- Drawer Header -->
       <v-list-item class="pa-4 border-b">
         <template #prepend>
-          <!-- Logo Image with Icon Fallback -->
-          <template v-if="navbarConfig.logo?.src">
-            <v-img
-              :src="navbarConfig.logo.src"
-              :alt="navbarConfig.logo.alt"
-              :width="navbarConfig.logo.width || 48"
-              :height="navbarConfig.logo.height || 48"
-              class="me-3"
-              contain
-            >
-              <template #error>
-                <!-- Fallback to avatar with icon if image fails to load -->
-                <v-avatar
-                  :color="navbarConfig.color === 'transparent' ? 'light' : 'primary-darken-1'"
-                  size="48"
-                >
-                  <v-icon
-                    :icon="navbarConfig.icon"
-                    size="28"
-                    color="white"
-                  />
-                </v-avatar>
-              </template>
-            </v-img>
-          </template>
-          <template v-else>
-            <!-- Default avatar with icon when no logo is configured -->
-            <v-avatar
-              :color="navbarConfig.color === 'transparent' ? 'light' : 'primary-darken-1'"
-              size="48"
-            >
-              <v-icon
-                :icon="navbarConfig.icon"
-                size="28"
-                color="white"
-              />
-            </v-avatar>
-          </template>
+          <v-avatar
+            size="48"
+            color="primary"
+            class="text-white font-weight-bold me-3"
+          >
+            {{ userInitials }}
+          </v-avatar>
         </template>
 
-        <v-list-item-title class="text-h6 font-weight-bold text-white">
-          {{ navbarConfig.title }}
+        <v-list-item-title class="text-h6 font-weight-bold">
+          {{ authStore.userName || 'User' }}
         </v-list-item-title>
-        <v-list-item-subtitle class="text-caption text-white">
-          Modern Design
+        <v-list-item-subtitle class="text-caption">
+          {{ authStore.userEmail }}
         </v-list-item-subtitle>
       </v-list-item>
 
@@ -272,7 +285,7 @@
           :title="themeTooltip"
           :prepend-icon="themeIcon"
           rounded="xl"
-          class="ma-2 text-white"
+          class="ma-2"
           @click="toggleTheme"
         />
 
@@ -281,7 +294,7 @@
           title="Logout"
           prepend-icon="mdi-logout"
           rounded="xl"
-          class="ma-2 text-white"
+          class="ma-2"
           color="error"
           @click="handleLogout"
         />
@@ -329,13 +342,10 @@
   color: white !important;
 }
 
-/* Ensure navigation drawer text is white */
-.v-navigation-drawer .text-white,
+/* Ensure navigation drawer has proper styling */
 .v-navigation-drawer .v-list-item-title,
-.v-navigation-drawer .v-list-item-subtitle,
-.v-navigation-drawer .v-list-item,
-.v-navigation-drawer .v-icon {
-  color: white !important;
+.v-navigation-drawer .v-list-item-subtitle {
+  color: inherit !important;
 }
 
 /* Smooth drawer animation */
