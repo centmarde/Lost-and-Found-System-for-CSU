@@ -20,6 +20,7 @@ interface Props {
 defineProps<Props>()
 
 defineEmits<{
+  openConversations: [item: Item]
   markAsClaimed: [id: number]
   markAsUnclaimed: [id: number]
 }>()
@@ -62,14 +63,26 @@ const getItemStatusIcon = (item: Item) => {
       </div>
     </v-card-text>
 
-    <v-card-actions class="pt-0">
+    <v-card-actions class="pt-0 d-flex gap-2">
+      <!-- Open Conversations button - always visible for admins -->
+      <v-btn
+        color="primary"
+        variant="flat"
+        size="small"
+        prepend-icon="mdi-message-text-outline"
+        @click="$emit('openConversations', item)"
+        :loading="isUpdating"
+      >
+        Open Conversations
+      </v-btn>
+      
       <v-spacer />
       
       <!-- Admin controls for managing item status -->
-      <v-btn
+      <!-- <v-btn
         v-if="!item.claimed_by"
         color="success"
-        variant="flat"
+        variant="outlined"
         size="small"
         prepend-icon="mdi-check"
         @click="$emit('markAsClaimed', item.id)"
@@ -87,7 +100,7 @@ const getItemStatusIcon = (item: Item) => {
         :loading="isUpdating"
       >
         Mark as Unclaimed
-      </v-btn>
+      </v-btn> -->
     </v-card-actions>
   </v-card>
 </template>
@@ -104,5 +117,9 @@ const getItemStatusIcon = (item: Item) => {
 
 .v-chip {
   border-radius: 8px;
+}
+
+.gap-2 {
+  gap: 8px;
 }
 </style>

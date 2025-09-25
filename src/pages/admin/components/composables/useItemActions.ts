@@ -1,4 +1,3 @@
-//useItemActions.ts
 import { ref } from 'vue'
 import { createClient } from '@supabase/supabase-js'
 
@@ -92,6 +91,61 @@ export const useItemActions = (refreshData?: () => Promise<void>) => {
       alert(`Error posting item: ${errorMessage}`)
     } finally {
       postingItem.value = false
+    }
+  }
+
+  // Contact function - initiates conversation with admin who posted the item
+  const contactAdmin = async (itemId: number, adminId: string) => {
+    startingConversation.value.add(itemId)
+
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      
+      if (!user) {
+        throw new Error('User not authenticated')
+      }
+
+      // Check if conversation already exists
+      const { data: existingConversation, error: checkError } = await supabase
+        .from('conversations')
+        .select('*')
+        .eq('item_id', itemId)
+        .eq('sender_id', user.id)
+        .eq('receiver_id', adminId)
+        .single()
+
+      if (checkError && checkError.code !== 'PGRST116') {
+        throw checkError
+      }
+
+      if (existingConversation) {
+        return { conversation: existingConversation, isNew: false }
+      } else {
+        // Create new conversation
+        const { data: newConversation, error: createError } = await supabase
+          .from('conversations')
+          .insert([
+            {
+              item_id: itemId,
+              sender_id: user.id,
+              receiver_id: adminId
+            }
+          ])
+          .select()
+          .single()
+
+        if (createError) {
+          throw createError
+        }
+
+        return { conversation: newConversation, isNew: true }
+      }
+
+    } catch (error) {
+      console.error('Error contacting admin:', error)
+      throw error
+    } finally {
+      startingConversation.value.delete(itemId)
     }
   }
 
@@ -299,6 +353,7 @@ export const useItemActions = (refreshData?: () => Promise<void>) => {
     startingConversation,
     newItemForm,
     postMissingItem,
+    contactAdmin,
     loadOrCreateConversation,
     loadMessages,
     sendMessage,

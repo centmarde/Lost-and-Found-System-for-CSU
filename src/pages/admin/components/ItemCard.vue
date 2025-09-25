@@ -1,7 +1,6 @@
+//UserItemCard.vue
 <script lang="ts" setup>
-
 import { formatDate } from '@/utils/helpers'
-
 
 interface Item {
   id: number
@@ -21,7 +20,7 @@ interface Props {
 defineProps<Props>()
 
 defineEmits<{
-  openConversations: [id: number]
+  contact: [id: number]
   markAsUnclaimed: [id: number]
 }>()
 
@@ -34,7 +33,6 @@ const getItemStatusText = (item: Item) => {
   if (item.claimed_by) return 'Claimed'
   return item.status === 'lost' ? 'Lost' : 'Found'
 }
-
 </script>
 
 <template>
@@ -65,11 +63,11 @@ const getItemStatusText = (item: Item) => {
         color="primary"
         variant="flat"
         size="small"
-        prepend-icon="mdi-message-text-outline"
-        @click="$emit('openConversations', item.id)"
+        prepend-icon="mdi-account-voice"
+        @click="$emit('contact', item.id)"
         :loading="isUpdating"
       >
-        Open Conversations
+        Contact
       </v-btn>
       <v-btn
         v-else

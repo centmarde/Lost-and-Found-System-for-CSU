@@ -1,12 +1,14 @@
-//Home.vue
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, nextTick } from 'vue'
+import { ref, onMounted, onUnmounted, nextTick, computed } from 'vue'
 import { useToast } from 'vue-toastification'
 import InnerLayoutWrapper from '@/layouts/InnerLayoutWrapper.vue'
-import MissingItemCard from '@/pages/admin/components/ItemCard.vue' 
+import AdminItemCard from '@/pages/admin/components/AdminCard.vue'
+import UserItemCard from '@/pages/admin/components/ItemCard.vue'
 import { supabase } from '@/lib/supabase'
 import { formatDate } from '@/utils/helpers'
 import { useAuthUserStore } from '@/stores/authUser'
+import { useItemActions } from '@/pages/admin/components/composables/useItemActions'
+import { useAdminItemActions } from '@/pages/admin/components/composables/useAdminItems'
 
 interface Item {
   id: number
@@ -33,6 +35,16 @@ interface Conversation {
   sender_id: string
   receiver_id: string
   created_at: string
+  items?: {
+    id: number
+    title: string
+    description: string
+    status: string
+  }
+  sender?: {
+    id: string
+    email: string
+  }
 }
 
 const toast = useToast()
@@ -42,7 +54,11 @@ const items = ref<Item[]>([])
 const itemsLoading = ref(false)
 const updatingItemId = ref<number | null>(null)
 
-// Chat state
+// User state
+const currentUser = ref<any>(null)
+const isCurrentUserAdmin = ref(false)
+
+// Chat state (for regular users)
 const showChatDialog = ref(false)
 const selectedItem = ref<Item | null>(null)
 const currentConversation = ref<Conversation | null>(null)
@@ -50,52 +66,97 @@ const messages = ref<Message[]>([])
 const newMessage = ref('')
 const messagesLoading = ref(false)
 const sendingMessage = ref(false)
-const currentUser = ref<any>(null)
 
-// Real-time subscription
+// Admin conversations state
+const showAdminConversationsDialog = ref(false)
+const selectedItemForConversations = ref<Item | null>(null)
+const adminConversations = ref<Conversation[]>([])
+const selectedAdminConversation = ref<Conversation | null>(null)
+const adminMessages = ref<Message[]>([])
+const newAdminMessage = ref('')
+const loadingAdminConversations = ref(false)
+const loadingAdminMessages = ref(false)
+const sendingAdminMessage = ref(false)
+
+// Real-time subscriptions
 let messageSubscription: any = null
+let adminMessageSubscription: any = null
 
-// Get current user
+// Use composables
+const { 
+  contactAdmin, 
+  startingConversation, 
+  loadMessages: loadMessagesFromActions,
+  sendMessage: sendMessageFromActions,
+  subscribeToMessages 
+} = useItemActions()
+
+// Check if current user is admin
+const checkIfUserIsAdmin = async (user: any) => {
+  if (!user) return false
+  
+  try {
+    const authStore = useAuthUserStore()
+    const { users, error } = await authStore.getAllUsers()
+    
+    if (error) return false
+    
+    const currentUserData = users?.find(u => u.id === user.id)
+    const roleId = currentUserData?.user_metadata?.role
+    
+    return roleId === 1 // Assuming admin role has ID 1
+  } catch (error) {
+    console.error('Error checking admin status:', error)
+    return false
+  }
+}
+
+// Get current user and check admin status
 const getCurrentUser = async () => {
   const { data: { user } } = await supabase.auth.getUser()
   currentUser.value = user
+  
+  if (user) {
+    isCurrentUserAdmin.value = await checkIfUserIsAdmin(user)
+  }
 }
 
-// Fetch items from database (only admin-posted items)
+// Fetch items from database
 const fetchItems = async () => {
   itemsLoading.value = true
   try {
-    // Get all users using the store method
-    const authStore = useAuthUserStore()
-    const { users, error: usersError } = await authStore.getAllUsers()
+    let query = supabase.from('items').select('*')
+    
+    if (!isCurrentUserAdmin.value) {
+      // For regular users, show only admin-posted items
+      const authStore = useAuthUserStore()
+      const { users, error: usersError } = await authStore.getAllUsers()
 
-    if (usersError) {
-      console.error('Error fetching users:', usersError)
-      toast.error('Failed to load admin users')
-      return
+      if (usersError) {
+        console.error('Error fetching users:', usersError)
+        toast.error('Failed to load admin users')
+        return
+      }
+
+      const adminUsers = users?.filter(user => {
+        const roleId = user.user_metadata?.role
+        return roleId === 1
+      }) || []
+
+      if (adminUsers.length === 0) {
+        items.value = []
+        return
+      }
+
+      const adminUserIds = adminUsers.map(admin => admin.id)
+      query = query.in('user_id', adminUserIds)
+    } else {
+      // For admins, show all items or just their own items
+      // You can modify this logic based on your requirements
+      query = query.eq('user_id', currentUser.value.id)
     }
 
-    // Filter admin users based on role in user_metadata
-    const adminUsers = users?.filter(user => {
-      const roleId = user.user_metadata?.role
-      // Assuming admin role has ID 1, adjust this value as needed
-      return roleId === 1 // or whatever your admin role ID is
-    }) || []
-
-    if (adminUsers.length === 0) {
-      items.value = []
-      return
-    }
-
-    // Extract admin user IDs
-    const adminUserIds = adminUsers.map(admin => admin.id)
-
-    // Fetch items posted by admins only
-    const { data, error } = await supabase
-      .from('items')
-      .select('*')
-      .in('user_id', adminUserIds)
-      .order('created_at', { ascending: false })
+    const { data, error } = await query.order('created_at', { ascending: false })
 
     if (error) {
       console.error('Error fetching items:', error)
@@ -112,10 +173,18 @@ const fetchItems = async () => {
   }
 }
 
-// Open conversation dialog
-const openConversations = async (itemId: number) => {
+// Use admin composable after fetchItems is declared
+const {
+  updatingItems,
+  markAsClaimed,
+  markAsUnclaimed,
+  subscribeToConversationMessages
+} = useAdminItemActions(fetchItems)
+
+// Handle contact button click (for regular users)
+const handleContact = async (itemId: number) => {
   if (!currentUser.value) {
-    toast.error('Please log in to start a conversation')
+    toast.error('Please log in to contact the admin')
     return
   }
 
@@ -123,121 +192,205 @@ const openConversations = async (itemId: number) => {
   if (!item) return
 
   selectedItem.value = item
-  showChatDialog.value = true
   
-  await loadOrCreateConversation(itemId, item.user_id)
-}
-
-// Load or create conversation
-const loadOrCreateConversation = async (itemId: number, adminId: string) => {
   try {
-    messagesLoading.value = true
-
-    // Check if conversation already exists
-    const { data: existingConversation, error: checkError } = await supabase
-      .from('conversations')
-      .select('*')
-      .eq('item_id', itemId)
-      .eq('sender_id', currentUser.value.id)
-      .eq('receiver_id', adminId)
-      .single()
-
-    if (checkError && checkError.code !== 'PGRST116') {
-      console.error('Error checking existing conversation:', checkError)
-      toast.error('Failed to load conversation')
-      return
-    }
-
-    if (existingConversation) {
-      // Use existing conversation
-      currentConversation.value = existingConversation
-    } else {
-      // Create new conversation
-      const { data: newConversation, error: createError } = await supabase
-        .from('conversations')
-        .insert([
-          {
-            item_id: itemId,
-            sender_id: currentUser.value.id,
-            receiver_id: adminId
-          }
-        ])
-        .select()
-        .single()
-
-      if (createError) {
-        console.error('Error creating conversation:', createError)
-        toast.error('Failed to create conversation')
-        return
-      }
-
-      currentConversation.value = newConversation
+    const result = await contactAdmin(itemId, item.user_id)
+    
+    if (result.isNew) {
       toast.success('Conversation started!')
     }
-
-    // Load messages
-    await loadMessages()
     
-    // Set up real-time subscription
+    currentConversation.value = result.conversation
+    showChatDialog.value = true
+    
+    await loadMessages()
     setupMessageSubscription()
-
+    
   } catch (error) {
-    console.error('Error loading conversation:', error)
-    toast.error('An unexpected error occurred')
+    console.error('Error contacting admin:', error)
+    toast.error('Failed to start conversation')
+  }
+}
+
+// Handle admin open conversations
+const handleOpenConversations = async (item: Item) => {
+  selectedItemForConversations.value = item
+  showAdminConversationsDialog.value = true
+  await loadAdminConversationsForItem(item.id)
+}
+
+// Load admin conversations for item
+const loadAdminConversationsForItem = async (itemId: number) => {
+  loadingAdminConversations.value = true
+  try {
+    // First, get conversations without trying to join users
+    const { data: conversations, error: conversationError } = await supabase
+      .from('conversations')
+      .select(`
+        *,
+        items:item_id (
+          id,
+          title,
+          description,
+          status
+        )
+      `)
+      .eq('item_id', itemId)
+      .order('created_at', { ascending: false })
+
+    if (conversationError) throw conversationError
+
+    // Then get user emails separately using the auth store
+    const authStore = useAuthUserStore()
+    const { users: allUsers, error: usersError } = await authStore.getAllUsers()
+
+    if (usersError) {
+      console.warn('Could not load user details:', usersError)
+      // Use conversations without user email details
+      adminConversations.value = conversations?.map(conv => ({
+        ...conv,
+        sender: { id: conv.sender_id, email: 'Unknown User' }
+      })) || []
+    } else {
+      // Map user emails to conversations
+      adminConversations.value = conversations?.map(conv => {
+        const senderUser = allUsers?.find(user => user.id === conv.sender_id)
+        return {
+          ...conv,
+          sender: { 
+            id: conv.sender_id, 
+            email: senderUser?.email || 'Unknown User' 
+          }
+        }
+      }) || []
+    }
+  } catch (error) {
+    console.error('Error loading admin conversations:', error)
+    toast.error('Failed to load conversations')
+    adminConversations.value = []
+  } finally {
+    loadingAdminConversations.value = false
+  }
+}
+
+// Select admin conversation
+const selectAdminConversation = async (conversation: Conversation) => {
+  selectedAdminConversation.value = conversation
+  await loadAdminMessages(conversation.id)
+  setupAdminMessageSubscription(conversation.id)
+}
+
+// Load admin messages
+const loadAdminMessages = async (conversationId: string) => {
+  loadingAdminMessages.value = true
+  try {
+    const { data, error } = await supabase
+      .from('messages')
+      .select('*')
+      .eq('conversation_id', conversationId)
+      .order('created_at', { ascending: true })
+
+    if (error) throw error
+
+    adminMessages.value = data || []
+    
+    await nextTick()
+    scrollAdminMessagesToBottom()
+  } catch (error) {
+    console.error('Error loading admin messages:', error)
+    toast.error('Failed to load messages')
+    adminMessages.value = []
+  } finally {
+    loadingAdminMessages.value = false
+  }
+}
+
+// Send admin message
+const sendAdminMessage = async () => {
+  if (!newAdminMessage.value.trim() || !selectedAdminConversation.value || sendingAdminMessage.value) return
+
+  const messageText = newAdminMessage.value.trim()
+  newAdminMessage.value = ''
+  sendingAdminMessage.value = true
+
+  try {
+    const { data: { user } } = await supabase.auth.getUser()
+    
+    if (!user) {
+      throw new Error('User not authenticated')
+    }
+
+    const { data, error } = await supabase
+      .from('messages')
+      .insert([
+        {
+          conversation_id: selectedAdminConversation.value.id,
+          message: messageText,
+          sender_id: user.id
+        }
+      ])
+      .select()
+
+    if (error) throw error
+
+    // Message will be added via real-time subscription
+  } catch (error) {
+    console.error('Error sending admin message:', error)
+    toast.error('Failed to send message')
+    newAdminMessage.value = messageText
+  } finally {
+    sendingAdminMessage.value = false
+  }
+}
+
+// Setup admin message subscription
+const setupAdminMessageSubscription = (conversationId: string) => {
+  if (adminMessageSubscription) {
+    adminMessageSubscription.unsubscribe()
+  }
+
+  adminMessageSubscription = subscribeToConversationMessages(
+    conversationId,
+    (message: Message) => {
+      adminMessages.value.push(message)
+      nextTick(() => scrollAdminMessagesToBottom())
+    }
+  )
+}
+
+// Load messages for current conversation (regular users)
+const loadMessages = async () => {
+  if (!currentConversation.value) return
+
+  try {
+    messagesLoading.value = true
+    const messagesData = await loadMessagesFromActions(currentConversation.value.id)
+    messages.value = messagesData || []
+    
+    await nextTick()
+    scrollToBottom()
+  } catch (error) {
+    console.error('Error loading messages:', error)
+    toast.error('Failed to load messages')
   } finally {
     messagesLoading.value = false
   }
 }
 
-// Load messages for current conversation
-const loadMessages = async () => {
-  if (!currentConversation.value) return
-
-  try {
-    const { data, error } = await supabase
-      .from('messages')
-      .select('*')
-      .eq('conversation_id', currentConversation.value.id)
-      .order('created_at', { ascending: true })
-
-    if (error) {
-      console.error('Error loading messages:', error)
-      return
-    }
-
-    messages.value = data || []
-    
-    // Scroll to bottom
-    await nextTick()
-    scrollToBottom()
-  } catch (error) {
-    console.error('Error loading messages:', error)
-  }
-}
-
-// Set up real-time message subscription
+// Set up regular message subscription
 const setupMessageSubscription = () => {
   if (!currentConversation.value || messageSubscription) return
 
-  messageSubscription = supabase
-    .channel(`messages:${currentConversation.value.id}`)
-    .on(
-      'postgres_changes',
-      {
-        event: 'INSERT',
-        schema: 'public',
-        table: 'messages',
-        filter: `conversation_id=eq.${currentConversation.value.id}`
-      },
-      (payload) => {
-        messages.value.push(payload.new as Message)
-        nextTick(() => scrollToBottom())
-      }
-    )
-    .subscribe()
+  messageSubscription = subscribeToMessages(
+    currentConversation.value.id,
+    (message: Message) => {
+      messages.value.push(message)
+      nextTick(() => scrollToBottom())
+    }
+  )
 }
 
-// Send message
+// Send message (regular users)
 const sendMessage = async () => {
   if (!newMessage.value.trim() || !currentConversation.value || sendingMessage.value) return
 
@@ -246,27 +399,11 @@ const sendMessage = async () => {
   sendingMessage.value = true
 
   try {
-    const { error } = await supabase
-      .from('messages')
-      .insert([
-        {
-          conversation_id: currentConversation.value.id,
-          message: messageText,
-          sender_id: currentUser.value.id
-        }
-      ])
-
-    if (error) {
-      console.error('Error sending message:', error)
-      toast.error('Failed to send message')
-      newMessage.value = messageText // Restore message on error
-      return
-    }
-
+    await sendMessageFromActions(currentConversation.value.id, messageText)
   } catch (error) {
     console.error('Error sending message:', error)
-    toast.error('An unexpected error occurred')
-    newMessage.value = messageText // Restore message on error
+    toast.error('Failed to send message')
+    newMessage.value = messageText
   } finally {
     sendingMessage.value = false
   }
@@ -280,14 +417,28 @@ const closeChatDialog = () => {
   messages.value = []
   newMessage.value = ''
   
-  // Clean up subscription
   if (messageSubscription) {
     messageSubscription.unsubscribe()
     messageSubscription = null
   }
 }
 
-// Scroll to bottom of messages
+// Close admin conversations dialog
+const closeAdminConversationsDialog = () => {
+  showAdminConversationsDialog.value = false
+  selectedItemForConversations.value = null
+  selectedAdminConversation.value = null
+  adminConversations.value = []
+  adminMessages.value = []
+  newAdminMessage.value = ''
+  
+  if (adminMessageSubscription) {
+    adminMessageSubscription.unsubscribe()
+    adminMessageSubscription = null
+  }
+}
+
+// Scroll functions
 const scrollToBottom = () => {
   const messagesContainer = document.querySelector('.messages-container')
   if (messagesContainer) {
@@ -295,11 +446,25 @@ const scrollToBottom = () => {
   }
 }
 
-// Handle Enter key in message input
+const scrollAdminMessagesToBottom = () => {
+  const messagesContainer = document.querySelector('.admin-messages-container')
+  if (messagesContainer) {
+    messagesContainer.scrollTop = messagesContainer.scrollHeight
+  }
+}
+
+// Handle key press
 const handleKeyPress = (event: KeyboardEvent) => {
   if (event.key === 'Enter' && !event.shiftKey) {
     event.preventDefault()
     sendMessage()
+  }
+}
+
+const handleAdminKeyPress = (event: KeyboardEvent) => {
+  if (event.key === 'Enter' && !event.shiftKey) {
+    event.preventDefault()
+    sendAdminMessage()
   }
 }
 
@@ -308,7 +473,7 @@ const isMyMessage = (message: Message) => {
   return message.sender_id === currentUser.value?.id
 }
 
-// Mark item as unclaimed (legacy function)
+// Mark item as unclaimed (for regular users)
 const markItemAsUnclaimed = async (itemId: number) => {
   updatingItemId.value = itemId
   try {
@@ -323,14 +488,13 @@ const markItemAsUnclaimed = async (itemId: number) => {
       return
     }
 
-    // Update local state
     const item = items.value.find(i => i.id === itemId)
     if (item) {
       item.claimed_by = ''
     }
 
     toast.success('Item marked as unclaimed!')
-    await fetchItems() // Refresh items
+    await fetchItems()
   } catch (error) {
     console.error('Error:', error)
     toast.error('An unexpected error occurred')
@@ -339,10 +503,24 @@ const markItemAsUnclaimed = async (itemId: number) => {
   }
 }
 
+// Computed property for page title
+const pageTitle = computed(() => {
+  return isCurrentUserAdmin.value ? 'Manage Lost & Found Items' : 'Lost & Found'
+})
+
+const pageSubtitle = computed(() => {
+  return isCurrentUserAdmin.value 
+    ? 'Manage your posted items and view conversations' 
+    : 'Find your lost items or help others find theirs'
+})
+
 // Cleanup on unmount
 onUnmounted(() => {
   if (messageSubscription) {
     messageSubscription.unsubscribe()
+  }
+  if (adminMessageSubscription) {
+    adminMessageSubscription.unsubscribe()
   }
 })
 
@@ -362,10 +540,10 @@ onMounted(async () => {
           <v-col cols="12">
             <div class="text-center">
               <h1 class="text-h3 font-weight-bold text-primary mb-2">
-                Lost & Found
+                {{ pageTitle }}
               </h1>
               <p class="text-h6 text-grey-darken-1">
-                Find your lost items or help others find theirs
+                {{ pageSubtitle }}
               </p>
             </div>
           </v-col>
@@ -377,7 +555,7 @@ onMounted(async () => {
             <v-card elevation="2" class="pa-4">
               <v-card-title class="text-h5 font-weight-bold mb-4 d-flex align-center">
                 <v-icon class="me-2" color="primary">mdi-package-variant-closed</v-icon>
-                Missing Items
+                {{ isCurrentUserAdmin ? 'Your Items' : 'Missing Items' }}
                 <v-spacer />
                 <v-chip 
                   v-if="!itemsLoading" 
@@ -404,9 +582,14 @@ onMounted(async () => {
                 <v-icon size="80" color="grey-lighten-1" class="mb-4">
                   mdi-package-variant-closed-remove
                 </v-icon>
-                <h3 class="text-h5 text-grey-darken-1 mb-2">No missing items found</h3>
+                <h3 class="text-h5 text-grey-darken-1 mb-2">
+                  {{ isCurrentUserAdmin ? 'No items posted yet' : 'No missing items found' }}
+                </h3>
                 <p class="text-body-1 text-grey-darken-2 mb-4">
-                  There are currently no missing items posted by admins.
+                  {{ isCurrentUserAdmin 
+                    ? 'You haven\'t posted any missing items yet.' 
+                    : 'There are currently no missing items posted by admins.' 
+                  }}
                 </p>
                 <v-btn 
                   color="primary" 
@@ -429,10 +612,22 @@ onMounted(async () => {
                   lg="3"
                   xl="3"
                 >
-                  <MissingItemCard
+                  <!-- Admin Card -->
+                  <AdminItemCard
+                    v-if="isCurrentUserAdmin"
                     :item="item"
-                    :is-updating="updatingItemId === item.id"
-                    @open-conversations="openConversations"
+                    :is-updating="updatingItems.has(item.id) || updatingItemId === item.id"
+                    @open-conversations="handleOpenConversations"
+                    @mark-as-claimed="markAsClaimed"
+                    @mark-as-unclaimed="markAsUnclaimed"
+                  />
+                  
+                  <!-- User Card -->
+                  <UserItemCard
+                    v-else
+                    :item="item"
+                    :is-updating="startingConversation.has(item.id) || updatingItemId === item.id"
+                    @contact="handleContact"
                     @mark-as-unclaimed="markItemAsUnclaimed"
                   />
                 </v-col>
@@ -441,7 +636,7 @@ onMounted(async () => {
           </v-col>
         </v-row>
 
-        <!-- Chat Dialog -->
+        <!-- Regular User Chat Dialog -->
         <v-dialog
           v-model="showChatDialog"
           max-width="600px"
@@ -465,7 +660,6 @@ onMounted(async () => {
               />
             </v-card-title>
 
-            <!-- Messages Container -->
             <div class="messages-container" style="height: 400px; overflow-y: auto;">
               <div v-if="messagesLoading" class="d-flex justify-center align-center pa-8">
                 <v-progress-circular indeterminate color="primary" />
@@ -498,7 +692,6 @@ onMounted(async () => {
               </div>
             </div>
 
-            <!-- Message Input -->
             <v-card-actions class="pa-4 bg-grey-lighten-5">
               <v-text-field
                 v-model="newMessage"
@@ -518,6 +711,131 @@ onMounted(async () => {
                 class="ml-2"
               />
             </v-card-actions>
+          </v-card>
+        </v-dialog>
+
+        <!-- Admin Conversations Dialog -->
+        <v-dialog
+          v-model="showAdminConversationsDialog"
+          max-width="800px"
+          persistent
+        >
+          <v-card class="admin-conversations-dialog">
+            <v-card-title class="d-flex align-center pa-4 bg-primary">
+              <v-icon class="me-2 text-white">mdi-forum</v-icon>
+              <div class="text-white">
+                <div class="text-h6">Conversations</div>
+                <div class="text-caption opacity-80">
+                  {{ selectedItemForConversations?.title }}
+                </div>
+              </div>
+              <v-spacer />
+              <v-btn
+                icon="mdi-close"
+                variant="text"
+                color="white"
+                @click="closeAdminConversationsDialog"
+              />
+            </v-card-title>
+
+            <div class="d-flex" style="height: 500px;">
+              <!-- Conversations List -->
+              <div class="conversations-list" style="width: 300px; border-right: 1px solid #e0e0e0;">
+                <div v-if="loadingAdminConversations" class="d-flex justify-center align-center pa-8">
+                  <v-progress-circular indeterminate color="primary" size="32" />
+                </div>
+
+                <div v-else-if="adminConversations.length === 0" class="text-center pa-8">
+                  <v-icon size="48" color="grey-lighten-1">mdi-message-outline</v-icon>
+                  <div class="text-body-2 text-grey-darken-1 mt-2">
+                    No conversations yet
+                  </div>
+                </div>
+
+                <v-list v-else class="pa-0">
+                  <v-list-item
+                    v-for="conversation in adminConversations"
+                    :key="conversation.id"
+                    @click="selectAdminConversation(conversation)"
+                    :active="selectedAdminConversation?.id === conversation.id"
+                    class="conversation-item"
+                  >
+                    <v-list-item-title class="text-subtitle-2">
+                      {{ conversation.sender?.email }}
+                    </v-list-item-title>
+                    <v-list-item-subtitle class="text-caption">
+                      {{ formatDate(conversation.created_at) }}
+                    </v-list-item-subtitle>
+                  </v-list-item>
+                </v-list>
+              </div>
+
+              <!-- Messages Area -->
+              <div class="flex-grow-1 d-flex flex-column">
+                <div v-if="!selectedAdminConversation" class="d-flex justify-center align-center flex-grow-1">
+                  <div class="text-center">
+                    <v-icon size="64" color="grey-lighten-1">mdi-message-text-outline</v-icon>
+                    <div class="text-body-1 text-grey-darken-1 mt-2">
+                      Select a conversation to view messages
+                    </div>
+                  </div>
+                </div>
+
+                <template v-else>
+                  <!-- Messages Container -->
+                  <div class="admin-messages-container flex-grow-1 pa-4" style="overflow-y: auto;">
+                    <div v-if="loadingAdminMessages" class="d-flex justify-center align-center pa-8">
+                      <v-progress-circular indeterminate color="primary" />
+                    </div>
+
+                    <div v-else-if="adminMessages.length === 0" class="text-center pa-8">
+                      <div class="text-body-2 text-grey-darken-1">
+                        No messages in this conversation yet
+                      </div>
+                    </div>
+
+                    <div v-else>
+                      <div
+                        v-for="message in adminMessages"
+                        :key="message.id"
+                        class="message-bubble mb-3"
+                        :class="{ 'my-message': isMyMessage(message) }"
+                      >
+                        <div class="message-content">
+                          <div class="message-text">{{ message.message }}</div>
+                          <div class="message-time">
+                            {{ formatDate(message.created_at) }}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Message Input -->
+                  <div class="pa-4 bg-grey-lighten-5" style="border-top: 1px solid #e0e0e0;">
+                    <div class="d-flex align-center">
+                      <v-text-field
+                        v-model="newAdminMessage"
+                        placeholder="Type your message..."
+                        variant="outlined"
+                        density="compact"
+                        hide-details
+                        @keypress="handleAdminKeyPress"
+                        :disabled="sendingAdminMessage"
+                      />
+                      <v-btn
+                        color="primary"
+                        icon="mdi-send"
+                        :loading="sendingAdminMessage"
+                        :disabled="!newAdminMessage.trim()"
+                        @click="sendAdminMessage"
+                        class="ml-2"
+                      />
+                    </div>
+                  </div>
+                </template>
+              </div>
+            </div>
           </v-card>
         </v-dialog>
       </v-container>
@@ -541,12 +859,12 @@ onMounted(async () => {
   background-clip: text;
 }
 
-.chat-dialog {
+.chat-dialog, .admin-conversations-dialog {
   border-radius: 12px !important;
   overflow: hidden;
 }
 
-.messages-container {
+.messages-container, .admin-messages-container {
   background: #f5f5f5;
 }
 
@@ -586,5 +904,17 @@ onMounted(async () => {
 
 .my-message .message-time {
   color: rgba(255,255,255,0.7);
+}
+
+.conversations-list {
+  background: #fafafa;
+}
+
+.conversation-item:hover {
+  background-color: #f0f0f0;
+}
+
+.conversation-item.v-list-item--active {
+  background-color: #e3f2fd;
 }
 </style>
