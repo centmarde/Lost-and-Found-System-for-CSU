@@ -69,7 +69,7 @@ const getItemStatusText = (item: Item) => {
         @click="$emit('markAsClaimed', item.id)"
         :loading="isUpdating"
       >
-        Mark as Claimed
+        Start a Chat
       </v-btn>
       <v-btn
         v-else

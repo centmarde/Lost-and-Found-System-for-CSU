@@ -105,11 +105,11 @@ const getRoleName = (roleId: number | undefined) => {
     case 1:
       return 'Admin'
     case 2:
-      return 'Moderator'
-    case 3:
+      return 'User'
+   /*  case 3:
       return 'Student'
     case 4:
-      return 'Faculty'
+      return 'Faculty' */
     default:
       return 'Unknown'
   }
