@@ -9,6 +9,7 @@ import SystemStats from '@/pages/admin/components/SystemStats.vue'
 import QuickSummary from '@/pages/admin/components/Summary.vue'
 import RecentActivity from '@/pages/admin/components/RecentActivity.vue'
 import PostItemDialog from '@/pages/admin/components/PostItemDialog.vue'
+import ConversationsDialog from '@/pages/admin/components/ConvoDialog.vue'
 import { useDashboardData } from '@/pages/admin/components/composables/useDashboardData'
 import { useItemActions } from '@/pages/admin/components/composables/useItemActions'
 import '@/styles/dashboardview.css'
@@ -25,9 +26,11 @@ const {
   postingItem,
   showPostDialog,
   updatingItems,
+  showConversationsDialog,
+  selectedItem,
   newItemForm,
   postMissingItem,
-  markAsClaimed,
+  openConversations,
   markAsUnclaimed
 } = useItemActions(fetchDashboardStats)
 
@@ -45,6 +48,14 @@ const filteredItems = computed(() => {
     (item.status?.toLowerCase().includes(query))
   )
 })
+
+// Handle opening conversations for an item
+const handleOpenConversations = (itemId: number) => {
+  const item = items.value.find(i => i.id === itemId)
+  if (item) {
+    openConversations(item)
+  }
+}
 
 onMounted(async () => {
   await fetchDashboardStats()
@@ -120,7 +131,7 @@ onMounted(async () => {
                     <ItemCard
                       :item="item"
                       :is-updating="updatingItems.has(item.id)"
-                      @mark-as-claimed="markAsClaimed"
+                      @open-conversations="handleOpenConversations"
                       @mark-as-unclaimed="markAsUnclaimed"
                     />
                   </v-col>
@@ -137,11 +148,18 @@ onMounted(async () => {
           <RecentActivity :stats="stats" />
         </template>
 
+        <!-- Dialogs -->
         <PostItemDialog
           v-model="showPostDialog"
           :posting="postingItem"
           :form="newItemForm"
           @submit="postMissingItem"
+        />
+
+        <ConversationsDialog
+          v-model="showConversationsDialog"
+          :item="selectedItem"
+          @item-claimed="fetchDashboardStats"
         />
       </div>
     </template>

@@ -11,10 +11,22 @@ interface NewItemForm {
   status: 'lost' | 'found'
 }
 
+interface Item {
+  id: number
+  title: string
+  description: string
+  status: 'lost' | 'found'
+  user_id: string
+  claimed_by: string
+  created_at: string
+}
+
 export const useItemActions = (refreshData: () => Promise<void>) => {
   const postingItem = ref(false)
   const showPostDialog = ref(false)
   const updatingItems = ref<Set<number>>(new Set())
+  const showConversationsDialog = ref(false)
+  const selectedItem = ref<Item | null>(null)
   const newItemForm = ref<NewItemForm>({
     title: '',
     description: '',
@@ -75,7 +87,17 @@ export const useItemActions = (refreshData: () => Promise<void>) => {
     }
   }
 
+  // New function to open conversations dialog
+  const openConversations = (item: Item) => {
+    selectedItem.value = item
+    showConversationsDialog.value = true
+  }
+
+  // Legacy function - kept for backward compatibility but modified
   const markAsClaimed = async (itemId: number) => {
+    // This function is now replaced by openConversations
+    // but kept for compatibility with existing code
+    console.warn('markAsClaimed is deprecated, use openConversations instead')
     updatingItems.value.add(itemId);
 
     try {
@@ -101,7 +123,10 @@ export const useItemActions = (refreshData: () => Promise<void>) => {
     try {
       const { error } = await supabase
         .from('items')
-        .update({ status: 'lost' })
+        .update({ 
+          status: 'lost',
+          claimed_by: null 
+        })
         .eq('id', itemId);
 
       if (error) throw error;
@@ -119,9 +144,12 @@ export const useItemActions = (refreshData: () => Promise<void>) => {
     postingItem,
     showPostDialog,
     updatingItems,
+    showConversationsDialog,
+    selectedItem,
     newItemForm,
     postMissingItem,
-    markAsClaimed,
+    openConversations,
+    markAsClaimed, // Legacy - kept for compatibility
     markAsUnclaimed
   }
 }

@@ -21,7 +21,7 @@ interface Props {
 defineProps<Props>()
 
 defineEmits<{
-  markAsClaimed: [id: number]
+  openConversations: [id: number]
   markAsUnclaimed: [id: number]
 }>()
 
@@ -62,14 +62,14 @@ const getItemStatusText = (item: Item) => {
       <v-spacer />
       <v-btn
         v-if="!item.claimed_by"
-        color="success"
+        color="primary"
         variant="flat"
         size="small"
-        prepend-icon="mdi-check"
-        @click="$emit('markAsClaimed', item.id)"
+        prepend-icon="mdi-message-text-outline"
+        @click="$emit('openConversations', item.id)"
         :loading="isUpdating"
       >
-        Mark as Claimed
+        Open Conversations
       </v-btn>
       <v-btn
         v-else
@@ -85,8 +85,6 @@ const getItemStatusText = (item: Item) => {
     </v-card-actions>
   </v-card>
 </template>
-
-
 
 <style scoped>
 .item-card {
