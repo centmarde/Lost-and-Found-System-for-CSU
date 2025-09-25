@@ -1,3 +1,4 @@
+//Home.vue
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, nextTick, computed } from 'vue'
 import { useToast } from 'vue-toastification'
@@ -26,7 +27,7 @@ interface Message {
   message: string
   attach_image: string | null
   created_at: string
-  sender_id: string
+  user_id: string
 }
 
 interface Conversation {
@@ -303,7 +304,7 @@ const loadAdminMessages = async (conversationId: string) => {
         message,
         attach_image,
         created_at,
-        sender_id
+        user_id
       `)
       .eq('conversation_id', conversationId)
       .order('created_at', { ascending: true })
@@ -345,7 +346,7 @@ const sendAdminMessage = async () => {
           conversation_id: selectedAdminConversation.value.id,
           message: messageText,
           attach_image: null,
-          sender_id: user.id
+          user_id: user.id
         }
       ])
       .select(`
@@ -354,7 +355,7 @@ const sendAdminMessage = async () => {
         message,
         attach_image,
         created_at,
-        sender_id
+        user_id
       `)
 
     if (error) throw error
@@ -405,7 +406,7 @@ const loadMessages = async () => {
         message,
         attach_image,
         created_at,
-        sender_id
+        user_id
       `)
       .eq('conversation_id', currentConversation.value.id)
       .order('created_at', { ascending: true })
@@ -517,7 +518,7 @@ const handleAdminKeyPress = (event: KeyboardEvent) => {
 
 // Check if message is from current user
 const isMyMessage = (message: Message) => {
-  return message.sender_id === currentUser.value?.id
+  return message.user_id === currentUser.value?.id
 }
 
 // Mark item as unclaimed (for regular users)
@@ -582,7 +583,6 @@ onMounted(async () => {
   <InnerLayoutWrapper>
     <template #content>
       <v-container fluid class="pa-6">
-        <!-- Page Header -->
         <v-row class="mb-6">
           <v-col cols="12">
             <div class="text-center">
@@ -596,7 +596,6 @@ onMounted(async () => {
           </v-col>
         </v-row>
 
-        <!-- Items Section -->
         <v-row>
           <v-col cols="12">
             <v-card elevation="2" class="pa-4">
@@ -614,7 +613,6 @@ onMounted(async () => {
                 </v-chip>
               </v-card-title>
 
-              <!-- Loading State -->
               <div v-if="itemsLoading" class="text-center py-12">
                 <v-progress-circular
                   indeterminate
@@ -624,7 +622,6 @@ onMounted(async () => {
                 <p class="text-body-1 mt-4">Loading items...</p>
               </div>
 
-              <!-- Empty State -->
               <div v-else-if="items.length === 0" class="text-center py-12">
                 <v-icon size="80" color="grey-lighten-1" class="mb-4">
                   mdi-package-variant-closed-remove
@@ -648,7 +645,6 @@ onMounted(async () => {
                 </v-btn>
               </div>
 
-              <!-- Items Grid -->
               <v-row v-else class="items-grid">
                 <v-col
                   v-for="item in items"
@@ -659,7 +655,6 @@ onMounted(async () => {
                   lg="3"
                   xl="3"
                 >
-                  <!-- Admin Card -->
                   <AdminItemCard
                     v-if="isCurrentUserAdmin"
                     :item="item"
@@ -669,7 +664,6 @@ onMounted(async () => {
                     @mark-as-unclaimed="markAsUnclaimed"
                   />
                   
-                  <!-- User Card -->
                   <UserItemCard
                     v-else
                     :item="item"
@@ -683,7 +677,6 @@ onMounted(async () => {
           </v-col>
         </v-row>
 
-        <!-- Regular User Chat Dialog -->
         <v-dialog
           v-model="showChatDialog"
           max-width="600px"
@@ -761,7 +754,6 @@ onMounted(async () => {
           </v-card>
         </v-dialog>
 
-        <!-- Admin Conversations Dialog -->
         <v-dialog
           v-model="showAdminConversationsDialog"
           max-width="800px"
@@ -786,7 +778,6 @@ onMounted(async () => {
             </v-card-title>
 
             <div class="d-flex" style="height: 500px;">
-              <!-- Conversations List -->
               <div class="conversations-list" style="width: 300px; border-right: 1px solid #e0e0e0;">
                 <div v-if="loadingAdminConversations" class="d-flex justify-center align-center pa-8">
                   <v-progress-circular indeterminate color="primary" size="32" />
@@ -817,7 +808,6 @@ onMounted(async () => {
                 </v-list>
               </div>
 
-              <!-- Messages Area -->
               <div class="flex-grow-1 d-flex flex-column">
                 <div v-if="!selectedAdminConversation" class="d-flex justify-center align-center flex-grow-1">
                   <div class="text-center">
@@ -829,7 +819,6 @@ onMounted(async () => {
                 </div>
 
                 <template v-else>
-                  <!-- Messages Container -->
                   <div class="admin-messages-container flex-grow-1 pa-4" style="overflow-y: auto;">
                     <div v-if="loadingAdminMessages" class="d-flex justify-center align-center pa-8">
                       <v-progress-circular indeterminate color="primary" />
@@ -858,7 +847,6 @@ onMounted(async () => {
                     </div>
                   </div>
 
-                  <!-- Message Input -->
                   <div class="pa-4 bg-grey-lighten-5" style="border-top: 1px solid #e0e0e0;">
                     <div class="d-flex align-center">
                       <v-text-field

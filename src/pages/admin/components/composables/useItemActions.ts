@@ -11,13 +11,14 @@ interface NewItemForm {
   status: 'lost' | 'found'
 }
 
-interface Message {
+// Corrected Message interface to use 'user_id' instead of 'sender_id'
+export interface Message {
   id: string
   conversation_id: string
   message: string
   attach_image: string | null
   created_at: string
-  sender_id: string
+  user_id: string
 }
 
 interface Conversation {
@@ -211,6 +212,7 @@ export const useItemActions = (refreshData?: () => Promise<void>) => {
 
       if (error) throw error
 
+      // Return data with correct type
       return data as Message[]
     } catch (error) {
       console.error('Error loading messages:', error)
@@ -234,7 +236,8 @@ export const useItemActions = (refreshData?: () => Promise<void>) => {
             conversation_id: conversationId,
             message: message,
             attach_image: attachImage || null,
-            sender_id: user.id
+            // Changed from sender_id to user_id to match the corrected interface and table
+            user_id: user.id
           }
         ])
         .select()
@@ -293,6 +296,7 @@ export const useItemActions = (refreshData?: () => Promise<void>) => {
           filter: `conversation_id=eq.${conversationId}`
         },
         (payload) => {
+          // Changed the type assertion to match the corrected interface
           callback(payload.new as Message)
         }
       )

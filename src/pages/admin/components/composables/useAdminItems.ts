@@ -28,7 +28,7 @@ interface Message {
   message: string
   attach_image: string | null
   created_at: string
-  sender_id: string
+  user_id: string
 }
 
 interface Conversation {
