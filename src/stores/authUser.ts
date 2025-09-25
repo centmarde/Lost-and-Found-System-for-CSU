@@ -32,13 +32,10 @@ export const useAuthUserStore = defineStore("authUser", () => {
 
 
   async function registerUser(
-   email: string,
+    email: string,
     password: string,
     username: string,
-    roleId: number,
-    full_name?: string,
-    student_number?: string,
-    organization_id?: number
+    roleId: number
   ) {
     loading.value = true;
     try {
@@ -205,24 +202,14 @@ export const useAuthUserStore = defineStore("authUser", () => {
         return { error: authError };
       }
 
-
-
-      // Merge auth users with student data
+      // Map auth users to consistent format
       const allUsers = authData.users.map(user => {
-
-
         return {
           id: user.id,
           email: user.email,
           created_at: user.created_at,
           user_metadata: user.user_metadata,
           app_metadata: user.app_metadata,
-          // Additional student info if available
-         /*  full_name: studentInfo?.full_name || user.user_metadata?.full_name || user.email,
-          student_number: studentInfo?.student_number || null,
-          status: studentInfo?.status || 'blocked',
-          organization_id: studentInfo?.organization_id || null,
-          role_id: user.user_metadata?.role || studentInfo?.role_id || null */
         };
       });
 
@@ -234,6 +221,46 @@ export const useAuthUserStore = defineStore("authUser", () => {
       loading.value = false;
     }
   }
+
+  // Update user metadata (admin function)
+  async function updateUserMetadata(userId: string, additionalData: Record<string, any>) {
+    loading.value = true;
+    try {
+      // First, get the current user to preserve existing metadata
+      const { data: currentUser, error: getUserError } = await supabaseAdmin.auth.admin.getUserById(userId);
+
+      if (getUserError) {
+        return { error: getUserError };
+      }
+
+      // Merge with existing user_metadata (not app_metadata)
+      const existingUserMetadata = currentUser.user?.user_metadata || {};
+
+      // Update user metadata using admin client
+      const { data, error } = await supabaseAdmin.auth.admin.updateUserById(userId, {
+        user_metadata: {
+          ...existingUserMetadata,
+          ...additionalData,
+          last_updated: new Date().toISOString()
+        }
+      });
+
+      if (error) {
+        return { error };
+      }      // If updating current user, refresh local userData
+      if (userData.value?.id === userId) {
+        await initializeAuth();
+      }
+
+      return { data };
+    } catch (error) {
+      console.error("Error updating user metadata:", error);
+      return { error };
+    } finally {
+      loading.value = false;
+    }
+  }
+
   // Call initialize on store creation
   initializeAuth();
 
@@ -256,6 +283,7 @@ export const useAuthUserStore = defineStore("authUser", () => {
     initializeAuth,
     getCurrentUser,
     getAllUsers,
+    updateUserMetadata,
   };
 });
 
