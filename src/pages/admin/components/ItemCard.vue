@@ -65,11 +65,11 @@ const getItemStatusText = (item: Item) => {
         color="success"
         variant="flat"
         size="small"
-        prepend-icon="mdi-check"
+        prepend-icon="mdi-message"
         @click="$emit('markAsClaimed', item.id)"
         :loading="isUpdating"
       >
-        Start a Chat
+        View Conversation
       </v-btn>
       <v-btn
         v-else
