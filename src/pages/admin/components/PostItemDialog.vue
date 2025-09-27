@@ -37,6 +37,7 @@ const handleSubmit = () => {
             v-model="form.status"
             :items="[
               { title: 'Lost Item', value: 'lost' },
+              { title: 'Found Item', value: 'found' }
             ]"
             label="Item Type"
             prepend-inner-icon="mdi-tag"
