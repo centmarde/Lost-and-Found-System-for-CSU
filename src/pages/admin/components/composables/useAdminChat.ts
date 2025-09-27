@@ -1,4 +1,3 @@
-//useAdminChat.ts
 import { ref, onUnmounted, nextTick } from 'vue'
 import { useToast } from 'vue-toastification'
 import { supabase } from '@/lib/supabase'
@@ -29,6 +28,12 @@ interface Message {
   created_at: string
 }
 
+interface SendMessagePayload {
+  conversationId: string
+  message: string
+  userId: string
+}
+
 export function useAdminChat(currentUser: any) {
   const toast = useToast()
   const authStore = useAuthUserStore()
@@ -43,6 +48,7 @@ export function useAdminChat(currentUser: any) {
   const loadingAdminMessages = ref(false)
   const sendingAdminMessage = ref(false)
   let adminMessageSubscription: any = null
+  let currentConversationId: string | null = null
 
   // Helper to scroll messages to the bottom
   const scrollAdminMessagesToBottom = () => {
@@ -56,6 +62,17 @@ export function useAdminChat(currentUser: any) {
 
   // Opens the admin conversations dialog and loads conversations for a specific item
   const handleOpenConversations = async (item: Item) => {
+    console.log('Opening conversations for item:', item.id, item.title)
+    
+    // Clean up previous state
+    selectedAdminConversation.value = null
+    adminMessages.value = []
+    if (adminMessageSubscription) {
+      adminMessageSubscription.unsubscribe()
+      adminMessageSubscription = null
+    }
+    currentConversationId = null
+    
     selectedItemForConversations.value = item
     showAdminConversationsDialog.value = true
     await loadAdminConversationsForItem(item.id)
@@ -65,6 +82,8 @@ export function useAdminChat(currentUser: any) {
   const loadAdminConversationsForItem = async (itemId: number) => {
     loadingAdminConversations.value = true
     try {
+      console.log('Loading conversations for item ID:', itemId)
+      
       const { data: conversations, error: conversationError } = await supabase
         .from('conversations')
         .select('*')
@@ -73,13 +92,19 @@ export function useAdminChat(currentUser: any) {
 
       if (conversationError) throw conversationError
 
+      console.log('Found conversations:', conversations?.length || 0)
+
       const { users: allUsers, error: usersError } = await authStore.getAllUsers()
       if (usersError) console.warn('Could not load user details:', usersError)
 
       adminConversations.value = conversations?.map(conv => ({
         ...conv,
-        sender: allUsers?.find(user => user.id === conv.sender_id) || { id: conv.sender_id, email: 'Unknown User' },
+        sender: allUsers?.find(user => user.id === conv.sender_id) || { 
+          id: conv.sender_id, 
+          email: 'Unknown User' 
+        },
       })) || []
+      
     } catch (error) {
       console.error('Error loading admin conversations:', error)
       toast.error('Failed to load conversations')
@@ -91,14 +116,32 @@ export function useAdminChat(currentUser: any) {
 
   // Selects a conversation and loads its messages
   const selectAdminConversation = async (conversation: Conversation) => {
+    console.log('Selecting conversation:', conversation.id)
+    
+    // Clean up previous subscription
+    if (adminMessageSubscription) {
+      console.log('Unsubscribing from previous conversation:', currentConversationId)
+      adminMessageSubscription.unsubscribe()
+      adminMessageSubscription = null
+    }
+    
+    // Clear previous messages immediately
+    adminMessages.value = []
     selectedAdminConversation.value = conversation
+    currentConversationId = conversation.id
+    
+    // Load messages for the new conversation
     await loadAdminMessages(conversation.id)
+    
+    // Setup subscription for the new conversation
     setupAdminMessageSubscription(conversation.id)
   }
 
   // Loads messages for a specific conversation
   const loadAdminMessages = async (conversationId: string) => {
+    console.log('Loading messages for conversation:', conversationId)
     loadingAdminMessages.value = true
+    
     try {
       const { data, error } = await supabase
         .from('messages')
@@ -107,6 +150,8 @@ export function useAdminChat(currentUser: any) {
         .order('created_at', { ascending: true })
 
       if (error) throw error
+      
+      console.log('Loaded messages:', data?.length || 0)
       adminMessages.value = data || []
       scrollAdminMessagesToBottom()
     } catch (error) {
@@ -119,30 +164,53 @@ export function useAdminChat(currentUser: any) {
   }
 
   // Sends a new message from the admin
-  const sendAdminMessage = async () => {
-    if (!newAdminMessage.value.trim() || !selectedAdminConversation.value || sendingAdminMessage.value) return
-    const messageText = newAdminMessage.value.trim()
-    newAdminMessage.value = ''
+  const sendAdminMessage = async (payload?: SendMessagePayload) => {
+    let messageData: SendMessagePayload
+    
+    if (payload) {
+      // Message sent from dialog component
+      messageData = payload
+    } else {
+      // Message sent from composable (fallback)
+      if (!newAdminMessage.value.trim() || !selectedAdminConversation.value) return
+      messageData = {
+        conversationId: selectedAdminConversation.value.id,
+        message: newAdminMessage.value.trim(),
+        userId: currentUser.value.id
+      }
+      newAdminMessage.value = ''
+    }
+
+    if (sendingAdminMessage.value) return
     sendingAdminMessage.value = true
 
     try {
+      console.log('Sending message to conversation:', messageData.conversationId)
+      
       const { data, error } = await supabase
         .from('messages')
         .insert({
-          conversation_id: selectedAdminConversation.value.id,
-          message: messageText,
-          user_id: currentUser.value.id,
+          conversation_id: messageData.conversationId,
+          message: messageData.message,
+          user_id: messageData.userId,
         })
         .select()
         .single()
 
       if (error) throw error
-      adminMessages.value.push(data)
-      scrollAdminMessagesToBottom()
+      
+      // Only add the message if it belongs to the current conversation
+      if (messageData.conversationId === currentConversationId) {
+        adminMessages.value.push(data)
+        scrollAdminMessagesToBottom()
+        console.log('Message added to current conversation')
+      } else {
+        console.log('Message sent to different conversation, not adding to current view')
+      }
+      
     } catch (error) {
       console.error('Error sending admin message:', error)
       toast.error('Failed to send message')
-      newAdminMessage.value = messageText
     } finally {
       sendingAdminMessage.value = false
     }
@@ -150,8 +218,8 @@ export function useAdminChat(currentUser: any) {
 
   // Subscribes to new messages in real-time for admin chat
   const setupAdminMessageSubscription = (conversationId: string) => {
-    if (adminMessageSubscription) adminMessageSubscription.unsubscribe()
-
+    console.log('Setting up subscription for conversation:', conversationId)
+    
     adminMessageSubscription = supabase
       .channel(`admin_message_${conversationId}`)
       .on(
@@ -163,28 +231,48 @@ export function useAdminChat(currentUser: any) {
           filter: `conversation_id=eq.${conversationId}`,
         },
         (payload: any) => {
-          adminMessages.value.push(payload.new as Message)
-          scrollAdminMessagesToBottom()
+          console.log('Received real-time message for conversation:', conversationId)
+          
+          // Only add the message if it's for the currently selected conversation
+          if (conversationId === currentConversationId) {
+            const newMessage = payload.new as Message
+            
+            // Check if the message is not already in the array (prevent duplicates)
+            const messageExists = adminMessages.value.some(msg => msg.id === newMessage.id)
+            if (!messageExists) {
+              adminMessages.value.push(newMessage)
+              scrollAdminMessagesToBottom()
+              console.log('Added real-time message to current conversation')
+            }
+          }
         }
       )
-      .subscribe()
+      .subscribe((status) => {
+        console.log('Subscription status for conversation', conversationId, ':', status)
+      })
   }
 
   // Closes the admin conversations dialog and cleans up
   const closeAdminConversationsDialog = () => {
+    console.log('Closing admin conversations dialog')
+    
     showAdminConversationsDialog.value = false
     selectedItemForConversations.value = null
     selectedAdminConversation.value = null
     adminConversations.value = []
     adminMessages.value = []
     newAdminMessage.value = ''
+    currentConversationId = null
+    
     if (adminMessageSubscription) {
+      console.log('Cleaning up subscription on dialog close')
       adminMessageSubscription.unsubscribe()
       adminMessageSubscription = null
     }
   }
 
   onUnmounted(() => {
+    console.log('useAdminChat unmounting, cleaning up subscriptions')
     if (adminMessageSubscription) {
       adminMessageSubscription.unsubscribe()
     }
