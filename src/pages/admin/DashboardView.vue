@@ -63,8 +63,7 @@ const handleClaimItem = async (itemId: number, claimedBy: string) => {
     const { error } = await supabase
       .from('items')
       .update({ 
-        claimed_by: claimedBy,
-        updated_at: new Date().toISOString()
+        claimed_by: claimedBy
       })
       .eq('id', itemId)
 
