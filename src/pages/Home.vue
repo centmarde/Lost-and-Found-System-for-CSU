@@ -323,36 +323,6 @@ onUnmounted(() => {
             </div>
           </v-col>
         </v-row>
-
-        <!-- Notification Status for Users -->
-        <v-row v-if="!isCurrentUserAdmin">
-          <v-col cols="12">
-            <v-alert
-              type="info"
-              variant="tonal"
-              prominent
-              border="start"
-              class="mb-4"
-            >
-              <template #title>
-                <v-icon class="me-2">mdi-bell-ring</v-icon>
-                Real-time Notifications Enabled
-              </template>
-              <div class="d-flex align-center justify-space-between">
-                <span>You'll be notified instantly when admins post new lost or found items.</span>
-                <v-chip
-                  v-if="unreadCount > 0"
-                  color="error"
-                  size="small"
-                  variant="flat"
-                >
-                  {{ unreadCount }} new
-                </v-chip>
-              </div>
-            </v-alert>
-          </v-col>
-        </v-row>
-
         <v-row>
           <v-col cols="12">
             <v-card elevation="2" class="pa-4">

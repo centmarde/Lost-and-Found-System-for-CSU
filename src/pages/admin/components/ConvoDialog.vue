@@ -1,68 +1,69 @@
 <script lang="ts" setup>
-import { ref, watch, computed } from 'vue'
-import { supabase } from '@/lib/supabase'
-import { formatDate } from '@/utils/helpers'
+import { ref, watch, computed } from "vue";
+import { supabase } from "@/lib/supabase";
+import { formatDate } from "@/utils/helpers";
 
 interface Item {
-  id: number
-  title: string
-  description: string
-  status: 'lost' | 'found'
-  user_id: string
-  claimed_by: string
-  created_at: string
+  id: number;
+  title: string;
+  description: string;
+  status: "lost" | "found";
+  user_id: string;
+  claimed_by: string;
+  created_at: string;
 }
 
 interface Conversation {
-  id: number
-  item_id: number
-  sender_id: string
-  receiver_id: string
-  created_at: string
+  id: number;
+  item_id: number;
+  sender_id: string;
+  receiver_id: string;
+  created_at: string;
   sender_profile: {
-    full_name: string
-    email: string
-  } | null
+    full_name: string;
+    email: string;
+  } | null;
   messages?: Array<{
-    message: string
-    created_at: string
-  }>
+    message: string;
+    created_at: string;
+  }>;
   latest_message: {
-    message: string
-    created_at: string
-  }
-  message_count: number
+    message: string;
+    created_at: string;
+  };
+  message_count: number;
 }
 
 interface Props {
-  modelValue: boolean
-  item: Item | null
+  modelValue: boolean;
+  item: Item | null;
 }
 
-const props = defineProps<Props>()
+const props = defineProps<Props>();
 const emit = defineEmits<{
-  'update:modelValue': [value: boolean]
-}>()
+  "update:modelValue": [value: boolean];
+}>();
 
-const conversations = ref<Conversation[]>([])
-const loading = ref(false)
-const selectedConversation = ref<Conversation | null>(null)
-const showChatDialog = ref(false)
+const conversations = ref<Conversation[]>([]);
+const loading = ref(false);
+const selectedConversation = ref<Conversation | null>(null);
+const showChatDialog = ref(false);
 
 const dialogValue = computed({
   get: () => props.modelValue,
-  set: (value: boolean) => emit('update:modelValue', value)
-})
+  set: (value: boolean) => emit("update:modelValue", value),
+});
 
 // Fetch conversations for the selected item
 const fetchConversations = async () => {
-  if (!props.item) return
+  if (!props.item) return;
 
-  loading.value = true
+  loading.value = true;
   try {
     const { data, error } = await supabase
-      .from('conversations')
-      .select(`
+      .from("conversations")
+      .select(
+        `
         id,
         item_id,
         sender_id,
@@ -76,13 +77,14 @@ const fetchConversations = async () => {
           message,
           created_at
         )
-      `)
-      .eq('item_id', props.item.id)
-      .order('created_at', { ascending: false })
+      `
+      )
+      .eq("item_id", props.item.id)
+      .order("created_at", { ascending: false });
 
     if (error) {
-      console.error('Error fetching conversations:', error)
-      return
+      console.error("Error fetching conversations:", error);
+      return;
     }
 
     // Process conversations to get latest message and count
@@ -94,58 +96,60 @@ const fetchConversations = async () => {
       created_at: conv.created_at,
       sender_profile: conv.sender_profile,
       messages: conv.messages,
-      latest_message: conv.messages && conv.messages.length > 0 
-        ? conv.messages[conv.messages.length - 1] 
-        : { message: 'No messages yet', created_at: conv.created_at },
-      message_count: conv.messages?.length || 0
-    }))
-
+      latest_message:
+        conv.messages && conv.messages.length > 0
+          ? conv.messages[conv.messages.length - 1]
+          : { message: "No messages yet", created_at: conv.created_at },
+      message_count: conv.messages?.length || 0,
+    }));
   } catch (error) {
-    console.error('Error:', error)
+    console.error("Error:", error);
   } finally {
-    loading.value = false
+    loading.value = false;
   }
-}
+};
 
 // Open chat dialog for specific conversation
 const openChat = (conversation: Conversation) => {
-  selectedConversation.value = conversation
-  showChatDialog.value = true
-}
+  selectedConversation.value = conversation;
+  showChatDialog.value = true;
+};
 
 // Mark item as claimed by specific user
 const markAsClaimedBy = async (conversation: Conversation) => {
-  if (!props.item) return
+  if (!props.item) return;
 
   try {
     const { error } = await supabase
-      .from('items')
-      .update({ 
+      .from("items")
+      .update({
         claimed_by: conversation.sender_id,
-        status: 'claimed'
+        status: "claimed",
       })
-      .eq('id', props.item.id)
+      .eq("id", props.item.id);
 
     if (error) {
-      console.error('Error marking item as claimed:', error)
-      return
+      console.error("Error marking item as claimed:", error);
+      return;
     }
 
     // Close dialogs and refresh
-    dialogValue.value = false
+    dialogValue.value = false;
     // You might want to emit an event here to refresh the parent component
-    
   } catch (error) {
-    console.error('Error:', error)
+    console.error("Error:", error);
   }
-}
+};
 
 // Watch for dialog opening
-watch(() => props.modelValue, (newValue) => {
-  if (newValue && props.item) {
-    fetchConversations()
+watch(
+  () => props.modelValue,
+  (newValue) => {
+    if (newValue && props.item) {
+      fetchConversations();
+    }
   }
-})
+);
 </script>
 
 <template>
@@ -177,8 +181,12 @@ watch(() => props.modelValue, (newValue) => {
 
         <!-- Empty State -->
         <div v-else-if="conversations.length === 0" class="text-center py-8">
-          <v-icon size="64" color="grey-lighten-1">mdi-message-off-outline</v-icon>
-          <div class="text-h6 text-grey-darken-1 mt-2">No conversations yet</div>
+          <v-icon size="64" color="grey-lighten-1"
+            >mdi-message-off-outline</v-icon
+          >
+          <div class="text-h6 text-grey-darken-1 mt-2">
+            No conversations yet
+          </div>
           <div class="text-body-2 text-grey-darken-2">
             No users have contacted you about this item yet.
           </div>
@@ -194,18 +202,18 @@ watch(() => props.modelValue, (newValue) => {
             >
               <template #prepend>
                 <v-avatar color="primary" class="text-white">
-                  {{ conversation.sender_profile?.full_name?.charAt(0) || 'U' }}
+                  {{ conversation.sender_profile?.full_name?.charAt(0) || "U" }}
                 </v-avatar>
               </template>
 
               <v-list-item-title>
-                {{ conversation.sender_profile?.full_name || 'Unknown User' }}
+                {{ conversation.sender_profile?.full_name || "Unknown User" }}
               </v-list-item-title>
 
               <v-list-item-subtitle class="mt-1">
                 <div class="d-flex align-center mb-1">
                   <v-icon size="12" class="me-1">mdi-email</v-icon>
-                  {{ conversation.sender_profile?.email || 'No email' }}
+                  {{ conversation.sender_profile?.email || "No email" }}
                 </div>
                 <div class="latest-message">
                   {{ conversation.latest_message?.message }}
@@ -213,7 +221,12 @@ watch(() => props.modelValue, (newValue) => {
                 <div class="d-flex align-center justify-space-between mt-2">
                   <div class="text-caption text-grey-darken-1">
                     <v-icon size="12" class="me-1">mdi-clock-outline</v-icon>
-                    {{ formatDate(conversation.latest_message?.created_at || conversation.created_at) }}
+                    {{
+                      formatDate(
+                        conversation.latest_message?.created_at ||
+                          conversation.created_at
+                      )
+                    }}
                   </div>
                   <v-chip size="x-small" color="info" variant="tonal">
                     {{ conversation.message_count }} messages
@@ -252,9 +265,7 @@ watch(() => props.modelValue, (newValue) => {
 
       <v-card-actions>
         <v-spacer />
-        <v-btn variant="outlined" @click="dialogValue = false">
-          Close
-        </v-btn>
+        <v-btn variant="outlined" @click="dialogValue = false"> Close </v-btn>
       </v-card-actions>
     </v-card>
   </v-dialog>
@@ -275,19 +286,17 @@ watch(() => props.modelValue, (newValue) => {
           <v-icon>mdi-close</v-icon>
         </v-btn>
       </v-card-title>
-      
+
       <v-card-text>
         <div class="text-center text-grey-darken-1 py-4">
           <v-icon size="48" class="mb-2">mdi-chat-outline</v-icon>
-          <div>
-            This will redirect to the full chat interface
-          </div>
+          <div>This will redirect to the full chat interface</div>
           <div class="text-caption mt-2">
             Conversation ID: {{ selectedConversation.id }}
           </div>
         </div>
       </v-card-text>
-      
+
       <v-card-actions>
         <v-spacer />
         <v-btn variant="outlined" @click="showChatDialog = false">

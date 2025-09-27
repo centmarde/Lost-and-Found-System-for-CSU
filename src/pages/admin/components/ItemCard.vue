@@ -307,18 +307,21 @@ onUnmounted(() => {
     </v-card-text>
 
     <v-card-actions class="pt-0">
-  <v-spacer />
-  <v-btn
-    color="primary"
-    variant="flat"
-    size="small"
-    :prepend-icon="item.claimed_by ? 'mdi-check-circle' : 'mdi-message-text'"
-    @click="handleContact"
-    :loading="isUpdating"
-    :disabled="!!item.claimed_by"  >
-    {{ item.claimed_by ? 'Item Claimed' : 'Contact Admin' }}
-  </v-btn>
-</v-card-actions>
+      <v-spacer />
+      <v-btn
+        color="primary"
+        variant="flat"
+        size="small"
+        :prepend-icon="
+          item.claimed_by ? 'mdi-check-circle' : 'mdi-message-text'
+        "
+        @click="handleContact"
+        :loading="isUpdating"
+        :disabled="!!item.claimed_by"
+      >
+        {{ item.claimed_by ? "Item Claimed" : "Contact Admin" }}
+      </v-btn>
+    </v-card-actions>
 
     <!-- Chat Dialog -->
     <v-dialog v-model="showChatDialog" max-width="600px" persistent>
@@ -391,28 +394,28 @@ onUnmounted(() => {
         </div>
 
         <v-card-actions class="pa-4 bg-grey-lighten-5">
-  <!-- Use a flex container to align items side-by-side -->
-  <div class="d-flex align-center w-100">
-    <v-text-field
-      v-model="newMessage"
-      placeholder="Type your message..."
-      variant="outlined"
-      density="compact"
-      hide-details
-      @keypress="handleKeyPress"
-      :disabled="sendingMessage || loadingConversation"
-      class="flex-grow-1"
-    />
-    <v-btn
-      color="primary"
-      icon="mdi-send"
-      :loading="sendingMessage"
-      :disabled="!newMessage.trim() || loadingConversation"
-      @click="sendMessage"
-      class="ml-2"
-    />
-  </div>
-</v-card-actions>
+          <!-- Use a flex container to align items side-by-side -->
+          <div class="d-flex align-center w-100">
+            <v-text-field
+              v-model="newMessage"
+              placeholder="Type your message..."
+              variant="outlined"
+              density="compact"
+              hide-details
+              @keypress="handleKeyPress"
+              :disabled="sendingMessage || loadingConversation"
+              class="flex-grow-1"
+            />
+            <v-btn
+              color="primary"
+              icon="mdi-send"
+              :loading="sendingMessage"
+              :disabled="!newMessage.trim() || loadingConversation"
+              @click="sendMessage"
+              class="ml-2"
+            />
+          </div>
+        </v-card-actions>
       </v-card>
     </v-dialog>
   </v-card>

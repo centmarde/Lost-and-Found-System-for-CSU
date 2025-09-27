@@ -1,69 +1,69 @@
 //NotificationDialog.vue
 <script lang="ts" setup>
-import { computed } from 'vue'
-import { formatDate } from '@/utils/helpers'
+import { computed } from "vue";
+import { formatDate } from "@/utils/helpers";
 
 interface Notification {
-  id: number
-  title: string
-  status: 'lost' | 'found'
-  created_at: string
-  read: boolean
+  id: number;
+  title: string;
+  status: "lost" | "found";
+  created_at: string;
+  read: boolean;
 }
 
 interface Props {
-  modelValue: boolean
-  notifications: Notification[]
+  modelValue: boolean;
+  notifications: Notification[];
 }
 
-const props = defineProps<Props>()
+const props = defineProps<Props>();
 
 const emit = defineEmits<{
-  'update:modelValue': [value: boolean]
-  'mark-as-read': [id: number]
-  'clear-all': []
-}>()
+  "update:modelValue": [value: boolean];
+  "mark-as-read": [id: number];
+  "clear-all": [];
+}>();
 
 const unreadCount = computed(() => {
-  return props.notifications.filter(n => !n.read).length
-})
+  return props.notifications.filter((n) => !n.read).length;
+});
 
 const sortedNotifications = computed(() => {
   return [...props.notifications].sort((a, b) => {
     // Unread first, then by date
     if (a.read !== b.read) {
-      return a.read ? 1 : -1
+      return a.read ? 1 : -1;
     }
-    return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-  })
-})
+    return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+  });
+});
 
 const getStatusIcon = (status: string) => {
-  return status === 'lost' ? 'mdi-alert-circle' : 'mdi-check-circle'
-}
+  return status === "lost" ? "mdi-alert-circle" : "mdi-check-circle";
+};
 
 const getStatusColor = (status: string) => {
-  return status === 'lost' ? 'error' : 'success'
-}
+  return status === "lost" ? "error" : "success";
+};
 
 const handleMarkAsRead = (notification: Notification) => {
   if (!notification.read) {
-    emit('mark-as-read', notification.id)
+    emit("mark-as-read", notification.id);
   }
-}
+};
 
 const handleClearAll = () => {
-  emit('clear-all')
-}
+  emit("clear-all");
+};
 
 const closeDialog = () => {
-  emit('update:modelValue', false)
-}
+  emit("update:modelValue", false);
+};
 </script>
 
 <template>
-  <v-dialog 
-    :model-value="modelValue" 
+  <v-dialog
+    :model-value="modelValue"
     @update:model-value="$emit('update:modelValue', $event)"
     max-width="500px"
     scrollable
@@ -83,22 +83,19 @@ const closeDialog = () => {
             {{ unreadCount }} new
           </v-chip>
         </div>
-        <v-btn
-          icon
-          variant="text"
-          size="small"
-          @click="closeDialog"
-        >
+        <v-btn icon variant="text" size="small" @click="closeDialog">
           <v-icon>mdi-close</v-icon>
         </v-btn>
       </v-card-title>
 
       <v-divider />
 
-      <v-card-text class="pa-0" style="max-height: 400px;">
+      <v-card-text class="pa-0" style="max-height: 400px">
         <div v-if="notifications.length === 0" class="text-center py-8">
           <v-icon size="64" color="grey-lighten-1">mdi-bell-off</v-icon>
-          <div class="text-h6 text-grey-darken-1 mt-2">No notifications yet</div>
+          <div class="text-h6 text-grey-darken-1 mt-2">
+            No notifications yet
+          </div>
           <div class="text-body-2 text-grey-darken-1">
             You'll be notified when admins post new items
           </div>
@@ -123,14 +120,17 @@ const closeDialog = () => {
             <v-list-item-title class="d-flex align-center">
               <span class="flex-grow-1">{{ notification.title }}</span>
               <v-chip
-  v-if="!notification.read"
-  color="primary"
-  size="x-small"
-  dot          class="ml-2"
-/>
+                v-if="!notification.read"
+                color="primary"
+                size="x-small"
+                dot
+                class="ml-2"
+              />
             </v-list-item-title>
 
-            <v-list-item-subtitle class="d-flex align-center justify-space-between">
+            <v-list-item-subtitle
+              class="d-flex align-center justify-space-between"
+            >
               <span>
                 <v-chip
                   :color="getStatusColor(notification.status)"
@@ -138,7 +138,7 @@ const closeDialog = () => {
                   variant="tonal"
                   class="me-2"
                 >
-                  {{ notification.status === 'lost' ? 'Lost' : 'Found' }}
+                  {{ notification.status === "lost" ? "Lost" : "Found" }}
                 </v-chip>
               </span>
               <span class="text-caption">
@@ -157,7 +157,7 @@ const closeDialog = () => {
           color="primary"
           variant="text"
           size="small"
-          @click="notifications.forEach(n => !n.read && handleMarkAsRead(n))"
+          @click="notifications.forEach((n) => !n.read && handleMarkAsRead(n))"
         >
           Mark all as read
         </v-btn>
