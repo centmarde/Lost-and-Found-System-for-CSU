@@ -250,7 +250,7 @@ onMounted(async () => {
         </v-row>
 
         <!-- Notification Status for Users -->
-        <v-row v-if="!isCurrentUserAdmin">
+        <!-- <v-row v-if="!isCurrentUserAdmin">
           <v-col cols="12">
             <v-alert
               type="info"
@@ -276,7 +276,7 @@ onMounted(async () => {
               </div>
             </v-alert>
           </v-col>
-        </v-row>
+        </v-row> -->
 
         <v-row>
           <v-col cols="12">

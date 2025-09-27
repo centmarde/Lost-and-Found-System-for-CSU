@@ -53,7 +53,6 @@ const messages = ref<Message[]>([]);
 const newMessage = ref("");
 const messagesLoading = ref(false);
 const sendingMessage = ref(false);
-const loadingConversation = ref(false);
 const currentUser = ref<any>(null);
 
 // Real-time subscription
@@ -77,14 +76,11 @@ const getCurrentUser = async () => {
   currentUser.value = user;
 };
 
-// Load or create conversation
-const loadOrCreateConversation = async () => {
-  if (!currentUser.value) {
-    toast.error("Please log in to start a conversation");
-    return;
-  }
+// Load existing conversation and messages
+const loadExistingConversation = async () => {
+  if (!currentUser.value) return;
 
-  loadingConversation.value = true;
+  messagesLoading.value = true;
 
   try {
     // Check if conversation already exists
@@ -102,35 +98,47 @@ const loadOrCreateConversation = async () => {
 
     if (existingConversation) {
       conversation.value = existingConversation;
-    } else {
-      // Create new conversation
-      const { data: newConversation, error: createError } = await supabase
-        .from("conversations")
-        .insert([
-          {
-            item_id: props.item.id,
-            sender_id: currentUser.value.id,
-            receiver_id: props.item.user_id,
-          },
-        ])
-        .select()
-        .single();
+      await loadMessages();
+      setupMessageSubscription();
+    }
+  } catch (error) {
+    console.error("Error loading existing conversation:", error);
+  } finally {
+    messagesLoading.value = false;
+  }
+};
 
-      if (createError) {
-        throw createError;
-      }
+// Create conversation when sending first message
+const createConversation = async () => {
+  if (!currentUser.value) {
+    throw new Error("User not logged in");
+  }
 
-      conversation.value = newConversation;
-      toast.success("Conversation started!");
+  try {
+    const { data: newConversation, error: createError } = await supabase
+      .from("conversations")
+      .insert([
+        {
+          item_id: props.item.id,
+          sender_id: currentUser.value.id,
+          receiver_id: props.item.user_id,
+        },
+      ])
+      .select()
+      .single();
+
+    if (createError) {
+      throw createError;
     }
 
-    await loadMessages();
+    conversation.value = newConversation;
     setupMessageSubscription();
+    toast.success("Conversation started!");
+    
+    return newConversation;
   } catch (error) {
-    console.error("Error loading/creating conversation:", error);
-    toast.error("Failed to start conversation");
-  } finally {
-    loadingConversation.value = false;
+    console.error("Error creating conversation:", error);
+    throw error;
   }
 };
 
@@ -138,10 +146,7 @@ const loadOrCreateConversation = async () => {
 const loadMessages = async () => {
   if (!conversation.value) return;
 
-  messagesLoading.value = true;
-
   try {
-    // First, let's check what columns actually exist by selecting all
     const { data, error } = await supabase
       .from("messages")
       .select("*")
@@ -157,27 +162,42 @@ const loadMessages = async () => {
   } catch (error) {
     console.error("Error loading messages:", error);
     toast.error("Failed to load messages");
-  } finally {
-    messagesLoading.value = false;
   }
 };
 
 // Send message
 const sendMessage = async () => {
-  if (!newMessage.value.trim() || !conversation.value || sendingMessage.value)
+  if (!newMessage.value.trim() || sendingMessage.value) return;
+
+  if (!currentUser.value) {
+    toast.error("Please log in to send messages");
     return;
+  }
 
   const messageText = newMessage.value.trim();
   newMessage.value = "";
   sendingMessage.value = true;
 
   try {
-    // Based on your schema, only insert the columns that actually exist
+    let currentConversation = conversation.value;
+    
+    // Create conversation if it doesn't exist
+    if (!currentConversation) {
+      currentConversation = await createConversation();
+      conversation.value = currentConversation;
+    }
+
+    // Ensure we have a conversation before proceeding
+    if (!currentConversation) {
+      throw new Error("Failed to create or get conversation");
+    }
+
+    // Send the message
     const { data, error } = await supabase
       .from("messages")
       .insert([
         {
-          conversation_id: conversation.value.id,
+          conversation_id: currentConversation.id,
           message: messageText,
           attach_image: null,
         },
@@ -229,7 +249,7 @@ const setupMessageSubscription = () => {
     .subscribe();
 };
 
-// Handle contact button click
+// Handle contact button click - now just opens dialog
 const handleContact = async () => {
   if (!currentUser.value) {
     toast.error("Please log in to contact the admin");
@@ -237,7 +257,9 @@ const handleContact = async () => {
   }
 
   showChatDialog.value = true;
-  await loadOrCreateConversation();
+  
+  // Load existing conversation if it exists, but don't create a new one
+  await loadExistingConversation();
 };
 
 // Close chat dialog
@@ -344,18 +366,9 @@ onUnmounted(() => {
         </v-card-title>
 
         <div class="messages-container" style="height: 400px; overflow-y: auto">
-          <!-- Loading conversation -->
-          <div
-            v-if="loadingConversation"
-            class="d-flex justify-center align-center pa-8"
-          >
-            <v-progress-circular indeterminate color="primary" />
-            <span class="ml-3">Starting conversation...</span>
-          </div>
-
           <!-- Loading messages -->
           <div
-            v-else-if="messagesLoading"
+            v-if="messagesLoading"
             class="d-flex justify-center align-center pa-8"
           >
             <v-progress-circular indeterminate color="primary" />
@@ -403,14 +416,14 @@ onUnmounted(() => {
               density="compact"
               hide-details
               @keypress="handleKeyPress"
-              :disabled="sendingMessage || loadingConversation"
+              :disabled="sendingMessage"
               class="flex-grow-1"
             />
             <v-btn
               color="primary"
               icon="mdi-send"
               :loading="sendingMessage"
-              :disabled="!newMessage.trim() || loadingConversation"
+              :disabled="!newMessage.trim()"
               @click="sendMessage"
               class="ml-2"
             />
