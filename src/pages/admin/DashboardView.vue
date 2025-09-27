@@ -2,7 +2,7 @@
 import { ref, onMounted, computed } from 'vue'
 import { createClient } from '@supabase/supabase-js'
 import InnerLayoutWrapper from '@/layouts/InnerLayoutWrapper.vue'
-import AdminItemCard from '@/pages/admin/components/AdminCard.vue'
+import AdminDashboardItemCard from '@/pages/admin/components/DashboardItemCards.vue'
 import StatsCards from '@/pages/admin/components/StatsCards.vue'
 import SearchBar from '@/pages/admin/components/SearchBar.vue'
 import SystemStats from '@/pages/admin/components/SystemStats.vue'
@@ -117,7 +117,7 @@ onMounted(async () => {
                     md="6"
                     class="mb-3"
                   >
-                    <AdminItemCard
+                    <AdminDashboardItemCard
                       :item="item"
                       :is-updating="updatingItems.has(item.id)"
                       @mark-as-claimed="markAsClaimed"
