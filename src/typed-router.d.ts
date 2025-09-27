@@ -26,6 +26,7 @@ declare module 'vue-router/auto-routes' {
     '/admin/components/DashboardItemCards': RouteRecordInfo<'/admin/components/DashboardItemCards', '/admin/components/DashboardItemCards', Record<never, never>, Record<never, never>>,
     '/admin/components/dialogs/AdminUserRolesDialog': RouteRecordInfo<'/admin/components/dialogs/AdminUserRolesDialog', '/admin/components/dialogs/AdminUserRolesDialog', Record<never, never>, Record<never, never>>,
     '/admin/components/ItemCard': RouteRecordInfo<'/admin/components/ItemCard', '/admin/components/ItemCard', Record<never, never>, Record<never, never>>,
+    '/admin/components/NotifDialog': RouteRecordInfo<'/admin/components/NotifDialog', '/admin/components/NotifDialog', Record<never, never>, Record<never, never>>,
     '/admin/components/PostItemDialog': RouteRecordInfo<'/admin/components/PostItemDialog', '/admin/components/PostItemDialog', Record<never, never>, Record<never, never>>,
     '/admin/components/RecentActivity': RouteRecordInfo<'/admin/components/RecentActivity', '/admin/components/RecentActivity', Record<never, never>, Record<never, never>>,
     '/admin/components/SearchBar': RouteRecordInfo<'/admin/components/SearchBar', '/admin/components/SearchBar', Record<never, never>, Record<never, never>>,

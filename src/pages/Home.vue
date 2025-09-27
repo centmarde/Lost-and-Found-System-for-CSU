@@ -1,16 +1,18 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, computed, watch } from 'vue'
 import { useToast } from 'vue-toastification'
 import InnerLayoutWrapper from '@/layouts/InnerLayoutWrapper.vue'
 import AdminItemCard from '@/pages/admin/components/AdminCard.vue'
 import UserItemCard from '@/pages/admin/components/ItemCard.vue'
 import UserChatDialog from '@/pages/admin/components/userChatDialog.vue'
 import AdminChatDialog from '@/pages/admin/components/AdminChatDialog.vue'
+import NotificationDialog from '@/pages/admin/components/NotifDialog.vue'
 import { supabase } from '@/lib/supabase'
 import { useAuthUserStore } from '@/stores/authUser'
 import { useUserChat } from '@/pages/admin/components/composables/useUserChat'
 import { useAdminChat } from '@/pages/admin/components/composables/useAdminChat'
 import { useAdminItemActions } from '@/pages/admin/components/composables/useAdminItems'
+import { useNotifications } from '@/pages/admin/components/composables/useNotification'
 import '@/styles/home.css'
 
 interface Item {
@@ -30,6 +32,8 @@ const items = ref<Item[]>([])
 const itemsLoading = ref(false)
 const currentUser = ref<any>(null)
 const isCurrentUserAdmin = ref(false)
+const showNotificationBell = ref(false)
+const showNotificationDialog = ref(false)
 
 // Use the new composables
 const {
@@ -58,6 +62,15 @@ const {
   sendAdminMessage,
   closeAdminConversationsDialog,
 } = useAdminChat(currentUser)
+
+// Initialize notifications composable
+const {
+  notifications,
+  setupItemNotifications,
+  markAsRead,
+  clearNotifications,
+  cleanup
+} = useNotifications(currentUser.value, isCurrentUserAdmin.value)
 
 // ---
 // Define core functions here
@@ -90,6 +103,7 @@ const getCurrentUser = async () => {
 
   if (user) {
     isCurrentUserAdmin.value = await checkIfUserIsAdmin(user)
+    showNotificationBell.value = !isCurrentUserAdmin.value // Show bell only for non-admin users
   }
 }
 
@@ -158,8 +172,32 @@ const markItemAsUnclaimed = async (itemId: number) => {
   // ... (existing logic)
 }
 
+// Notification functions
+const unreadCount = computed(() => {
+  return notifications.value.filter(n => !n.read).length
+})
+
+const toggleNotifications = () => {
+  showNotificationDialog.value = true
+}
+
+const handleMarkAsRead = (notificationId: number) => {
+  markAsRead(notificationId)
+}
+
+const handleClearAllNotifications = () => {
+  clearNotifications()
+}
+
 const pageTitle = computed(() => isCurrentUserAdmin.value ? 'Manage Lost & Found Items' : 'Lost & Found')
 const pageSubtitle = computed(() => isCurrentUserAdmin.value ? 'Manage your posted items and view conversations' : 'Find your lost items or help others find theirs')
+
+// Watch for user changes to setup notifications
+watch([currentUser, isCurrentUserAdmin], async ([user, isAdmin]) => {
+  if (user && !isAdmin) {
+    await setupItemNotifications()
+  }
+}, { immediate: false })
 
 onMounted(async () => {
   await getCurrentUser()
@@ -173,14 +211,65 @@ onMounted(async () => {
       <v-container fluid class="pa-6">
         <v-row class="mb-6">
           <v-col cols="12">
-            <div class="text-center">
+            <div class="text-center position-relative">
               <h1 class="text-h3 font-weight-bold text-primary mb-2">
                 {{ pageTitle }}
               </h1>
               <p class="text-h6 text-grey-darken-1">
                 {{ pageSubtitle }}
               </p>
+
+              <!-- Notification Bell for Users -->
+              <div 
+                v-if="showNotificationBell" 
+                class="notification-bell"
+              >
+                <v-btn
+                  icon
+                  size="large"
+                  @click="toggleNotifications"
+                  :color="unreadCount > 0 ? 'primary' : 'default'"
+                >
+                  <v-badge
+                    :content="unreadCount"
+                    :model-value="unreadCount > 0"
+                    color="error"
+                    overlap
+                  >
+                    <v-icon>mdi-bell</v-icon>
+                  </v-badge>
+                </v-btn>
+              </div>
             </div>
+          </v-col>
+        </v-row>
+
+        <!-- Notification Status for Users -->
+        <v-row v-if="!isCurrentUserAdmin">
+          <v-col cols="12">
+            <v-alert
+              type="info"
+              variant="tonal"
+              prominent
+              border="start"
+              class="mb-4"
+            >
+              <template #title>
+                <v-icon class="me-2">mdi-bell-ring</v-icon>
+                Real-time Notifications Enabled
+              </template>
+              <div class="d-flex align-center justify-space-between">
+                <span>You'll be notified instantly when admins post new lost or found items.</span>
+                <v-chip
+                  v-if="unreadCount > 0"
+                  color="error"
+                  size="small"
+                  variant="flat"
+                >
+                  {{ unreadCount }} new
+                </v-chip>
+              </div>
+            </v-alert>
           </v-col>
         </v-row>
 
@@ -286,7 +375,34 @@ onMounted(async () => {
           @select-conversation="selectAdminConversation"
           @send-message="sendAdminMessage"
         />
+
+        <NotificationDialog
+          v-model="showNotificationDialog"
+          :notifications="notifications"
+          @mark-as-read="handleMarkAsRead"
+          @clear-all="handleClearAllNotifications"
+        />
       </v-container>
     </template>
   </InnerLayoutWrapper>
 </template>
+
+<style scoped>
+.notification-bell {
+  position: absolute;
+  top: 0;
+  right: 24px;
+  z-index: 10;
+}
+
+@media (max-width: 768px) {
+  .notification-bell {
+    position: relative;
+    margin-top: 16px;
+  }
+}
+
+.items-grid {
+  margin-top: 16px;
+}
+</style>

@@ -1,3 +1,4 @@
+//UserItemCard.vue
 <script lang="ts" setup>
 import { ref, onMounted, onUnmounted, nextTick } from "vue";
 import { formatDate } from "@/utils/helpers";
@@ -306,30 +307,18 @@ onUnmounted(() => {
     </v-card-text>
 
     <v-card-actions class="pt-0">
-      <v-spacer />
-      <v-btn
-        v-if="!item.claimed_by"
-        color="primary"
-        variant="flat"
-        size="small"
-        prepend-icon="mdi-message-text"
-        @click="handleContact"
-        :loading="isUpdating"
-      >
-        Contact Admin
-      </v-btn>
-      <v-btn
-        v-else
-        color="warning"
-        variant="outlined"
-        size="small"
-        prepend-icon="mdi-undo"
-        @click="$emit('markAsUnclaimed', item.id)"
-        :loading="isUpdating"
-      >
-        Mark as Unclaimed
-      </v-btn>
-    </v-card-actions>
+  <v-spacer />
+  <v-btn
+    color="primary"
+    variant="flat"
+    size="small"
+    :prepend-icon="item.claimed_by ? 'mdi-check-circle' : 'mdi-message-text'"
+    @click="handleContact"
+    :loading="isUpdating"
+    :disabled="!!item.claimed_by"  >
+    {{ item.claimed_by ? 'Item Claimed' : 'Contact Admin' }}
+  </v-btn>
+</v-card-actions>
 
     <!-- Chat Dialog -->
     <v-dialog v-model="showChatDialog" max-width="600px" persistent>
