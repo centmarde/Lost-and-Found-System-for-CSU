@@ -19,7 +19,7 @@ interface Props {
 defineProps<Props>()
 
 defineEmits<{
-  markAsClaimed: [id: number]
+  showClaimDialog: [item: Item]
   markAsUnclaimed: [id: number]
 }>()
 
@@ -69,7 +69,7 @@ const getItemStatusIcon = (item: Item) => {
         variant="flat"
         size="small"
         prepend-icon="mdi-check"
-        @click="$emit('markAsClaimed', item.id)"
+        @click="$emit('showClaimDialog', item)"
         :loading="isUpdating"
       >
         Mark as Claimed

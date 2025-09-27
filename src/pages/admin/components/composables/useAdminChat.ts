@@ -1,4 +1,4 @@
-// src/composables/useAdminChat.ts
+//useAdminChat.ts
 import { ref, onUnmounted, nextTick } from 'vue'
 import { useToast } from 'vue-toastification'
 import { supabase } from '@/lib/supabase'

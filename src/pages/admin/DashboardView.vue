@@ -3,6 +3,7 @@ import { ref, onMounted, computed } from 'vue'
 import { createClient } from '@supabase/supabase-js'
 import InnerLayoutWrapper from '@/layouts/InnerLayoutWrapper.vue'
 import AdminDashboardItemCard from '@/pages/admin/components/DashboardItemCards.vue'
+import ClaimItemDialog from '@/pages/admin/components/ClaimItemDialog.vue'
 import StatsCards from '@/pages/admin/components/StatsCards.vue'
 import SearchBar from '@/pages/admin/components/SearchBar.vue'
 import SystemStats from '@/pages/admin/components/SystemStats.vue'
@@ -12,6 +13,20 @@ import PostItemDialog from '@/pages/admin/components/PostItemDialog.vue'
 import { useDashboardData } from '@/pages/admin/components/composables/useDashboardData'
 import { useAdminItemActions } from '@/pages/admin/components/composables/useAdminItems'
 import '@/styles/dashboardview.css'
+
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
+const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY
+const supabase = createClient(supabaseUrl, supabaseKey)
+
+interface Item {
+  id: number
+  title: string
+  description: string
+  status: 'lost' | 'found'
+  user_id: string
+  claimed_by: string
+  created_at: string
+}
 
 const {
   loading,
@@ -27,9 +42,42 @@ const {
   updatingItems,
   newItemForm,
   postMissingItem,
-  markAsClaimed,
   markAsUnclaimed
 } = useAdminItemActions(fetchDashboardStats)
+
+// Claim dialog state
+const showClaimDialog = ref(false)
+const selectedItemForClaim = ref<Item | null>(null)
+
+// Handle showing claim dialog
+const handleShowClaimDialog = (item: Item) => {
+  selectedItemForClaim.value = item
+  showClaimDialog.value = true
+}
+
+// Handle claiming item with selected user
+const handleClaimItem = async (itemId: number, claimedBy: string) => {
+  updatingItems.value.add(itemId)
+  
+  try {
+    const { error } = await supabase
+      .from('items')
+      .update({ 
+        claimed_by: claimedBy,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', itemId)
+
+    if (error) throw error
+
+    await fetchDashboardStats()
+  } catch (error) {
+    console.error('Error marking item as claimed:', error)
+    alert('Error updating item status')
+  } finally {
+    updatingItems.value.delete(itemId)
+  }
+}
 
 const searchQuery = ref('')
 
@@ -120,7 +168,7 @@ onMounted(async () => {
                     <AdminDashboardItemCard
                       :item="item"
                       :is-updating="updatingItems.has(item.id)"
-                      @mark-as-claimed="markAsClaimed"
+                      @show-claim-dialog="handleShowClaimDialog"
                       @mark-as-unclaimed="markAsUnclaimed"
                     />
                   </v-col>
@@ -142,6 +190,13 @@ onMounted(async () => {
           :posting="postingItem"
           :form="newItemForm"
           @submit="postMissingItem"
+        />
+
+        <ClaimItemDialog
+          v-model="showClaimDialog"
+          :item="selectedItemForClaim"
+          :loading="selectedItemForClaim ? updatingItems.has(selectedItemForClaim.id) : false"
+          @claim-item="handleClaimItem"
         />
       </div>
     </template>
