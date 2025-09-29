@@ -12,8 +12,8 @@ import { useUserChat } from '@/pages/admin/components/composables/useUserChat'
 import { useAdminChat } from '@/pages/admin/components/composables/useAdminChat'
 import { useAdminItemActions } from '@/pages/admin/components/composables/useAdminItems'
 import { useNotifications } from '@/pages/admin/components/composables/useNotification'
-import useHomeData from '@/pages/admin/components/composables/HomeData'
-import type { Item } from '@/pages/admin/components/composables/HomeData'
+import useHomeData from '@/pages/admin/components/composables/useHomeData'
+import type { Item } from '@/pages/admin/components/composables/useHomeData'
 
 import '@/styles/home.css'
 

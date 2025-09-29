@@ -1,64 +1,30 @@
 <script lang="ts" setup>
-interface ActivityItem {
-  id: string;
-  type: "lost" | "found" | "resolved" | "claimed";
-  title: string;
-  user: string;
-  timestamp: string;
-  status: string;
-}
+import { computed } from 'vue';
+import { 
+  type ActivityItem,
+  getActivityColor, 
+  getActivityIcon, 
+  formatTimestamp,
+  filterRecentActivities 
+} from '@/utils/helpers'; 
 
 interface Props {
   stats: {
     recentActivity: ActivityItem[];
   };
+  maxItems?: number;
+  maxDays?: number;
 }
 
-defineProps<Props>();
+const props = withDefaults(defineProps<Props>(), {
+  maxItems: 10,
+  maxDays: 7
+});
 
-const getActivityColor = (type: string) => {
-  switch (type) {
-    case "lost":
-      return "error";
-    case "found":
-      return "success";
-    case "resolved":
-      return "primary";
-    case "claimed":
-      return "info";
-    default:
-      return "grey";
-  }
-};
-
-const getActivityIcon = (type: string) => {
-  switch (type) {
-    case "lost":
-      return "mdi-alert-circle";
-    case "found":
-      return "mdi-check-circle";
-    case "resolved":
-      return "mdi-handshake";
-    case "claimed":
-      return "mdi-account-check";
-    default:
-      return "mdi-circle";
-  }
-};
-
-const formatTimestamp = (timestamp: string) => {
-  const date = new Date(timestamp);
-  const now = new Date();
-  const diff = now.getTime() - date.getTime();
-
-  const minutes = Math.floor(diff / 60000);
-  const hours = Math.floor(diff / 3600000);
-  const days = Math.floor(diff / 86400000);
-
-  if (minutes < 60) return `${minutes} minutes ago`;
-  if (hours < 24) return `${hours} hours ago`;
-  return `${days} days ago`;
-};
+// Filter and limit recent activities using helper function
+const filteredActivity = computed(() => 
+  filterRecentActivities(props.stats.recentActivity, props.maxItems, props.maxDays)
+);
 </script>
 
 <template>
@@ -68,17 +34,27 @@ const formatTimestamp = (timestamp: string) => {
         <v-card-title class="text-h6 font-weight-bold mb-4">
           <v-icon class="me-2">mdi-clock-outline</v-icon>
           Recent Activity
+          <v-chip 
+            v-if="filteredActivity.length > 0" 
+            class="ms-2" 
+            size="small" 
+            color="primary"
+          >
+            {{ filteredActivity.length }}
+          </v-chip>
         </v-card-title>
-        <div v-if="stats.recentActivity.length === 0" class="text-center py-8">
+        
+        <div v-if="filteredActivity.length === 0" class="text-center py-8">
           <v-icon size="64" color="grey-lighten-1">mdi-inbox</v-icon>
           <div class="text-h6 text-grey-darken-1 mt-2">No recent activity</div>
           <div class="text-body-2 text-grey-darken-1">
-            Items and activities will appear here
+            Items and activities from the last {{ maxDays }} days will appear here
           </div>
         </div>
+        
         <v-list v-else>
           <v-list-item
-            v-for="activity in stats.recentActivity"
+            v-for="activity in filteredActivity"
             :key="activity.id"
             class="px-0"
           >
