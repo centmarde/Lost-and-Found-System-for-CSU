@@ -1,11 +1,9 @@
 <script lang="ts" setup>
 import { ref, onMounted } from 'vue'
-import { createClient } from '@supabase/supabase-js'
+import { supabase } from '@/lib/supabase'
 import { useAuthUserStore } from '@/stores/authUser'
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
-const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY
-const supabase = createClient(supabaseUrl, supabaseKey)
+
 
 const authStore = useAuthUserStore()
 
