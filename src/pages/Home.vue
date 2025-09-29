@@ -35,6 +35,12 @@ const isCurrentUserAdmin = ref(false)
 const showNotificationBell = ref(false)
 const showNotificationDialog = ref(false)
 
+// Pagination and sorting
+const page = ref(1)
+const itemsPerPage = ref(12)
+const sortBy = ref<'newest' | 'oldest'>('newest')
+const filterByMonth = ref<string>('all')
+
 // Use the new composables
 const {
   showChatDialog,
@@ -72,9 +78,63 @@ const {
   cleanup
 } = useNotifications(currentUser, isCurrentUserAdmin)
 
-// ---
-// Define core functions here
-// ---
+// Available months from items
+const availableMonths = computed(() => {
+  const months = new Set<string>()
+  items.value.forEach(item => {
+    const date = new Date(item.created_at)
+    const monthYear = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
+    months.add(monthYear)
+  })
+  return Array.from(months).sort().reverse()
+})
+
+// Month display names
+const getMonthName = (monthYear: string) => {
+  const [year, month] = monthYear.split('-')
+  const date = new Date(parseInt(year), parseInt(month) - 1)
+  return date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+}
+
+// Filtered and sorted items
+const filteredItems = computed(() => {
+  let filtered = [...items.value]
+
+  // Filter by month
+  if (filterByMonth.value !== 'all') {
+    filtered = filtered.filter(item => {
+      const date = new Date(item.created_at)
+      const monthYear = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
+      return monthYear === filterByMonth.value
+    })
+  }
+
+  // Sort
+  filtered.sort((a, b) => {
+    const dateA = new Date(a.created_at).getTime()
+    const dateB = new Date(b.created_at).getTime()
+    return sortBy.value === 'newest' ? dateB - dateA : dateA - dateB
+  })
+
+  return filtered
+})
+
+// Paginated items
+const paginatedItems = computed(() => {
+  const start = (page.value - 1) * itemsPerPage.value
+  const end = start + itemsPerPage.value
+  return filteredItems.value.slice(start, end)
+})
+
+// Total pages
+const totalPages = computed(() => {
+  return Math.ceil(filteredItems.value.length / itemsPerPage.value)
+})
+
+// Reset page when filters change
+watch([filterByMonth, sortBy], () => {
+  page.value = 1
+})
 
 // Check if current user is admin
 const checkIfUserIsAdmin = async (user: any) => {
@@ -103,11 +163,10 @@ const getCurrentUser = async () => {
 
   if (user) {
     isCurrentUserAdmin.value = await checkIfUserIsAdmin(user)
-    showNotificationBell.value = !isCurrentUserAdmin.value // Show bell only for non-admin users
+    showNotificationBell.value = !isCurrentUserAdmin.value
     
-    // ⬇️ NEW CODE: Trigger setup immediately after admin status is confirmed
     if (!isCurrentUserAdmin.value) {
-        await setupItemNotifications() 
+      await setupItemNotifications() 
     }
   }
 }
@@ -161,10 +220,6 @@ const fetchItems = async () => {
   }
 }
 
-// ---
-// End of core functions
-// ---
-
 // Use the existing admin item actions
 const {
   updatingItems,
@@ -172,9 +227,9 @@ const {
   markAsUnclaimed,
 } = useAdminItemActions(fetchItems)
 
-// Handle item unclaiming (regular users) - This can stay here as it's a global action
+// Handle item unclaiming (regular users)
 const markItemAsUnclaimed = async (itemId: number) => {
-  // ... (existing logic)
+  // existing logic
 }
 
 // Notification functions
@@ -197,7 +252,6 @@ const handleClearAllNotifications = () => {
 const pageTitle = computed(() => isCurrentUserAdmin.value ? 'Manage Lost & Found Items' : 'Lost & Found')
 const pageSubtitle = computed(() => isCurrentUserAdmin.value ? 'Manage your posted items and view conversations' : 'Find your lost items or help others find theirs')
 
-// Watch for user changes to setup notifications
 watch([currentUser, isCurrentUserAdmin], async ([user, isAdmin]) => {
   if (user && !isAdmin) {
     await setupItemNotifications()
@@ -249,41 +303,14 @@ onMounted(async () => {
           </v-col>
         </v-row>
 
-        <!-- Notification Status for Users -->
-        <!-- <v-row v-if="!isCurrentUserAdmin">
-          <v-col cols="12">
-            <v-alert
-              type="info"
-              variant="tonal"
-              prominent
-              border="start"
-              class="mb-4"
-            >
-              <template #title>
-                <v-icon class="me-2">mdi-bell-ring</v-icon>
-                Real-time Notifications Enabled
-              </template>
-              <div class="d-flex align-center justify-space-between">
-                <span>You'll be notified instantly when admins post new lost or found items.</span>
-                <v-chip
-                  v-if="unreadCount > 0"
-                  color="error"
-                  size="small"
-                  variant="flat"
-                >
-                  {{ unreadCount }} new
-                </v-chip>
-              </div>
-            </v-alert>
-          </v-col>
-        </v-row> -->
-
         <v-row>
           <v-col cols="12">
             <v-card elevation="2" class="pa-4">
-              <v-card-title class="text-h5 font-weight-bold mb-4 d-flex align-center">
-                <v-icon class="me-2" color="primary">mdi-package-variant-closed</v-icon>
-                {{ isCurrentUserAdmin ? 'Your Items' : 'Missing Items' }}
+              <v-card-title class="text-h5 font-weight-bold mb-4 d-flex align-center flex-wrap">
+                <div class="d-flex align-center">
+                  <v-icon class="me-2" color="primary">mdi-package-variant-closed</v-icon>
+                  {{ isCurrentUserAdmin ? 'Your Items' : 'Missing Items' }}
+                </div>
                 <v-spacer />
                 <v-chip 
                   v-if="!itemsLoading" 
@@ -291,9 +318,41 @@ onMounted(async () => {
                   variant="tonal"
                   size="small"
                 >
-                  {{ items.length }} items
+                  {{ filteredItems.length }} items
                 </v-chip>
               </v-card-title>
+
+              <!-- Filters and Sorting (Only for Users) -->
+              <v-row v-if="!isCurrentUserAdmin && items.length > 0" class="mb-4">
+                <v-col cols="12" sm="6" md="4">
+                  <v-select
+                    v-model="filterByMonth"
+                    label="Filter by Month"
+                    :items="[{ title: 'All Months', value: 'all' }, ...availableMonths.map(m => ({ title: getMonthName(m), value: m }))]"
+                    variant="outlined"
+                    density="compact"
+                    hide-details
+                  />
+                </v-col>
+                <v-col cols="12" sm="6" md="4">
+                  <v-select
+                    v-model="sortBy"
+                    label="Sort by"
+                    :items="[
+                      { title: 'Newest First', value: 'newest' },
+                      { title: 'Oldest First', value: 'oldest' }
+                    ]"
+                    variant="outlined"
+                    density="compact"
+                    hide-details
+                  />
+                </v-col>
+                <v-col cols="12" sm="12" md="4" class="d-flex align-center">
+                  <v-chip class="me-2" size="small" variant="outlined">
+                    Page {{ page }} of {{ totalPages }}
+                  </v-chip>
+                </v-col>
+              </v-row>
 
               <div v-if="itemsLoading" class="text-center py-12">
                 <v-progress-circular
@@ -327,34 +386,67 @@ onMounted(async () => {
                 </v-btn>
               </div>
 
-              <v-row v-else class="items-grid">
-                <v-col
-                  v-for="item in items"
-                  :key="item.id"
-                  cols="12"
-                  sm="6"
-                  md="4"
-                  lg="3"
-                  xl="3"
+              <div v-else-if="filteredItems.length === 0" class="text-center py-12">
+                <v-icon size="80" color="grey-lighten-1" class="mb-4">
+                  mdi-filter-remove
+                </v-icon>
+                <h3 class="text-h5 text-grey-darken-1 mb-2">
+                  No items found
+                </h3>
+                <p class="text-body-1 text-grey-darken-2 mb-4">
+                  Try adjusting your filters
+                </p>
+                <v-btn 
+                  color="primary" 
+                  variant="outlined"
+                  @click="filterByMonth = 'all'"
                 >
-                  <AdminItemCard
-                    v-if="isCurrentUserAdmin"
-                    :item="item"
-                    :is-updating="updatingItems.has(item.id)"
-                    @open-conversations="handleOpenConversations"
-                    @mark-as-claimed="markAsClaimed"
-                    @mark-as-unclaimed="markAsUnclaimed"
-                  />
-                  
-                  <UserItemCard
-                    v-else
-                    :item="item"
-                    :is-updating="false"
-                    @contact="handleContact(item)"
-                    @mark-as-unclaimed="markItemAsUnclaimed"
-                  />
-                </v-col>
-              </v-row>
+                  Clear Filters
+                </v-btn>
+              </div>
+
+              <div v-else>
+                <v-row class="items-grid">
+                  <v-col
+                    v-for="item in paginatedItems"
+                    :key="item.id"
+                    cols="12"
+                    sm="6"
+                    md="4"
+                    lg="3"
+                    xl="3"
+                  >
+                    <AdminItemCard
+                      v-if="isCurrentUserAdmin"
+                      :item="item"
+                      :is-updating="updatingItems.has(item.id)"
+                      @open-conversations="handleOpenConversations"
+                      @mark-as-claimed="markAsClaimed"
+                      @mark-as-unclaimed="markAsUnclaimed"
+                    />
+                    
+                    <UserItemCard
+                      v-else
+                      :item="item"
+                      :is-updating="false"
+                      @contact="handleContact(item)"
+                      @mark-as-unclaimed="markItemAsUnclaimed"
+                    />
+                  </v-col>
+                </v-row>
+
+                <!-- Pagination (Only for Users) -->
+                <v-row v-if="!isCurrentUserAdmin && totalPages > 1" class="mt-4">
+                  <v-col cols="12" class="d-flex justify-center">
+                    <v-pagination
+                      v-model="page"
+                      :length="totalPages"
+                      :total-visible="7"
+                      rounded="circle"
+                    />
+                  </v-col>
+                </v-row>
+              </div>
             </v-card>
           </v-col>
         </v-row>
