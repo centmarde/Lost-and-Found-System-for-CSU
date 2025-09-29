@@ -334,18 +334,7 @@ onMounted(async () => {
 
               <!-- Filters and Sorting (Only for Users) -->
               <v-row v-if="!isCurrentUserAdmin && items.length > 0" class="mb-4">
-                <v-col cols="12">
-                  <v-text-field
-                    v-model="searchQuery"
-                    label="Search items..."
-                    placeholder="Search by title or description"
-                    prepend-inner-icon="mdi-magnify"
-                    variant="outlined"
-                    density="compact"
-                    hide-details
-                    clearable
-                  />
-                </v-col>
+                
                 <v-col cols="12" sm="6" md="4">
                   <v-select
                     v-model="filterByMonth"
@@ -373,6 +362,18 @@ onMounted(async () => {
                   <v-chip class="me-2" size="small" variant="outlined">
                     Showing {{ paginatedItems.length }} of {{ filteredItems.length }}
                   </v-chip>
+                </v-col>
+                <v-col cols="12" sm="6" md="4">
+                  <v-text-field
+                    v-model="searchQuery"
+                    label="Search items..."
+                    placeholder="Search by title or description"
+                    prepend-inner-icon="mdi-magnify"
+                    variant="outlined"
+                    density="compact"
+                    hide-details
+                    clearable
+                  />
                 </v-col>
               </v-row>
 
