@@ -44,6 +44,8 @@ export async function loadConversationsForItem(itemId: number): Promise<Conversa
   }
 }
 
+
+
 export async function fetchConversations(itemId: number): Promise<Conversation[]> {
   try {
     const { data, error } = await supabase
@@ -96,3 +98,55 @@ export async function fetchConversations(itemId: number): Promise<Conversation[]
     throw error;
   }
 }
+
+export async function loadExistingConversation(
+  itemId: number,
+  senderId: string,
+  receiverId: string
+): Promise<Conversation | null> {
+  try {
+    const { data: existingConversation, error: checkError } = await supabase
+      .from("conversations")
+      .select("*")
+      .eq("item_id", itemId)
+      .eq("sender_id", senderId)
+      .eq("receiver_id", receiverId)
+      .single();
+
+    if (checkError && checkError.code !== "PGRST116") {
+      throw checkError;
+    }
+
+    return existingConversation || null;
+  } catch (error) {
+    console.error("Error loading existing conversation:", error);
+    throw new Error("Failed to load existing conversation");
+  }
+}
+
+export async function createConversation(
+  itemId: number,
+  senderId: string,
+  receiverId: string
+): Promise<Conversation> {
+  try {
+    const { data: newConversation, error: createError } = await supabase
+      .from("conversations")
+      .insert([
+        {
+          item_id: itemId,
+          sender_id: senderId,
+          receiver_id: receiverId,
+        },
+      ])
+      .select()
+      .single();
+
+    if (createError) throw createError;
+    return newConversation;
+  } catch (error) {
+    console.error("Error creating conversation:", error);
+    throw new Error("Failed to create conversation");
+  }
+}
+

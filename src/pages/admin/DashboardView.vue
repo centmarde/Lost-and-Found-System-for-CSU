@@ -15,8 +15,6 @@ import { handleClaimItem } from '@/stores/items'
 
 import '@/styles/dashboardview.css'
 
-
-
 interface Item {
   id: number
   title: string
@@ -40,8 +38,7 @@ const {
   showPostDialog,
   updatingItems,
   newItemForm,
-  postMissingItem,
-  markAsUnclaimed
+  postMissingItem
 } = useAdminItemActions(fetchDashboardStats)
 
 // Claim dialog state
@@ -54,6 +51,10 @@ const handleShowClaimDialog = (item: Item) => {
   showClaimDialog.value = true
 }
 
+// Handle claim item with refresh
+const onClaimItem = async (itemId: number, claimedBy: string) => {
+  await handleClaimItem(itemId, claimedBy, fetchDashboardStats)
+}
 
 const searchQuery = ref('')
 
@@ -145,7 +146,6 @@ onMounted(async () => {
                       :item="item"
                       :is-updating="updatingItems.has(item.id)"
                       @show-claim-dialog="handleShowClaimDialog"
-                      @mark-as-unclaimed="markAsUnclaimed"
                     />
                   </v-col>
                 </v-row>
@@ -172,7 +172,7 @@ onMounted(async () => {
           v-model="showClaimDialog"
           :item="selectedItemForClaim"
           :loading="selectedItemForClaim ? updatingItems.has(selectedItemForClaim.id) : false"
-          @claim-item="handleClaimItem"
+          @claim-item="onClaimItem"
         />
       </div>
     </template>

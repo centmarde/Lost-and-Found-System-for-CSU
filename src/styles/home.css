@@ -71,3 +71,25 @@
 .conversation-item.v-list-item--active {
   background-color: #e3f2fd;
 }
+
+.notification-bell {
+  position: absolute;
+  top: 0;
+  right: 24px;
+  z-index: 10;
+}
+
+@media (max-width: 768px) {
+  .notification-bell {
+    position: relative;
+    margin-top: 16px;
+  }
+}
+
+.items-grid {
+  margin-top: 16px;
+}
+
+.gap-2 {
+  gap: 8px;
+}

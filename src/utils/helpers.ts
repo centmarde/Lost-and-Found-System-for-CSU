@@ -2,6 +2,23 @@
  * Utility functions for the application
  */
 
+import { computed, ref, watch, type Ref } from 'vue';
+
+// --- Interface for items (assuming ActivityItem structure) ---
+export interface ActivityItem {
+  id: string;
+  type: "lost" | "found" | "resolved" | "claimed";
+  title: string;
+  user: string;
+  timestamp: string; // Use 'timestamp' to match existing ActivityItem
+  status: string;
+  created_at: string; // Add 'created_at' as used in the new logic
+}
+
+// ----------------------------------------------------------------------------
+// Existing Utility Functions
+// ----------------------------------------------------------------------------
+
 /**
  * Generates initials from an email address for avatar display
  * @param email - The email address to extract initials from
@@ -77,15 +94,6 @@ export function formatDate(dateString: string): string {
 // Activity-related utilities
 // ============================================================================
 
-export interface ActivityItem {
-  id: string;
-  type: "lost" | "found" | "resolved" | "claimed";
-  title: string;
-  user: string;
-  timestamp: string;
-  status: string;
-}
-
 /**
  * Get the Vuetify color for an activity type
  * @param type - The activity type
@@ -98,7 +106,6 @@ export function getActivityColor(type: string): string {
     case "found":
       return "success";
     case "resolved":
-      return "primary";
     case "claimed":
       return "info";
     default:
@@ -118,7 +125,6 @@ export function getActivityIcon(type: string): string {
     case "found":
       return "mdi-check-circle";
     case "resolved":
-      return "mdi-handshake";
     case "claimed":
       return "mdi-account-check";
     default:
@@ -165,7 +171,7 @@ export function filterRecentActivities(
 ): ActivityItem[] {
   const now = new Date();
   const maxAge = maxDays * 24 * 60 * 60 * 1000; // Convert days to milliseconds
-  
+
   return activities
     .filter(activity => {
       const activityDate = new Date(activity.timestamp);
@@ -173,4 +179,138 @@ export function filterRecentActivities(
       return age <= maxAge; // Only include items within the time window
     })
     .slice(0, maxItems); // Limit to max number of items
+}
+
+// ============================================================================
+// Filtering, Sorting, and Pagination Composable
+// ============================================================================
+
+// Type for the sort direction
+type SortBy = 'newest' | 'oldest';
+
+/**
+ * Composable for handling filtering, sorting, and pagination of a list of items.
+ *
+ * @param items - A reactive reference to the array of items.
+ * @returns An object containing reactive state and computed properties.
+ */
+export function useFilterSortPagination<T extends { created_at: string }>(
+  items: Ref<T[]>,
+  initialItemsPerPage: number = 10
+) {
+  // --- Reactive State ---
+  const selectedMonth = ref('all');
+  const selectedDay = ref('all');
+  const sortBy = ref<SortBy>('newest');
+  const page = ref(1);
+  const itemsPerPage = ref(initialItemsPerPage);
+
+  // --- Computed properties for filtering and sorting ---
+  const availableMonths = computed(() => {
+    const months = new Set<string>()
+    items.value.forEach(item => {
+      // Ensure the property is correct, assuming T extends the ActivityItem's date structure
+      const date = new Date(item.created_at)
+      const monthYear = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
+      months.add(monthYear)
+    })
+    return Array.from(months).sort((a, b) => b.localeCompare(a))
+  })
+
+  const availableDays = computed(() => {
+    if (selectedMonth.value === 'all') return []
+
+    const days = new Set<string>()
+    items.value.forEach(item => {
+      const date = new Date(item.created_at)
+      const monthYear = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
+
+      if (monthYear === selectedMonth.value) {
+        const fullDate = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+        days.add(fullDate)
+      }
+    })
+    return Array.from(days).sort((a, b) => b.localeCompare(a))
+  })
+
+  const filteredAndSortedItems = computed(() => {
+    let filtered = [...items.value]
+
+    // Filter by month
+    if (selectedMonth.value !== 'all') {
+      filtered = filtered.filter(item => {
+        const date = new Date(item.created_at)
+        const monthYear = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
+        return monthYear === selectedMonth.value
+      })
+    }
+
+    // Filter by day
+    if (selectedDay.value !== 'all') {
+      filtered = filtered.filter(item => {
+        const date = new Date(item.created_at)
+        const fullDate = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+        return fullDate === selectedDay.value
+      })
+    }
+
+    // Sort items
+    filtered.sort((a, b) => {
+      // Assuming 'created_at' is the timestamp property
+      const dateA = new Date(a.created_at).getTime()
+      const dateB = new Date(b.created_at).getTime()
+      return sortBy.value === 'newest' ? dateB - dateA : dateA - dateB
+    })
+
+    return filtered
+  })
+
+  const paginatedItems = computed(() => {
+    const start = (page.value - 1) * itemsPerPage.value
+    const end = start + itemsPerPage.value
+    return filteredAndSortedItems.value.slice(start, end)
+  })
+
+  const totalPages = computed(() => {
+    return Math.ceil(filteredAndSortedItems.value.length / itemsPerPage.value)
+  })
+
+  // --- Formatting Functions ---
+  const formatMonthLabel = (monthValue: string) => {
+    const [year, month] = monthValue.split('-')
+    const date = new Date(parseInt(year), parseInt(month) - 1)
+    return date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+  }
+
+  const formatDayLabel = (dayValue: string) => {
+    const date = new Date(dayValue)
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+  }
+
+  // --- Watchers for State Reset ---
+  // Reset pagination when filters change
+  watch([selectedMonth, selectedDay, sortBy, itemsPerPage], () => {
+    page.value = 1
+  })
+
+  // Reset day filter when month changes
+  watch(selectedMonth, () => {
+    selectedDay.value = 'all'
+  })
+
+  // Return reactive state and computed properties
+  return {
+    selectedMonth,
+    selectedDay,
+    sortBy,
+    page,
+    itemsPerPage,
+    availableMonths,
+    availableDays,
+    filteredAndSortedItems,
+    paginatedItems,
+    totalPages,
+    formatMonthLabel,
+    formatDayLabel,
+  }
 }

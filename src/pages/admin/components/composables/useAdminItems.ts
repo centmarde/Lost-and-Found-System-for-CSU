@@ -1,9 +1,6 @@
+//useAdminItems.ts
 import { ref } from 'vue'
-import { createClient } from '@supabase/supabase-js'
-
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
-const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY
-const supabase = createClient(supabaseUrl, supabaseKey)
+import { supabase } from '@/lib/supabase'
 
 interface NewItemForm {
   title: string
@@ -282,27 +279,7 @@ export const useAdminItemActions = (refreshData: () => Promise<void>) => {
   }
 
   // Admin function to mark item as unclaimed  
-  const markAsUnclaimed = async (itemId: number) => {
-    updatingItems.value.add(itemId)
 
-    try {
-      const { error } = await supabase
-        .from('items')
-        .update({ 
-          claimed_by: null
-        })
-        .eq('id', itemId)
-
-      if (error) throw error
-
-      await refreshData()
-    } catch (error) {
-      console.error('Error marking item as unclaimed:', error)
-      alert('Error updating item status')
-    } finally {
-      updatingItems.value.delete(itemId)
-    }
-  }
 
   // Get all conversations for admin review (legacy function)
   const getAdminConversations = async () => {
@@ -381,7 +358,6 @@ export const useAdminItemActions = (refreshData: () => Promise<void>) => {
     subscribeToConversationMessages,
     closeConversationsDialog,
     markAsClaimed,
-    markAsUnclaimed,
     getAdminConversations,
     getConversationMessages
   }

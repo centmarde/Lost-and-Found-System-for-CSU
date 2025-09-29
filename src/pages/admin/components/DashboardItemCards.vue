@@ -20,7 +20,6 @@ defineProps<Props>()
 
 defineEmits<{
   showClaimDialog: [item: Item]
-  markAsUnclaimed: [id: number]
 }>()
 
 const getItemStatusColor = (item: Item) => {
@@ -74,17 +73,15 @@ const getItemStatusIcon = (item: Item) => {
       >
         Mark as Claimed
       </v-btn>
-      <v-btn
+      <v-chip
         v-else
-        color="warning"
-        variant="outlined"
+        color="success"
+        variant="flat"
         size="small"
-        prepend-icon="mdi-undo"
-        @click="$emit('markAsUnclaimed', item.id)"
-        :loading="isUpdating"
+        prepend-icon="mdi-check-circle"
       >
-        Mark as Unclaimed
-      </v-btn>
+        Item Claimed
+      </v-chip>
     </v-card-actions>
   </v-card>
 </template>

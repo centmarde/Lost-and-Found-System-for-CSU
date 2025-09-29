@@ -26,6 +26,7 @@ export interface Message {
   message: string
   user_id: string
   created_at: string
+  sender_id: string
 }
 
 export interface SendMessagePayload {
