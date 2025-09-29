@@ -9,9 +9,7 @@ import {
 } from '@/utils/helpers'; 
 
 interface Props {
-  stats: {
-    recentActivity: ActivityItem[];
-  };
+  stats: any; // Accept any stats object structure
   maxItems?: number;
   maxDays?: number;
 }
@@ -21,10 +19,12 @@ const props = withDefaults(defineProps<Props>(), {
   maxDays: 7
 });
 
-// Filter and limit recent activities using helper function
-const filteredActivity = computed(() => 
-  filterRecentActivities(props.stats.recentActivity, props.maxItems, props.maxDays)
-);
+// Filter and limit recent activities using helper function with safe default
+const filteredActivity = computed(() => {
+  // Check if recentActivity exists in stats, otherwise return empty array
+  const activities = props.stats?.recentActivity || [];
+  return filterRecentActivities(activities, props.maxItems, props.maxDays);
+});
 </script>
 
 <template>
@@ -71,7 +71,7 @@ const filteredActivity = computed(() =>
               {{
                 activity.type.charAt(0).toUpperCase() + activity.type.slice(1)
               }}
-              by {{ activity.user }} • {{ activity.status }}
+              {{ activity.status === 'claimed' ? 'claimed' : '' }} by {{ activity.user }}
             </v-list-item-subtitle>
 
             <template #append>
