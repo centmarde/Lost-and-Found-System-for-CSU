@@ -37,9 +37,10 @@ const showNotificationDialog = ref(false)
 
 // Pagination and sorting
 const page = ref(1)
-const itemsPerPage = ref(12)
+const itemsPerPage = ref(8)
 const sortBy = ref<'newest' | 'oldest'>('newest')
 const filterByMonth = ref<string>('all')
+const searchQuery = ref('')
 
 // Use the new composables
 const {
@@ -100,6 +101,15 @@ const getMonthName = (monthYear: string) => {
 const filteredItems = computed(() => {
   let filtered = [...items.value]
 
+  // Filter by search query
+  if (searchQuery.value.trim()) {
+    const query = searchQuery.value.toLowerCase()
+    filtered = filtered.filter(item => 
+      item.title.toLowerCase().includes(query) ||
+      item.description.toLowerCase().includes(query)
+    )
+  }
+
   // Filter by month
   if (filterByMonth.value !== 'all') {
     filtered = filtered.filter(item => {
@@ -132,7 +142,7 @@ const totalPages = computed(() => {
 })
 
 // Reset page when filters change
-watch([filterByMonth, sortBy], () => {
+watch([filterByMonth, sortBy, searchQuery], () => {
   page.value = 1
 })
 
@@ -324,6 +334,18 @@ onMounted(async () => {
 
               <!-- Filters and Sorting (Only for Users) -->
               <v-row v-if="!isCurrentUserAdmin && items.length > 0" class="mb-4">
+                <v-col cols="12">
+                  <v-text-field
+                    v-model="searchQuery"
+                    label="Search items..."
+                    placeholder="Search by title or description"
+                    prepend-inner-icon="mdi-magnify"
+                    variant="outlined"
+                    density="compact"
+                    hide-details
+                    clearable
+                  />
+                </v-col>
                 <v-col cols="12" sm="6" md="4">
                   <v-select
                     v-model="filterByMonth"
@@ -349,7 +371,7 @@ onMounted(async () => {
                 </v-col>
                 <v-col cols="12" sm="12" md="4" class="d-flex align-center">
                   <v-chip class="me-2" size="small" variant="outlined">
-                    Page {{ page }} of {{ totalPages }}
+                    Showing {{ paginatedItems.length }} of {{ filteredItems.length }}
                   </v-chip>
                 </v-col>
               </v-row>
@@ -394,14 +416,14 @@ onMounted(async () => {
                   No items found
                 </h3>
                 <p class="text-body-1 text-grey-darken-2 mb-4">
-                  Try adjusting your filters
+                  {{ searchQuery ? 'No items match your search.' : 'Try adjusting your filters' }}
                 </p>
                 <v-btn 
                   color="primary" 
                   variant="outlined"
-                  @click="filterByMonth = 'all'"
+                  @click="() => { filterByMonth = 'all'; searchQuery = '' }"
                 >
-                  Clear Filters
+                  Clear All Filters
                 </v-btn>
               </div>
 
