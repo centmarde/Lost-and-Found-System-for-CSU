@@ -1,6 +1,5 @@
 <script lang="ts" setup>
 import { ref, onMounted, computed } from 'vue'
-import { createClient } from '@supabase/supabase-js'
 import InnerLayoutWrapper from '@/layouts/InnerLayoutWrapper.vue'
 import AdminDashboardItemCard from '@/pages/admin/components/DashboardItemCards.vue'
 import ClaimItemDialog from '@/pages/admin/components/ClaimItemDialog.vue'
@@ -12,11 +11,11 @@ import RecentActivity from '@/pages/admin/components/RecentActivity.vue'
 import PostItemDialog from '@/pages/admin/components/PostItemDialog.vue'
 import { useDashboardData } from '@/pages/admin/components/composables/useDashboardData'
 import { useAdminItemActions } from '@/pages/admin/components/composables/useAdminItems'
+import { handleClaimItem } from '@/stores/items'
+
 import '@/styles/dashboardview.css'
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
-const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY
-const supabase = createClient(supabaseUrl, supabaseKey)
+
 
 interface Item {
   id: number
@@ -55,28 +54,6 @@ const handleShowClaimDialog = (item: Item) => {
   showClaimDialog.value = true
 }
 
-// Handle claiming item with selected user
-const handleClaimItem = async (itemId: number, claimedBy: string) => {
-  updatingItems.value.add(itemId)
-  
-  try {
-    const { error } = await supabase
-      .from('items')
-      .update({ 
-        claimed_by: claimedBy
-      })
-      .eq('id', itemId)
-
-    if (error) throw error
-
-    await fetchDashboardStats()
-  } catch (error) {
-    console.error('Error marking item as claimed:', error)
-    alert('Error updating item status')
-  } finally {
-    updatingItems.value.delete(itemId)
-  }
-}
 
 const searchQuery = ref('')
 

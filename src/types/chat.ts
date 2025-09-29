@@ -1,7 +1,10 @@
 export interface Item {
   id: number
   title: string
+  status: 'lost' | 'found'
+  user_id: string
 }
+
 
 export interface User {
   id: string
@@ -30,3 +33,4 @@ export interface SendMessagePayload {
   message: string
   userId: string
 }
+

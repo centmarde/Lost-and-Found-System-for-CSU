@@ -11,7 +11,6 @@ interface NewItemForm {
   status: 'lost' | 'found'
 }
 
-// Corrected Message interface to use 'user_id' instead of 'sender_id'
 export interface Message {
   id: string
   conversation_id: string

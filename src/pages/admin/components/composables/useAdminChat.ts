@@ -2,8 +2,7 @@
 
 import { ref, onUnmounted, nextTick, type Ref } from 'vue'
 import { useToast } from 'vue-toastification'
-// Removed direct Supabase import as it's now in stores
-// Removed useAuthUserStore import as it's now used in stores/conversations.ts
+
 
 import { loadConversationsForItem } from '@/stores/conversation'
 import { loadMessages, sendMessage, setupMessageSubscription } from '@/stores/messages'

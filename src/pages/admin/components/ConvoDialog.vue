@@ -2,6 +2,8 @@
 import { ref, watch, computed } from "vue";
 import { supabase } from "@/lib/supabase";
 import { formatDate } from "@/utils/helpers";
+import { fetchConversations } from "@/stores/conversation";
+import { markAsClaimedBy } from "@/stores/items";
 
 interface Item {
   id: number;
@@ -54,61 +56,6 @@ const dialogValue = computed({
   set: (value: boolean) => emit("update:modelValue", value),
 });
 
-// Fetch conversations for the selected item
-const fetchConversations = async () => {
-  if (!props.item) return;
-
-  loading.value = true;
-  try {
-    const { data, error } = await supabase
-      .from("conversations")
-      .select(
-        `
-        id,
-        item_id,
-        sender_id,
-        receiver_id,
-        created_at,
-        sender_profile:profiles!conversations_sender_id_fkey (
-          full_name,
-          email
-        ),
-        messages (
-          message,
-          created_at
-        )
-      `
-      )
-      .eq("item_id", props.item.id)
-      .order("created_at", { ascending: false });
-
-    if (error) {
-      console.error("Error fetching conversations:", error);
-      return;
-    }
-
-    // Process conversations to get latest message and count
-    conversations.value = (data || []).map((conv: any) => ({
-      id: conv.id,
-      item_id: conv.item_id,
-      sender_id: conv.sender_id,
-      receiver_id: conv.receiver_id,
-      created_at: conv.created_at,
-      sender_profile: conv.sender_profile,
-      messages: conv.messages,
-      latest_message:
-        conv.messages && conv.messages.length > 0
-          ? conv.messages[conv.messages.length - 1]
-          : { message: "No messages yet", created_at: conv.created_at },
-      message_count: conv.messages?.length || 0,
-    }));
-  } catch (error) {
-    console.error("Error:", error);
-  } finally {
-    loading.value = false;
-  }
-};
-
 // Open chat dialog for specific conversation
 const openChat = (conversation: Conversation) => {
   selectedConversation.value = conversation;
@@ -116,23 +63,12 @@ const openChat = (conversation: Conversation) => {
 };
 
 // Mark item as claimed by specific user
-const markAsClaimedBy = async (conversation: Conversation) => {
+const handleAwardItem = async (conversation: Conversation) => {
   if (!props.item) return;
 
   try {
-    const { error } = await supabase
-      .from("items")
-      .update({
-        claimed_by: conversation.sender_id,
-        status: "claimed",
-      })
-      .eq("id", props.item.id);
-
-    if (error) {
-      console.error("Error marking item as claimed:", error);
-      return;
-    }
-
+    await markAsClaimedBy(props.item.id, conversation.sender_id);
+    
     // Close dialogs and refresh
     dialogValue.value = false;
     // You might want to emit an event here to refresh the parent component
@@ -146,7 +82,7 @@ watch(
   () => props.modelValue,
   (newValue) => {
     if (newValue && props.item) {
-      fetchConversations();
+      fetchConversations(props.item.id); 
     }
   }
 );
@@ -250,7 +186,7 @@ watch(
                     variant="flat"
                     size="small"
                     prepend-icon="mdi-check"
-                    @click="markAsClaimedBy(conversation)"
+                    @click="handleAwardItem(conversation)"
                   >
                     Award Item
                   </v-btn>

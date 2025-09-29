@@ -1,29 +1,8 @@
 import { ref, onUnmounted, nextTick } from 'vue'
 import { useToast } from 'vue-toastification'
 import { supabase } from '@/lib/supabase'
+import type { Item, Conversation, Message } from '@/types/chat'
 
-interface Item {
-  id: number
-  title: string
-  status: 'lost' | 'found'
-  user_id: string
-}
-
-interface Conversation {
-  id: string
-  item_id: number
-  sender_id: string
-  receiver_id: string
-  created_at: string
-}
-
-interface Message {
-  id: string
-  conversation_id: string
-  message: string
-  user_id: string
-  created_at: string
-}
 
 export function useUserChat(currentUser: any) {
   const toast = useToast()

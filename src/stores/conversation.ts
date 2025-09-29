@@ -43,3 +43,56 @@ export async function loadConversationsForItem(itemId: number): Promise<Conversa
     throw new Error('Failed to load conversations from the database.')
   }
 }
+
+export async function fetchConversations(itemId: number): Promise<Conversation[]> {
+  try {
+    const { data, error } = await supabase
+      .from('conversations')
+      .select(
+        `
+          id,
+          item_id,
+          sender_id,
+          receiver_id,
+          created_at,
+          sender_profile:profiles!conversations_sender_id_fkey (
+            full_name,
+            email
+          ),
+          messages (
+            message,
+            created_at
+          )
+        `
+      )
+      .eq('item_id', itemId)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error("Supabase Error fetching conversations:", error);
+      throw error;
+    }
+
+    // Process conversations to calculate latest message and count
+    const processedConversations: Conversation[] = (data || []).map((conv: any) => ({
+      id: conv.id,
+      item_id: conv.item_id,
+      sender_id: conv.sender_id,
+      receiver_id: conv.receiver_id,
+      created_at: conv.created_at,
+      sender_profile: conv.sender_profile,
+      messages: conv.messages,
+      latest_message:
+        conv.messages && conv.messages.length > 0
+          ? conv.messages[conv.messages.length - 1]
+          : { message: "No messages yet", created_at: conv.created_at },
+      message_count: conv.messages?.length || 0,
+    }));
+    
+    return processedConversations;
+
+  } catch (error) {
+    // Re-throw the error so the calling component can handle its loading state
+    throw error;
+  }
+}
