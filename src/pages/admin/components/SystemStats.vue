@@ -1,14 +1,18 @@
 <script lang="ts" setup>
 import { ref, onMounted } from 'vue'
 import { createClient } from '@supabase/supabase-js'
+import { useAuthUserStore } from '@/stores/authUser'
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
 const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY
 const supabase = createClient(supabaseUrl, supabaseKey)
 
+const authStore = useAuthUserStore()
+
 const stats = ref({
   totalUsers: 0,
-  totalConversations: 0,
+  totalItems: 0,
+  activeConversations: 0,
   totalMessages: 0
 })
 
@@ -17,25 +21,28 @@ const loading = ref(true)
 const fetchSystemStats = async () => {
   loading.value = true
   try {
-    // Fetch total users (unique user_ids from items table)
-    const { data: items } = await supabase
-      .from('items')
-      .select('user_id')
-      .not('user_id', 'is', null)
-
-    if (items) {
-      const uniqueUserIds = new Set(items.map(item => item.user_id))
-      stats.value.totalUsers = uniqueUserIds.size
+    // Fetch total users from auth (includes all registered users)
+    const { users, error: usersError } = await authStore.getAllUsers()
+    
+    if (!usersError && users) {
+      stats.value.totalUsers = users.length
     }
 
-    // Fetch total conversations (assuming you have a conversations table)
+    // Fetch total items (lost & found)
+    const { count: itemsCount } = await supabase
+      .from('items')
+      .select('*', { count: 'exact', head: true })
+
+    stats.value.totalItems = itemsCount || 0
+
+    // Fetch total active conversations
     const { count: conversationsCount } = await supabase
       .from('conversations')
       .select('*', { count: 'exact', head: true })
 
-    stats.value.totalConversations = conversationsCount || 0
+    stats.value.activeConversations = conversationsCount || 0
 
-    // Fetch total messages (assuming you have a messages table)
+    // Fetch total messages exchanged
     const { count: messagesCount } = await supabase
       .from('messages')
       .select('*', { count: 'exact', head: true })
@@ -57,8 +64,8 @@ onMounted(() => {
 <template>
   <v-card class="pa-4 mb-4 system-stats-card" elevation="2">
     <v-card-title class="text-h6 font-weight-bold mb-4">
-      <v-icon class="me-2">mdi-database</v-icon>
-      System Stats
+      <v-icon class="me-2">mdi-chart-box-outline</v-icon>
+      System Overview
     </v-card-title>
     
     <div v-if="loading" class="text-center pa-4">
@@ -67,16 +74,35 @@ onMounted(() => {
 
     <div v-else>
       <div class="d-flex justify-space-between align-center mb-3">
-        <span class="text-body-1">Active Users</span>
+        <div class="d-flex align-center">
+          <v-icon class="me-2" size="small" color="primary">mdi-account-group</v-icon>
+          <span class="text-body-1">Total Users</span>
+        </div>
         <v-chip color="primary" variant="flat">{{ stats.totalUsers }}</v-chip>
       </div>
+      
       <div class="d-flex justify-space-between align-center mb-3">
-        <span class="text-body-1">Conversations</span>
-        <v-chip color="secondary" variant="flat">{{ stats.totalConversations }}</v-chip>
+        <div class="d-flex align-center">
+          <v-icon class="me-2" size="small" color="secondary">mdi-package-variant</v-icon>
+          <span class="text-body-1">Total Items</span>
+        </div>
+        <v-chip color="secondary" variant="flat">{{ stats.totalItems }}</v-chip>
       </div>
+
+      <div class="d-flex justify-space-between align-center mb-3">
+        <div class="d-flex align-center">
+          <v-icon class="me-2" size="small" color="info">mdi-message-text</v-icon>
+          <span class="text-body-1">Active Chats</span>
+        </div>
+        <v-chip color="info" variant="flat">{{ stats.activeConversations }}</v-chip>
+      </div>
+      
       <div class="d-flex justify-space-between align-center">
-        <span class="text-body-1">Messages</span>
-        <v-chip color="info" variant="flat">{{ stats.totalMessages }}</v-chip>
+        <div class="d-flex align-center">
+          <v-icon class="me-2" size="small" color="success">mdi-chat</v-icon>
+          <span class="text-body-1">Messages Sent</span>
+        </div>
+        <v-chip color="success" variant="flat">{{ stats.totalMessages }}</v-chip>
       </div>
     </div>
   </v-card>
