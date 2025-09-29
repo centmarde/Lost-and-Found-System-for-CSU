@@ -29,11 +29,11 @@ const fetchSystemStats = async () => {
     }
 
     // Fetch total items (lost & found)
-    const { count: itemsCount } = await supabase
-      .from('items')
-      .select('*', { count: 'exact', head: true })
+    // const { count: itemsCount } = await supabase
+    //   .from('items')
+    //   .select('*', { count: 'exact', head: true })
 
-    stats.value.totalItems = itemsCount || 0
+    // stats.value.totalItems = itemsCount || 0
 
     // Fetch total active conversations
     const { count: conversationsCount } = await supabase
@@ -81,13 +81,13 @@ onMounted(() => {
         <v-chip color="primary" variant="flat">{{ stats.totalUsers }}</v-chip>
       </div>
       
-      <div class="d-flex justify-space-between align-center mb-3">
+      <!-- <div class="d-flex justify-space-between align-center mb-3">
         <div class="d-flex align-center">
           <v-icon class="me-2" size="small" color="secondary">mdi-package-variant</v-icon>
           <span class="text-body-1">Total Items</span>
         </div>
         <v-chip color="secondary" variant="flat">{{ stats.totalItems }}</v-chip>
-      </div>
+      </div> -->
 
       <div class="d-flex justify-space-between align-center mb-3">
         <div class="d-flex align-center">
