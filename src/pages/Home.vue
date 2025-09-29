@@ -201,7 +201,6 @@ const fetchItems = async () => {
 const {
   updatingItems,
   markAsClaimed,
-  markAsUnclaimed,
 } = useAdminItemActions(fetchItems)
 
 
@@ -467,7 +466,6 @@ onMounted(async () => {
                       :is-updating="updatingItems.has(item.id)"
                       @open-conversations="handleOpenConversations"
                       @mark-as-claimed="markAsClaimed"
-                      @mark-as-unclaimed="markAsUnclaimed"
                     />
                     
                     <UserItemCard
