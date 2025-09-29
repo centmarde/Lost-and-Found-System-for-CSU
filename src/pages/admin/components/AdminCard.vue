@@ -1,4 +1,3 @@
-//AdminItemCard.vue
 <script lang="ts" setup>
 import { formatDate } from '@/utils/helpers'
 

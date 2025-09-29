@@ -1,48 +1,54 @@
 <script setup lang="ts">
-import { ref, onMounted, computed, watch } from 'vue'
-import { useToast } from 'vue-toastification'
+import { computed, onMounted, onUnmounted } from 'vue'
 import InnerLayoutWrapper from '@/layouts/InnerLayoutWrapper.vue'
+// Component Imports
 import AdminItemCard from '@/pages/admin/components/AdminCard.vue'
 import UserItemCard from '@/pages/admin/components/ItemCard.vue'
 import UserChatDialog from '@/pages/admin/components/userChatDialog.vue'
 import AdminChatDialog from '@/pages/admin/components/AdminChatDialog.vue'
 import NotificationDialog from '@/pages/admin/components/NotifDialog.vue'
-import { supabase } from '@/lib/supabase'
-import { useAuthUserStore } from '@/stores/authUser'
+// Composables
 import { useUserChat } from '@/pages/admin/components/composables/useUserChat'
 import { useAdminChat } from '@/pages/admin/components/composables/useAdminChat'
 import { useAdminItemActions } from '@/pages/admin/components/composables/useAdminItems'
 import { useNotifications } from '@/pages/admin/components/composables/useNotification'
+import useHomeData from '@/pages/admin/components/composables/HomeData'
+import type { Item } from '@/pages/admin/components/composables/HomeData'
+
 import '@/styles/home.css'
 
-interface Item {
-  id: number
-  title: string
-  description: string
-  status: 'lost' | 'found'
-  user_id: string
-  claimed_by: string
-  created_at: string
-}
+const {
+  // State
+  itemsLoading,
+  isCurrentUserAdmin,
+  currentUser,
+  showNotificationBell,
+  showNotificationDialog,
+  
+  // Data
+  filteredItems,
+  paginatedItems,
+  availableMonths,
 
-const toast = useToast()
+  // Filtering/Sorting/Pagination
+  page,
+  itemsPerPage,
+  sortBy,
+  filterByMonth,
+  searchQuery,
+  totalPages,
+  getMonthName,
+  
+  // Actions
+  fetchItems,
+  clearAllFilters,
+  
+  // Computed Properties for UI
+  pageTitle,
+  pageSubtitle,
+} = useHomeData()
 
-// Global state
-const items = ref<Item[]>([])
-const itemsLoading = ref(false)
-const currentUser = ref<any>(null)
-const isCurrentUserAdmin = ref(false)
-const showNotificationBell = ref(false)
-const showNotificationDialog = ref(false)
-
-// Pagination and sorting
-const page = ref(1)
-const itemsPerPage = ref(8)
-const sortBy = ref<'newest' | 'oldest'>('newest')
-const filterByMonth = ref<string>('all')
-const searchQuery = ref('')
-
-// Use the new composables
+// 2. Chat Composables (Remain here as they depend on currentUser from useHomeData)
 const {
   showChatDialog,
   selectedItem,
@@ -51,7 +57,6 @@ const {
   sendingMessage,
   handleContact,
   sendMessage,
-  closeChatDialog,
 } = useUserChat(currentUser)
 
 const {
@@ -60,7 +65,6 @@ const {
   adminConversations,
   selectedAdminConversation,
   adminMessages,
-  newAdminMessage,
   loadingAdminConversations,
   loadingAdminMessages,
   sendingAdminMessage,
@@ -70,207 +74,49 @@ const {
   closeAdminConversationsDialog,
 } = useAdminChat(currentUser)
 
-// Initialize notifications composable
+// 3. Notification Composable (Remains here)
 const {
   notifications,
-  setupItemNotifications,
+  setupItemNotifications, // Called inside useHomeData now, but exposed for clarity
   markAsRead,
   clearNotifications,
-  cleanup
+  cleanup,
 } = useNotifications(currentUser, isCurrentUserAdmin)
 
-// Available months from items
-const availableMonths = computed(() => {
-  const months = new Set<string>()
-  items.value.forEach(item => {
-    const date = new Date(item.created_at)
-    const monthYear = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
-    months.add(monthYear)
-  })
-  return Array.from(months).sort().reverse()
+// Computed property for notification count
+const unreadCount = computed(() => {
+  return notifications.value.filter(n => !n.read).length
 })
 
-// Month display names
-const getMonthName = (monthYear: string) => {
-  const [year, month] = monthYear.split('-')
-  const date = new Date(parseInt(year), parseInt(month) - 1)
-  return date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+// Notification action handlers
+const toggleNotifications = () => {
+  showNotificationDialog.value = true
 }
+const handleMarkAsRead = (notificationId: number) => markAsRead(notificationId)
+const handleClearAllNotifications = () => clearNotifications()
 
-// Filtered and sorted items
-const filteredItems = computed(() => {
-  let filtered = [...items.value]
-
-  // Filter by search query
-  if (searchQuery.value.trim()) {
-    const query = searchQuery.value.toLowerCase()
-    filtered = filtered.filter(item => 
-      item.title.toLowerCase().includes(query) ||
-      item.description.toLowerCase().includes(query)
-    )
-  }
-
-  // Filter by month
-  if (filterByMonth.value !== 'all') {
-    filtered = filtered.filter(item => {
-      const date = new Date(item.created_at)
-      const monthYear = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
-      return monthYear === filterByMonth.value
-    })
-  }
-
-  // Sort
-  filtered.sort((a, b) => {
-    const dateA = new Date(a.created_at).getTime()
-    const dateB = new Date(b.created_at).getTime()
-    return sortBy.value === 'newest' ? dateB - dateA : dateA - dateB
-  })
-
-  return filtered
-})
-
-// Paginated items
-const paginatedItems = computed(() => {
-  const start = (page.value - 1) * itemsPerPage.value
-  const end = start + itemsPerPage.value
-  return filteredItems.value.slice(start, end)
-})
-
-// Total pages
-const totalPages = computed(() => {
-  return Math.ceil(filteredItems.value.length / itemsPerPage.value)
-})
-
-// Reset page when filters change
-watch([filterByMonth, sortBy, searchQuery], () => {
-  page.value = 1
-})
-
-// Check if current user is admin
-const checkIfUserIsAdmin = async (user: any) => {
-  if (!user) return false
-
-  try {
-    const authStore = useAuthUserStore()
-    const { users, error } = await authStore.getAllUsers()
-
-    if (error) return false
-
-    const currentUserData = users?.find(u => u.id === user.id)
-    const roleId = currentUserData?.user_metadata?.role
-
-    return roleId === 1
-  } catch (error) {
-    console.error('Error checking admin status:', error)
-    return false
-  }
-}
-
-// Get current user and check admin status
-const getCurrentUser = async () => {
-  const { data: { user } } = await supabase.auth.getUser()
-  currentUser.value = user
-
-  if (user) {
-    isCurrentUserAdmin.value = await checkIfUserIsAdmin(user)
-    showNotificationBell.value = !isCurrentUserAdmin.value
-    
-    if (!isCurrentUserAdmin.value) {
-      await setupItemNotifications() 
-    }
-  }
-}
-
-// Fetch items from database
-const fetchItems = async () => {
-  itemsLoading.value = true
-  try {
-    let query = supabase.from('items').select('*')
-
-    if (!isCurrentUserAdmin.value) {
-      const authStore = useAuthUserStore()
-      const { users, error: usersError } = await authStore.getAllUsers()
-
-      if (usersError) {
-        console.error('Error fetching users:', usersError)
-        toast.error('Failed to load admin users')
-        return
-      }
-
-      const adminUsers = users?.filter(user => {
-        const roleId = user.user_metadata?.role
-        return roleId === 1
-      }) || []
-
-      if (adminUsers.length === 0) {
-        items.value = []
-        return
-      }
-
-      const adminUserIds = adminUsers.map(admin => admin.id)
-      query = query.in('user_id', adminUserIds)
-    } else {
-      query = query.eq('user_id', currentUser.value.id)
-    }
-
-    const { data, error } = await query.order('created_at', { ascending: false })
-
-    if (error) {
-      console.error('Error fetching items:', error)
-      toast.error('Failed to load items')
-      return
-    }
-
-    items.value = data || []
-  } catch (error) {
-    console.error('Error:', error)
-    toast.error('An unexpected error occurred while loading items')
-  } finally {
-    itemsLoading.value = false
-  }
-}
-
-// Use the existing admin item actions
+// 4. Admin Item Actions Composable (Remains here)
 const {
   updatingItems,
   markAsClaimed,
   markAsUnclaimed,
 } = useAdminItemActions(fetchItems)
 
-// Handle item unclaiming (regular users)
+// 5. User-side item actions (Simplified placeholder)
+// Note: The logic for markItemAsUnclaimed should ideally be in a useUserItemActions composable
+// or directly here if it's very simple. Sticking with the existing structure for refactoring.
 const markItemAsUnclaimed = async (itemId: number) => {
-  // existing logic
+  // Existing logic...
 }
 
-// Notification functions
-const unreadCount = computed(() => {
-  return notifications.value.filter(n => !n.read).length
+// 6. Lifecycle hooks
+onMounted(async () => {
+  // getCurrentUser and initial fetchItems are now handled inside useHomeData
 })
 
-const toggleNotifications = () => {
-  showNotificationDialog.value = true
-}
-
-const handleMarkAsRead = (notificationId: number) => {
-  markAsRead(notificationId)
-}
-
-const handleClearAllNotifications = () => {
-  clearNotifications()
-}
-
-const pageTitle = computed(() => isCurrentUserAdmin.value ? 'Manage Lost & Found Items' : 'Lost & Found')
-const pageSubtitle = computed(() => isCurrentUserAdmin.value ? 'Manage your posted items and view conversations' : 'Find your lost items or help others find theirs')
-
-watch([currentUser, isCurrentUserAdmin], async ([user, isAdmin]) => {
-  if (user && !isAdmin) {
-    await setupItemNotifications()
-  }
-}, { immediate: false })
-
-onMounted(async () => {
-  await getCurrentUser()
-  await fetchItems()
+// Cleanup notifications when the component is unmounted
+onUnmounted(() => {
+  cleanup()
 })
 </script>
 
@@ -288,7 +134,6 @@ onMounted(async () => {
                 {{ pageSubtitle }}
               </p>
 
-              <!-- Notification Bell for Users -->
               <div 
                 v-if="showNotificationBell" 
                 class="notification-bell"
@@ -332,9 +177,7 @@ onMounted(async () => {
                 </v-chip>
               </v-card-title>
 
-              <!-- Filters and Sorting (Only for Users) -->
-              <v-row v-if="!isCurrentUserAdmin && items.length > 0" class="mb-4">
-                
+              <v-row v-if="!isCurrentUserAdmin && filteredItems.length > 0" class="mb-4">
                 <v-col cols="12" sm="6" md="4">
                   <v-select
                     v-model="filterByMonth"
@@ -386,7 +229,7 @@ onMounted(async () => {
                 <p class="text-body-1 mt-4">Loading items...</p>
               </div>
 
-              <div v-else-if="items.length === 0" class="text-center py-12">
+              <div v-else-if="itemsLoading === false && filteredItems.length === 0 && !searchQuery && filterByMonth === 'all'" class="text-center py-12">
                 <v-icon size="80" color="grey-lighten-1" class="mb-4">
                   mdi-package-variant-closed-remove
                 </v-icon>
@@ -422,7 +265,7 @@ onMounted(async () => {
                 <v-btn 
                   color="primary" 
                   variant="outlined"
-                  @click="() => { filterByMonth = 'all'; searchQuery = '' }"
+                  @click="clearAllFilters"
                 >
                   Clear All Filters
                 </v-btn>
@@ -452,13 +295,12 @@ onMounted(async () => {
                       v-else
                       :item="item"
                       :is-updating="false"
-                      @contact="handleContact(item)"
+                      @contact="handleContact(item as Item)"
                       @mark-as-unclaimed="markItemAsUnclaimed"
                     />
                   </v-col>
                 </v-row>
 
-                <!-- Pagination (Only for Users) -->
                 <v-row v-if="!isCurrentUserAdmin && totalPages > 1" class="mt-4">
                   <v-col cols="12" class="d-flex justify-center">
                     <v-pagination
@@ -494,6 +336,7 @@ onMounted(async () => {
           :sending-message="sendingAdminMessage"
           @select-conversation="selectAdminConversation"
           @send-message="sendAdminMessage"
+          @close-dialog="closeAdminConversationsDialog"
         />
 
         <NotificationDialog

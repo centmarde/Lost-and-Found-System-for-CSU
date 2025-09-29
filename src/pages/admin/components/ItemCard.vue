@@ -1,4 +1,3 @@
-//UserItemCard.vue
 <script lang="ts" setup>
 import { ref, onMounted, onUnmounted, nextTick } from "vue";
 import { formatDate } from "@/utils/helpers";
