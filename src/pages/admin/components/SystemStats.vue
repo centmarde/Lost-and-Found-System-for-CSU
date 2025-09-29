@@ -1,61 +1,13 @@
 <script lang="ts" setup>
-import { ref, onMounted } from 'vue'
-import { supabase } from '@/lib/supabase'
-import { useAuthUserStore } from '@/stores/authUser'
+import { onMounted } from 'vue'
+import { useSystemStatsStore } from '@/stores/stats'
+import { storeToRefs } from 'pinia'
 
-
-
-const authStore = useAuthUserStore()
-
-const stats = ref({
-  totalUsers: 0,
-  totalItems: 0,
-  activeConversations: 0,
-  totalMessages: 0
-})
-
-const loading = ref(true)
-
-const fetchSystemStats = async () => {
-  loading.value = true
-  try {
-    // Fetch total users from auth (includes all registered users)
-    const { users, error: usersError } = await authStore.getAllUsers()
-    
-    if (!usersError && users) {
-      stats.value.totalUsers = users.length
-    }
-
-    // Fetch total items (lost & found)
-    // const { count: itemsCount } = await supabase
-    //   .from('items')
-    //   .select('*', { count: 'exact', head: true })
-
-    // stats.value.totalItems = itemsCount || 0
-
-    // Fetch total active conversations
-    const { count: conversationsCount } = await supabase
-      .from('conversations')
-      .select('*', { count: 'exact', head: true })
-
-    stats.value.activeConversations = conversationsCount || 0
-
-    // Fetch total messages exchanged
-    const { count: messagesCount } = await supabase
-      .from('messages')
-      .select('*', { count: 'exact', head: true })
-
-    stats.value.totalMessages = messagesCount || 0
-
-  } catch (error) {
-    console.error('Error fetching system stats:', error)
-  } finally {
-    loading.value = false
-  }
-}
+const systemStatsStore = useSystemStatsStore()
+const { stats, loading } = storeToRefs(systemStatsStore)
 
 onMounted(() => {
-  fetchSystemStats()
+  systemStatsStore.fetchSystemStats()
 })
 </script>
 
@@ -79,13 +31,6 @@ onMounted(() => {
         <v-chip color="primary" variant="flat">{{ stats.totalUsers }}</v-chip>
       </div>
       
-      <!-- <div class="d-flex justify-space-between align-center mb-3">
-        <div class="d-flex align-center">
-          <v-icon class="me-2" size="small" color="secondary">mdi-package-variant</v-icon>
-          <span class="text-body-1">Total Items</span>
-        </div>
-        <v-chip color="secondary" variant="flat">{{ stats.totalItems }}</v-chip>
-      </div> -->
 
       <div class="d-flex justify-space-between align-center mb-3">
         <div class="d-flex align-center">
