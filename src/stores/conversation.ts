@@ -1,3 +1,4 @@
+//stores/conversation.ts
 import { supabase } from '@/lib/supabase'
 import { useAuthUserStore } from '@/stores/authUser'
 import type { Conversation } from '@/types/chat'
@@ -36,6 +37,9 @@ export async function loadConversationsForItem(itemId: number): Promise<Conversa
   }
 }
 
+/**
+ * Fetches conversations for a specific item with full details including messages
+ */
 export async function fetchConversations(itemId: number): Promise<Conversation[]> {
   try {
     const { data, error } = await supabase
@@ -87,6 +91,37 @@ export async function fetchConversations(itemId: number): Promise<Conversation[]
   }
 }
 
+/**
+ * Gets all conversations for the current user (both as sender and receiver)
+ */
+export async function getUserConversations(userId: string) {
+  try {
+    const { data, error } = await supabase
+      .from('conversations')
+      .select(`
+        *,
+        items:item_id (
+          id,
+          title,
+          description,
+          status
+        )
+      `)
+      .or(`sender_id.eq.${userId},receiver_id.eq.${userId}`)
+      .order('created_at', { ascending: false })
+
+    if (error) throw error
+
+    return data || []
+  } catch (error) {
+    console.error('Error fetching user conversations:', error)
+    throw new Error('Failed to fetch user conversations')
+  }
+}
+
+/**
+ * Loads an existing conversation between two users for a specific item
+ */
 export async function loadExistingConversation(
   itemId: number,
   senderId: string,
@@ -112,6 +147,9 @@ export async function loadExistingConversation(
   }
 }
 
+/**
+ * Creates a new conversation between two users for a specific item
+ */
 export async function createConversation(
   itemId: number,
   senderId: string,
