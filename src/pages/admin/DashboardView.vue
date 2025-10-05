@@ -11,7 +11,9 @@ import RecentActivity from '@/pages/admin/components/RecentActivity.vue'
 import PostItemDialog from '@/pages/admin/components/PostItemDialog.vue'
 import { useDashboardData } from '@/pages/admin/components/composables/useDashboardData'
 import { useAdminItemActions } from '@/pages/admin/components/composables/useAdminItems'
-import { handleClaimItem } from '@/stores/items'
+// import { handleClaimItem } from '@/stores/items'
+import { markItemAsClaimed } from '@/stores/items'
+
 
 import '@/styles/dashboardview.css'
 
@@ -53,7 +55,8 @@ const handleShowClaimDialog = (item: Item) => {
 
 // Handle claim item with refresh
 const onClaimItem = async (itemId: number, claimedBy: string) => {
-  await handleClaimItem(itemId, claimedBy, fetchDashboardStats)
+  await markItemAsClaimed(itemId, claimedBy)
+  await fetchDashboardStats()
 }
 
 const searchQuery = ref('')

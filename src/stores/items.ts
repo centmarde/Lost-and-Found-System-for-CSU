@@ -1,83 +1,137 @@
-// stores/items.ts
 import { ref } from 'vue'
 import { supabase } from '@/lib/supabase'
 
 const updatingItems = ref<Set<number>>(new Set())
 
+export interface NewItemForm {
+  title: string
+  description: string
+  status: 'lost' | 'found'
+}
+
+export interface Item {
+  id: number
+  title: string
+  description: string
+  status: 'lost' | 'found' | 'claimed'
+  user_id: string
+  claimed_by: string | null
+  created_at: string
+}
+
 /**
- * Updates an item's status to 'claimed' and assigns the claimed_by user.
- * @param itemId The ID of the item to update.
- * @param claimedByUserId The ID of the user who is claiming the item.
- * @param refreshCallback Optional callback to refresh dashboard data after update
- * @throws An error if the Supabase update fails.
+ * Creates a new item in the database
  */
-export async function handleClaimItem(
-  itemId: number, 
-  claimedBy: string,
-  refreshCallback?: () => Promise<void>
+export async function createItem(
+  itemData: NewItemForm,
+  userId: string
+): Promise<Item> {
+  try {
+    const { data, error } = await supabase
+      .from('items')
+      .insert([{
+        title: itemData.title,
+        description: itemData.description,
+        status: itemData.status,
+        user_id: userId,
+        claimed_by: null
+      }])
+      .select()
+      .single()
+
+    if (error) throw error
+    return data
+  } catch (error) {
+    console.error('Error creating item:', error)
+    throw new Error('Failed to create item')
+  }
+}
+
+/**
+ * Marks an item as claimed by a specific user
+ */
+export async function markItemAsClaimed(
+  itemId: number,
+  claimedByUserId: string
 ): Promise<void> {
   updatingItems.value.add(itemId)
   
   try {
     const { error } = await supabase
       .from('items')
-      .update({ 
-        claimed_by: claimedBy,
-        status: 'claimed'
+      .update({
+        claimed_by: claimedByUserId,
+        status: 'claimed',
       })
       .eq('id', itemId)
 
     if (error) throw error
-
-    // Call the refresh callback if provided
-    if (refreshCallback) {
-      await refreshCallback()
-    }
   } catch (error) {
     console.error('Error marking item as claimed:', error)
-    throw new Error('Failed to update item status')
+    throw new Error('Failed to update item status to claimed')
   } finally {
     updatingItems.value.delete(itemId)
   }
 }
 
-export async function markItemAsClaimed(itemId: number, claimedByUserId: string): Promise<void> {
+/**
+ * Marks an item as unclaimed
+ */
+export async function markItemAsUnclaimed(itemId: number): Promise<void> {
+  updatingItems.value.add(itemId)
+  
   try {
     const { error } = await supabase
       .from('items')
       .update({
-        claimed_by: claimedByUserId,
-        status: 'claimed',
+        claimed_by: null,
+        status: 'lost', // or determine based on original status
       })
       .eq('id', itemId)
 
-    if (error) {
-      console.error("Supabase error marking item as claimed:", error)
-      throw error
-    }
+    if (error) throw error
   } catch (error) {
-    console.error('Error in markItemAsClaimed:', error)
-    throw new Error('Failed to update item status to claimed.')
+    console.error('Error marking item as unclaimed:', error)
+    throw new Error('Failed to update item status to unclaimed')
+  } finally {
+    updatingItems.value.delete(itemId)
   }
 }
 
-export async function markAsClaimedBy(itemId: number, claimedByUserId: string): Promise<void> {
+/**
+ * Fetches all items from the database
+ */
+export async function fetchAllItems(): Promise<Item[]> {
   try {
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from('items')
-      .update({
-        claimed_by: claimedByUserId,
-        status: 'claimed',
-      })
-      .eq('id', itemId)
+      .select('*')
+      .order('created_at', { ascending: false })
 
-    if (error) {
-      console.error("Supabase error marking item as claimed:", error)
-      throw error
-    }
+    if (error) throw error
+    return data || []
   } catch (error) {
-    console.error('Error in markAsClaimedBy:', error)
-    throw new Error('Failed to update item status to claimed.')
+    console.error('Error fetching items:', error)
+    throw new Error('Failed to fetch items')
+  }
+}
+
+/**
+ * Fetches items posted by a specific user
+ */
+export async function fetchItemsByUser(userId: string): Promise<Item[]> {
+  try {
+    const { data, error } = await supabase
+      .from('items')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+
+    if (error) throw error
+    return data || []
+  } catch (error) {
+    console.error('Error fetching user items:', error)
+    throw new Error('Failed to fetch user items')
   }
 }
 

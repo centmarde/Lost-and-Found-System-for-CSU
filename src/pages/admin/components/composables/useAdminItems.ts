@@ -1,54 +1,32 @@
-//useAdminItems.ts
 import { ref } from 'vue'
 import { supabase } from '@/lib/supabase'
-
-interface NewItemForm {
-  title: string
-  description: string
-  status: 'lost' | 'found'
-}
-
-interface Item {
-  id: number
-  title: string
-  description: string
-  status: 'lost' | 'found'
-  user_id: string
-  claimed_by: string
-  created_at: string
-}
-
-interface Message {
-  id: string
-  conversation_id: string
-  message: string
-  attach_image: string | null
-  created_at: string
-  user_id: string
-}
-
-interface Conversation {
-  id: string
-  item_id: number
-  sender_id: string
-  receiver_id: string
-  created_at: string
-  items?: {
-    id: number
-    title: string
-    description: string
-    status: string
-  }
-  sender?: {
-    id: string
-    email: string
-  }
-}
+import { 
+  createItem, 
+  markItemAsClaimed, 
+  markItemAsUnclaimed,
+  updatingItems,
+  type NewItemForm,
+  type Item
+} from '@/stores/items'
+import { loadConversationsForItem } from '@/stores/conversation'
+import { 
+  loadMessages, 
+  sendMessage, 
+  setupMessageSubscription 
+} from '@/stores/messages'
+import type { Message, Conversation } from '@/types/chat'
 
 export const useAdminItemActions = (refreshData: () => Promise<void>) => {
+  // Item posting state
   const postingItem = ref(false)
   const showPostDialog = ref(false)
-  const updatingItems = ref<Set<number>>(new Set())
+  const newItemForm = ref<NewItemForm>({
+    title: '',
+    description: '',
+    status: 'lost'
+  })
+
+  // Conversations state
   const showConversationsDialog = ref(false)
   const selectedItem = ref<Item | null>(null)
   const conversations = ref<Conversation[]>([])
@@ -58,13 +36,10 @@ export const useAdminItemActions = (refreshData: () => Promise<void>) => {
   const loadingConversations = ref(false)
   const loadingMessages = ref(false)
   const sendingMessage = ref(false)
-  
-  const newItemForm = ref<NewItemForm>({
-    title: '',
-    description: '',
-    status: 'lost'
-  })
 
+  let messageSubscription: any = null
+
+  // Post a new missing/found item using store function
   const postMissingItem = async () => {
     if (!newItemForm.value.title || !newItemForm.value.description) {
       return
@@ -75,23 +50,13 @@ export const useAdminItemActions = (refreshData: () => Promise<void>) => {
     try {
       const { data: { user } } = await supabase.auth.getUser()
 
-      const insertData = {
-        title: newItemForm.value.title,
-        description: newItemForm.value.description,
-        status: newItemForm.value.status,
-        user_id: user?.id || null,
-        claimed_by: null
+      if (!user) {
+        throw new Error('User not authenticated')
       }
 
-      const { data, error } = await supabase
-        .from('items')
-        .insert([insertData])
-        .select()
+      await createItem(newItemForm.value, user.id)
 
-      if (error) {
-        throw error
-      }
-
+      // Reset form
       newItemForm.value = {
         title: '',
         description: '',
@@ -101,56 +66,28 @@ export const useAdminItemActions = (refreshData: () => Promise<void>) => {
 
       await refreshData()
 
-      console.log('Item posted successfully:', data)
-
     } catch (error) {
       console.error('Error posting item:', error)
-      let errorMessage = 'An unknown error occurred'
-
-      if (error && typeof error === 'object' && 'message' in error) {
-        errorMessage = String(error.message)
-      } else if (typeof error === 'string') {
-        errorMessage = error
-      }
-
+      const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred'
       alert(`Error posting item: ${errorMessage}`)
     } finally {
       postingItem.value = false
     }
   }
 
-  // Open conversations dialog for an item
+  // Open conversations dialog for an item using store function
   const openConversations = async (item: Item) => {
     selectedItem.value = item
     showConversationsDialog.value = true
-    await loadConversationsForItem(item.id)
+    await loadConversationsForSelectedItem(item.id)
   }
 
-  // Load conversations for a specific item
-  const loadConversationsForItem = async (itemId: number) => {
+  // Load conversations for a specific item using store function
+  const loadConversationsForSelectedItem = async (itemId: number) => {
     loadingConversations.value = true
     try {
-      const { data, error } = await supabase
-        .from('conversations')
-        .select(`
-          *,
-          items:item_id (
-            id,
-            title,
-            description,
-            status
-          ),
-          sender:sender_id (
-            id,
-            email
-          )
-        `)
-        .eq('item_id', itemId)
-        .order('created_at', { ascending: false })
-
-      if (error) throw error
-
-      conversations.value = data || []
+      const loadedConversations = await loadConversationsForItem(itemId)
+      conversations.value = loadedConversations
     } catch (error) {
       console.error('Error loading conversations:', error)
       conversations.value = []
@@ -159,25 +96,26 @@ export const useAdminItemActions = (refreshData: () => Promise<void>) => {
     }
   }
 
-  // Select a conversation to view messages
+  // Select a conversation to view messages using store function
   const selectConversation = async (conversation: Conversation) => {
+    // Clean up previous subscription
+    if (messageSubscription) {
+      messageSubscription.unsubscribe()
+      messageSubscription = null
+    }
+
     selectedConversation.value = conversation
-    await loadMessages(conversation.id)
+    messages.value = []
+    await loadMessagesForConversation(conversation.id)
+    await setupMessageSubscriptionForConversation(conversation.id)
   }
 
-  // Load messages for a conversation
-  const loadMessages = async (conversationId: string) => {
+  // Load messages for a conversation using store function
+  const loadMessagesForConversation = async (conversationId: string) => {
     loadingMessages.value = true
     try {
-      const { data, error } = await supabase
-        .from('messages')
-        .select('*')
-        .eq('conversation_id', conversationId)
-        .order('created_at', { ascending: true })
-
-      if (error) throw error
-
-      messages.value = data || []
+      const loadedMessages = await loadMessages(conversationId)
+      messages.value = loadedMessages
     } catch (error) {
       console.error('Error loading messages:', error)
       messages.value = []
@@ -186,9 +124,11 @@ export const useAdminItemActions = (refreshData: () => Promise<void>) => {
     }
   }
 
-  // Send message as admin
+  // Send message as admin using store function
   const sendAdminMessage = async () => {
-    if (!newMessage.value.trim() || !selectedConversation.value || sendingMessage.value) return
+    if (!newMessage.value.trim() || !selectedConversation.value || sendingMessage.value) {
+      return
+    }
 
     const messageText = newMessage.value.trim()
     newMessage.value = ''
@@ -201,20 +141,15 @@ export const useAdminItemActions = (refreshData: () => Promise<void>) => {
         throw new Error('User not authenticated')
       }
 
-      const { data, error } = await supabase
-        .from('messages')
-        .insert([
-          {
-            conversation_id: selectedConversation.value.id,
-            message: messageText,
-            sender_id: user.id
-          }
-        ])
-        .select()
+      const sentMessage = await sendMessage(
+        selectedConversation.value.id,
+        messageText,
+        user.id
+      )
 
-      if (error) throw error
+      // Add message to local array immediately
+      messages.value.push(sentMessage)
 
-      // Message will be added via real-time subscription
     } catch (error) {
       console.error('Error sending admin message:', error)
       newMessage.value = messageText // Restore message on error
@@ -224,23 +159,27 @@ export const useAdminItemActions = (refreshData: () => Promise<void>) => {
     }
   }
 
-  // Subscribe to real-time message updates for admin
-  const subscribeToConversationMessages = (conversationId: string, callback: (message: Message) => void) => {
-    return supabase
-      .channel(`admin-messages:${conversationId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'messages',
-          filter: `conversation_id=eq.${conversationId}`
+  // Setup real-time subscription for messages using store function
+  const setupMessageSubscriptionForConversation = async (conversationId: string) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      
+      if (!user) return
+
+      messageSubscription = setupMessageSubscription(
+        conversationId,
+        (newMsg: Message) => {
+          // Check for duplicates before adding
+          const messageExists = messages.value.some(msg => msg.id === newMsg.id)
+          if (!messageExists) {
+            messages.value.push(newMsg)
+          }
         },
-        (payload) => {
-          callback(payload.new as Message)
-        }
+        user.id
       )
-      .subscribe()
+    } catch (error) {
+      console.error('Error setting up message subscription:', error)
+    }
   }
 
   // Close conversations dialog
@@ -251,95 +190,54 @@ export const useAdminItemActions = (refreshData: () => Promise<void>) => {
     conversations.value = []
     messages.value = []
     newMessage.value = ''
-  }
 
-  // Admin function to mark item as claimed
-  const markAsClaimed = async (itemId: number) => {
-    updatingItems.value.add(itemId)
-
-    try {
-      const { data: { user } } = await supabase.auth.getUser()
-
-      const { error } = await supabase
-        .from('items')
-        .update({ 
-          claimed_by: user?.id || null
-        })
-        .eq('id', itemId)
-
-      if (error) throw error
-
-      await refreshData()
-    } catch (error) {
-      console.error('Error marking item as claimed:', error)
-      alert('Error updating item status')
-    } finally {
-      updatingItems.value.delete(itemId)
+    if (messageSubscription) {
+      messageSubscription.unsubscribe()
+      messageSubscription = null
     }
   }
 
-  // Admin function to mark item as unclaimed  
-
-
-  // Get all conversations for admin review (legacy function)
-  const getAdminConversations = async () => {
+  // Mark item as claimed using store function
+  const markAsClaimed = async (itemId: number) => {
     try {
       const { data: { user } } = await supabase.auth.getUser()
-      
+
       if (!user) {
         throw new Error('User not authenticated')
       }
 
-      // Get conversations where admin is the receiver (items posted by admin)
-      const { data, error } = await supabase
-        .from('conversations')
-        .select(`
-          *,
-          items:item_id (
-            id,
-            title,
-            description,
-            status
-          ),
-          sender:sender_id (
-            id,
-            email
-          )
-        `)
-        .eq('receiver_id', user.id)
-        .order('created_at', { ascending: false })
-
-      if (error) throw error
-
-      return data
+      await markItemAsClaimed(itemId, user.id)
+      await refreshData()
     } catch (error) {
-      console.error('Error fetching admin conversations:', error)
-      throw error
+      console.error('Error marking item as claimed:', error)
+      alert('Error updating item status')
     }
   }
 
-  // Get messages for a specific conversation (legacy function)
-  const getConversationMessages = async (conversationId: string) => {
+  // Mark item as unclaimed using store function
+  const markAsUnclaimed = async (itemId: number) => {
     try {
-      const { data, error } = await supabase
-        .from('messages')
-        .select('*')
-        .eq('conversation_id', conversationId)
-        .order('created_at', { ascending: true })
-
-      if (error) throw error
-
-      return data
+      await markItemAsUnclaimed(itemId)
+      await refreshData()
     } catch (error) {
-      console.error('Error fetching conversation messages:', error)
-      throw error
+      console.error('Error marking item as unclaimed:', error)
+      alert('Error updating item status')
     }
   }
 
   return {
+    // Item posting
     postingItem,
     showPostDialog,
+    newItemForm,
+    postMissingItem,
+    
+    // Item status
     updatingItems,
+    markAsClaimed,
+    markAsUnclaimed,
+    
+    // Conversations
     showConversationsDialog,
     selectedItem,
     conversations,
@@ -349,16 +247,9 @@ export const useAdminItemActions = (refreshData: () => Promise<void>) => {
     loadingConversations,
     loadingMessages,
     sendingMessage,
-    newItemForm,
-    postMissingItem,
     openConversations,
     selectConversation,
-    loadMessages,
     sendAdminMessage,
-    subscribeToConversationMessages,
     closeConversationsDialog,
-    markAsClaimed,
-    getAdminConversations,
-    getConversationMessages
   }
 }
