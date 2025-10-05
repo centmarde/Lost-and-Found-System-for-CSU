@@ -4,7 +4,8 @@
 
   import Sidebar from '@/components/common/sideBar/Sidebar.vue'
   import { useLandingController } from '@/controller/landingController'
-
+  import OuterFooter from '@/components/common/outerFooters/OuterFooter.vue'
+  import OuterFooter2 from '@/components/common/outerFooters/OuterFooter2.vue'
   const { data, fetchLandingData } = useLandingController()
 
   onMounted(async () => {
@@ -42,12 +43,21 @@
     </v-main>
 
     <!-- Dynamic Footer Selection -->
-    <!-- TODO: Create InnerFooter component when needed -->
-    <!-- <InnerFooter
+     <div class="my-5">
+
+     </div>
+     <OuterFooter
       v-if="data?.ui?.footerComponent === '1'"
       :config="data?.ui"
-    /> -->
+    />
+    <OuterFooter2
+      v-else-if="data?.ui?.footerComponent === '2'"
+      :config="data?.ui"
+    />
   </v-app>
+
+
+
 </template>
 
 

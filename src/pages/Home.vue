@@ -387,14 +387,14 @@ onMounted(async () => {
 
         <v-row>
           <v-col cols="12">
-            <v-card elevation="2" class="pa-4">
+
               <v-card-title class="text-h5 font-weight-bold mb-4 d-flex align-center">
                 <v-icon class="me-2" color="primary">mdi-package-variant-closed</v-icon>
                 {{ isCurrentUserAdmin ? 'Your Items' : 'Missing Items' }}
                 <v-spacer />
-                <v-chip 
-                  v-if="!itemsLoading" 
-                  color="info" 
+                <v-chip
+                  v-if="!itemsLoading"
+                  color="info"
                   variant="tonal"
                   size="small"
                 >

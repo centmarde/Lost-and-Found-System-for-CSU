@@ -74,13 +74,15 @@ const filteredActivity = computed(() => {
               {{ activity.status === 'claimed' ? 'claimed' : '' }} by {{ activity.user }}
             </v-list-item-subtitle>
 
-            <template #append>
-              <div class="text-caption text-grey-darken-1">
-                {{ formatTimestamp(activity.timestamp) }}
-              </div>
-            </template>
-          </v-list-item>
-        </v-list>
+          <!-- No data slot -->
+          <template v-slot:no-data>
+            <div class="text-center py-8">
+              <v-icon size="64" color="grey-lighten-1">mdi-inbox</v-icon>
+              <div class="text-h6 text-grey-darken-1 mt-2">No recent activity</div>
+              <div class="text-body-2 text-grey-darken-1">Items and activities will appear here</div>
+            </div>
+          </template>
+        </v-data-table>
       </v-card>
     </v-col>
   </v-row>
