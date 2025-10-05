@@ -3,6 +3,16 @@ import { ref, onMounted, onUnmounted, nextTick } from "vue";
 import { formatDate } from "@/utils/helpers";
 import { supabase } from "@/lib/supabase";
 import { useToast } from "vue-toastification";
+import { 
+  loadExistingConversation, 
+  createConversation 
+} from "@/stores/conversation";
+import { 
+  sendMessage as sendMessageToConversation,
+  loadMessages as loadMessagesFromConversation,
+  setupMessageSubscription as setupRealtimeSubscription
+} from "@/stores/messages";
+import type { Message, Conversation } from "@/types/chat";
 
 interface Item {
   id: number;
@@ -11,23 +21,6 @@ interface Item {
   status: "lost" | "found";
   user_id: string;
   claimed_by: string;
-  created_at: string;
-}
-
-interface Message {
-  id: string;
-  conversation_id: string;
-  message: string;
-  attach_image: string | null;
-  created_at: string;
-  sender_id: string;
-}
-
-interface Conversation {
-  id: string;
-  item_id: number;
-  sender_id: string;
-  receiver_id: string;
   created_at: string;
 }
 
@@ -76,24 +69,17 @@ const getCurrentUser = async () => {
 };
 
 // Load existing conversation and messages
-const loadExistingConversation = async () => {
+const loadExistingConv = async () => {
   if (!currentUser.value) return;
 
   messagesLoading.value = true;
 
   try {
-    // Check if conversation already exists
-    const { data: existingConversation, error: checkError } = await supabase
-      .from("conversations")
-      .select("*")
-      .eq("item_id", props.item.id)
-      .eq("sender_id", currentUser.value.id)
-      .eq("receiver_id", props.item.user_id)
-      .single();
-
-    if (checkError && checkError.code !== "PGRST116") {
-      throw checkError;
-    }
+    const existingConversation = await loadExistingConversation(
+      props.item.id,
+      currentUser.value.id,
+      props.item.user_id
+    );
 
     if (existingConversation) {
       conversation.value = existingConversation;
@@ -102,59 +88,19 @@ const loadExistingConversation = async () => {
     }
   } catch (error) {
     console.error("Error loading existing conversation:", error);
+    toast.error("Failed to load conversation");
   } finally {
     messagesLoading.value = false;
   }
 };
 
-// Create conversation when sending first message
-const createConversation = async () => {
-  if (!currentUser.value) {
-    throw new Error("User not logged in");
-  }
-
-  try {
-    const { data: newConversation, error: createError } = await supabase
-      .from("conversations")
-      .insert([
-        {
-          item_id: props.item.id,
-          sender_id: currentUser.value.id,
-          receiver_id: props.item.user_id,
-        },
-      ])
-      .select()
-      .single();
-
-    if (createError) {
-      throw createError;
-    }
-
-    conversation.value = newConversation;
-    setupMessageSubscription();
-    toast.success("Conversation started!");
-    
-    return newConversation;
-  } catch (error) {
-    console.error("Error creating conversation:", error);
-    throw error;
-  }
-};
-
-// Load messages
+// Load messages using the messages.ts function
 const loadMessages = async () => {
   if (!conversation.value) return;
 
   try {
-    const { data, error } = await supabase
-      .from("messages")
-      .select("*")
-      .eq("conversation_id", conversation.value.id)
-      .order("created_at", { ascending: true });
-
-    if (error) throw error;
-
-    messages.value = data || [];
+    const loadedMessages = await loadMessagesFromConversation(conversation.value.id);
+    messages.value = loadedMessages;
 
     await nextTick();
     scrollToBottom();
@@ -164,7 +110,7 @@ const loadMessages = async () => {
   }
 };
 
-// Send message
+// Send message using the messages.ts function
 const sendMessage = async () => {
   if (!newMessage.value.trim() || sendingMessage.value) return;
 
@@ -182,8 +128,14 @@ const sendMessage = async () => {
     
     // Create conversation if it doesn't exist
     if (!currentConversation) {
-      currentConversation = await createConversation();
+      currentConversation = await createConversation(
+        props.item.id,
+        currentUser.value.id,
+        props.item.user_id
+      );
       conversation.value = currentConversation;
+      setupMessageSubscription();
+      toast.success("Conversation started!");
     }
 
     // Ensure we have a conversation before proceeding
@@ -191,29 +143,17 @@ const sendMessage = async () => {
       throw new Error("Failed to create or get conversation");
     }
 
-    // Send the message
-    const { data, error } = await supabase
-      .from("messages")
-      .insert([
-        {
-          conversation_id: currentConversation.id,
-          message: messageText,
-          attach_image: null,
-        },
-      ])
-      .select("*");
-
-    if (error) {
-      console.error("Insert error details:", error);
-      throw error;
-    }
+    // Send the message using the messages.ts function
+    const sentMessage = await sendMessageToConversation(
+      currentConversation.id,
+      messageText,
+      currentUser.value.id
+    );
 
     // Add the message to the local array immediately
-    if (data && data[0]) {
-      messages.value.push(data[0]);
-      await nextTick();
-      scrollToBottom();
-    }
+    messages.value.push(sentMessage);
+    await nextTick();
+    scrollToBottom();
   } catch (error) {
     console.error("Error sending message:", error);
     toast.error("Failed to send message");
@@ -223,32 +163,21 @@ const sendMessage = async () => {
   }
 };
 
-// Setup real-time message subscription
+// Setup real-time message subscription using messages.ts function
 const setupMessageSubscription = () => {
-  if (!conversation.value || messageSubscription) return;
+  if (!conversation.value || messageSubscription || !currentUser.value) return;
 
-  messageSubscription = supabase
-    .channel(`messages:${conversation.value.id}`)
-    .on(
-      "postgres_changes",
-      {
-        event: "INSERT",
-        schema: "public",
-        table: "messages",
-        filter: `conversation_id=eq.${conversation.value.id}`,
-      },
-      (payload) => {
-        // Only add if it's not from current user (to avoid duplicates)
-        if (payload.new.sender_id !== currentUser.value?.id) {
-          messages.value.push(payload.new as Message);
-          nextTick(() => scrollToBottom());
-        }
-      }
-    )
-    .subscribe();
+  messageSubscription = setupRealtimeSubscription(
+    conversation.value.id,
+    (newMessage: Message) => {
+      messages.value.push(newMessage);
+      nextTick(() => scrollToBottom());
+    },
+    currentUser.value.id
+  );
 };
 
-// Handle contact button click - now just opens dialog
+// Handle contact button click - opens dialog
 const handleContact = async () => {
   if (!currentUser.value) {
     toast.error("Please log in to contact the admin");
@@ -257,8 +186,8 @@ const handleContact = async () => {
 
   showChatDialog.value = true;
   
-  // Load existing conversation if it exists, but don't create a new one
-  await loadExistingConversation();
+  // Load existing conversation if it exists
+  await loadExistingConv();
 };
 
 // Close chat dialog
@@ -291,10 +220,8 @@ const handleKeyPress = (event: KeyboardEvent) => {
 };
 
 // Check if message is from current user
-const isMyMessage = (message: any) => {
-  // Try different possible column names for the sender
-  const senderId = message.sender_id || message.user_id || message.from_user;
-  return senderId === currentUser.value?.id;
+const isMyMessage = (message: Message) => {
+  return message.user_id === currentUser.value?.id;
 };
 
 // Initialize
@@ -406,7 +333,6 @@ onUnmounted(() => {
         </div>
 
         <v-card-actions class="pa-4 bg-grey-lighten-5">
-          <!-- Use a flex container to align items side-by-side -->
           <div class="d-flex align-center w-100">
             <v-text-field
               v-model="newMessage"
