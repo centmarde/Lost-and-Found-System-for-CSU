@@ -1,20 +1,14 @@
-// stores/conversations.ts
-
 import { supabase } from '@/lib/supabase'
 import { useAuthUserStore } from '@/stores/authUser'
-import type { Conversation } from '@/types/chat' // Assuming you'll move interfaces to a types file
+import type { Conversation } from '@/types/chat'
 
 /**
  * Fetches conversations related to a specific item ID and enriches them with sender details.
- * @param itemId The ID of the item to retrieve conversations for.
- * @returns An array of enriched Conversation objects.
- * @throws An error if the Supabase query fails.
  */
 export async function loadConversationsForItem(itemId: number): Promise<Conversation[]> {
   const authStore = useAuthUserStore()
 
   try {
-    // 1. Fetch conversations
     const { data: conversations, error: conversationError } = await supabase
       .from('conversations')
       .select('*')
@@ -23,11 +17,9 @@ export async function loadConversationsForItem(itemId: number): Promise<Conversa
 
     if (conversationError) throw conversationError
 
-    // 2. Fetch all users for enrichment
     const { users: allUsers, error: usersError } = await authStore.getAllUsers()
     if (usersError) console.warn('Could not load user details:', usersError)
 
-    // 3. Map conversations and enrich with sender data
     const enrichedConversations: Conversation[] = conversations?.map(conv => ({
       ...conv,
       sender: allUsers?.find(user => user.id === conv.sender_id) || {
@@ -43,8 +35,6 @@ export async function loadConversationsForItem(itemId: number): Promise<Conversa
     throw new Error('Failed to load conversations from the database.')
   }
 }
-
-
 
 export async function fetchConversations(itemId: number): Promise<Conversation[]> {
   try {
@@ -75,7 +65,6 @@ export async function fetchConversations(itemId: number): Promise<Conversation[]
       throw error;
     }
 
-    // Process conversations to calculate latest message and count
     const processedConversations: Conversation[] = (data || []).map((conv: any) => ({
       id: conv.id,
       item_id: conv.item_id,
@@ -94,7 +83,6 @@ export async function fetchConversations(itemId: number): Promise<Conversation[]
     return processedConversations;
 
   } catch (error) {
-    // Re-throw the error so the calling component can handle its loading state
     throw error;
   }
 }
@@ -149,4 +137,3 @@ export async function createConversation(
     throw new Error("Failed to create conversation");
   }
 }
-
