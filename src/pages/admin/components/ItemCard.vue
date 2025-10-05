@@ -394,7 +394,7 @@ onUnmounted(() => {
 }
 
 .my-message .message-content {
-  background: #1976d2;
+  background: #1b5e20;
   color: white;
 }
 
