@@ -1,3 +1,4 @@
+//authUser.ts
 import { computed, ref } from "vue";
 import type { Ref } from "vue";
 import { defineStore } from "pinia";

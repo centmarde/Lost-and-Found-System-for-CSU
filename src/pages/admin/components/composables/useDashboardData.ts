@@ -63,13 +63,19 @@ export const useDashboardData = () => {
       items.value = itemsData || [];
 
       const totalItems = items.value.length;
-      const lostItems = items.value.filter(item => item.status === 'lost').length;
-      const foundItems = items.value.filter(item => item.status === 'found').length;
+      
+      // Items are resolved if they have claimed_by set (regardless of lost/found status)
       const resolvedItems = items.value.filter(
-        item =>
-          item.status === 'found' &&
-          item.claimed_by !== null &&
-          item.claimed_by !== ''
+        item => item.claimed_by !== null && item.claimed_by !== ''
+      ).length;
+
+      // Lost/Found items are only counted if they are NOT claimed (not resolved)
+      const lostItems = items.value.filter(
+        item => item.status === 'lost' && (item.claimed_by === null || item.claimed_by === '')
+      ).length;
+      
+      const foundItems = items.value.filter(
+        item => item.status === 'found' && (item.claimed_by === null || item.claimed_by === '')
       ).length;
 
       stats.value.totalItems = totalItems;
@@ -77,22 +83,18 @@ export const useDashboardData = () => {
       stats.value.foundItems = foundItems;
       stats.value.resolvedItems = resolvedItems;
 
-      stats.value.recentActivity = items.value.map(item => ({
-        id: String(item.id),
-        type:
-          item.status === 'lost'
-            ? 'lost'
-            : item.claimed_by !== null && item.claimed_by !== ''
-            ? 'resolved'
-            : 'found',
-        title: item.title,
-        user: item.user_id || 'Unknown User',
-        timestamp: item.created_at,
-        status:
-          item.claimed_by !== null && item.claimed_by !== ''
-            ? 'Claimed'
-            : item.status,
-      }));
+      stats.value.recentActivity = items.value.map(item => {
+        const isClaimed = item.claimed_by !== null && item.claimed_by !== '';
+        
+        return {
+          id: String(item.id),
+          type: isClaimed ? 'resolved' : item.status,
+          title: item.title,
+          user: item.user_id || 'Unknown User',
+          timestamp: item.created_at,
+          status: isClaimed ? 'Claimed' : (item.status === 'lost' ? 'Lost' : 'Found'),
+        };
+      });
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
     } finally {

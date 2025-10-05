@@ -1,116 +1,138 @@
-import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import { useToast } from 'vue-toastification'
 import { supabase } from '@/lib/supabase'
+
+const updatingItems = ref<Set<number>>(new Set())
+
+export interface NewItemForm {
+  title: string
+  description: string
+  status: 'lost' | 'found'
+}
 
 export interface Item {
   id: number
   title: string
   description: string
-  status: 'lost' | 'found'
+  status: 'lost' | 'found' | 'claimed'
   user_id: string
-  claimed_by: string
+  claimed_by: string | null
   created_at: string
 }
 
-export const useItemsStore = defineStore('items', () => {
-  // State
-  const items = ref<Item[]>([])
-  const itemsLoading = ref(false)
-  const updatingItemId = ref<number | null>(null)
+/**
+ * Creates a new item in the database
+ */
+export async function createItem(
+  itemData: NewItemForm,
+  userId: string
+): Promise<Item> {
+  try {
+    const { data, error } = await supabase
+      .from('items')
+      .insert([{
+        title: itemData.title,
+        description: itemData.description,
+        status: itemData.status,
+        user_id: userId,
+        claimed_by: null
+      }])
+      .select()
+      .single()
 
-  const toast = useToast()
-
-  // Actions
-  const fetchItems = async () => {
-    itemsLoading.value = true
-    try {
-      const { data, error } = await supabase
-        .from('items')
-        .select('*')
-        .order('created_at', { ascending: false })
-
-      if (error) {
-        console.error('Error fetching items:', error)
-        toast.error('Failed to load items')
-        return
-      }
-
-      items.value = data || []
-    } catch (error) {
-      console.error('Error:', error)
-      toast.error('An unexpected error occurred while loading items')
-    } finally {
-      itemsLoading.value = false
-    }
+    if (error) throw error
+    return data
+  } catch (error) {
+    console.error('Error creating item:', error)
+    throw new Error('Failed to create item')
   }
+}
 
-  const markItemAsClaimed = async (itemId: number) => {
-    updatingItemId.value = itemId
-    try {
-      const { error } = await supabase
-        .from('items')
-        .update({ claimed_by: 'current_user' }) // You might want to handle user ID differently
-        .eq('id', itemId)
+/**
+ * Marks an item as claimed by a specific user
+ */
+export async function markItemAsClaimed(
+  itemId: number,
+  claimedByUserId: string
+): Promise<void> {
+  updatingItems.value.add(itemId)
+  
+  try {
+    const { error } = await supabase
+      .from('items')
+      .update({
+        claimed_by: claimedByUserId,
+        status: 'claimed',
+      })
+      .eq('id', itemId)
 
-      if (error) {
-        console.error('Error claiming item:', error)
-        toast.error('Failed to claim item')
-        return
-      }
-
-      // Update local state
-      const item = items.value.find(i => i.id === itemId)
-      if (item) {
-        item.claimed_by = 'current_user'
-      }
-
-      toast.success('Item marked as claimed!')
-    } catch (error) {
-      console.error('Error:', error)
-      toast.error('An unexpected error occurred')
-    } finally {
-      updatingItemId.value = null
-    }
+    if (error) throw error
+  } catch (error) {
+    console.error('Error marking item as claimed:', error)
+    throw new Error('Failed to update item status to claimed')
+  } finally {
+    updatingItems.value.delete(itemId)
   }
+}
 
-  const markItemAsUnclaimed = async (itemId: number) => {
-    updatingItemId.value = itemId
-    try {
-      const { error } = await supabase
-        .from('items')
-        .update({ claimed_by: null })
-        .eq('id', itemId)
+/**
+ * Marks an item as unclaimed
+ */
+export async function markItemAsUnclaimed(itemId: number): Promise<void> {
+  updatingItems.value.add(itemId)
+  
+  try {
+    const { error } = await supabase
+      .from('items')
+      .update({
+        claimed_by: null,
+        status: 'lost', // or determine based on original status
+      })
+      .eq('id', itemId)
 
-      if (error) {
-        console.error('Error unclaiming item:', error)
-        toast.error('Failed to unclaim item')
-        return
-      }
-
-      // Update local state
-      const item = items.value.find(i => i.id === itemId)
-      if (item) {
-        item.claimed_by = ''
-      }
-
-      toast.success('Item marked as unclaimed!')
-    } catch (error) {
-      console.error('Error:', error)
-      toast.error('An unexpected error occurred')
-    } finally {
-      updatingItemId.value = null
-    }
+    if (error) throw error
+  } catch (error) {
+    console.error('Error marking item as unclaimed:', error)
+    throw new Error('Failed to update item status to unclaimed')
+  } finally {
+    updatingItems.value.delete(itemId)
   }
+}
 
-  return {
-    // State
-    items,
-    itemsLoading,
-    updatingItemId,
-    // Actions
-    fetchItems,
-    markItemAsClaimed,
-    markItemAsUnclaimed
+/**
+ * Fetches all items from the database
+ */
+export async function fetchAllItems(): Promise<Item[]> {
+  try {
+    const { data, error } = await supabase
+      .from('items')
+      .select('*')
+      .order('created_at', { ascending: false })
+
+    if (error) throw error
+    return data || []
+  } catch (error) {
+    console.error('Error fetching items:', error)
+    throw new Error('Failed to fetch items')
   }
-})
+}
+
+/**
+ * Fetches items posted by a specific user
+ */
+export async function fetchItemsByUser(userId: string): Promise<Item[]> {
+  try {
+    const { data, error } = await supabase
+      .from('items')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+
+    if (error) throw error
+    return data || []
+  } catch (error) {
+    console.error('Error fetching user items:', error)
+    throw new Error('Failed to fetch user items')
+  }
+}
+
+export { updatingItems }
