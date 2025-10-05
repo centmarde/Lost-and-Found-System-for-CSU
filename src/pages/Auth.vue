@@ -225,20 +225,20 @@ const isDarkMode = computed(() => {
       :order="quoteSectionOrder"
     >
       <v-card-text class="text-center">
-        <v-icon size="48" color="primary" class="mb-4 d-flex justify-start">
+        <v-icon size="48" color="green-darken-4" class="mb-4 d-flex justify-start">
           mdi-format-quote-open
         </v-icon>
 
         <div
           class="text-h4 font-weight-light mb-6"
-          :class="{'text-white': isDarkMode, 'text-primary': !isDarkMode}"
+          :class="{'text-white': isDarkMode, 'text-green-darken-4': !isDarkMode}"
         >
           {{ authPageData.quote.text }}
         </div>
 
         <div
           class="text-h6 opacity-75"
-          :class="{'text-white': isDarkMode, 'text-primary': !isDarkMode}"
+          :class="{'text-white': isDarkMode, 'text-green-darken-4': !isDarkMode}"
         >
           — {{ authPageData.quote.author }}
           <span v-if="authPageData.quote.source" class="text-caption">
@@ -249,7 +249,7 @@ const isDarkMode = computed(() => {
         <div
           v-if="authPageData.quote.motivationalText"
           class="text-body-1 opacity-75"
-          :class="{'text-white': isDarkMode, 'text-primary': !isDarkMode}"
+          :class="{'text-white': isDarkMode, 'text-green-darken-4': !isDarkMode}"
         >
           {{ authPageData.quote.motivationalText }}
         </div>
