@@ -7,7 +7,7 @@
     "alt": "Abstract academic background with geometric patterns",
     "overlay": {
       "enabled": true,
-      "color": "rgba(85, 107, 47, 0.1)",
+      "color": "rgba(27, 94, 32, 0.1)",
       "opacity": 0.8
     }
   },
@@ -37,8 +37,8 @@
   "author": "CSU Development Team",
   "lastUpdated": "2025-09-22",
   "theme": {
-    "primaryColor": "#0A4465",
-    "secondaryColor": "#E8EBF7"
+    "primaryColor": "#1b5e20",
+    "secondaryColor": "#faf6ed"
   },
   "ui": {
     "showNavbar": true,
@@ -51,7 +51,7 @@
       "title": "Lost & Found CSU",
       "icon": "mdi-magnify",
       "logo": {
-        "src": "/src/assets/logo.svg",
+        "src": "/src/assets/csulogo.svg",
         "alt": "CSU Lost and Found Logo",
         "width": 32,
         "height": 32
@@ -126,17 +126,17 @@
         "subtitle": "Meet the team behind CSU's digital lost and found solution",
         "members": [
           {
-            "name": "Security Office",
-            "role": "System Administrator",
+            "name": "Web Developer",
+            "role": "Frontend Specialist",
             "avatar": "/images/team/security.jpg"
           },
           {
-            "name": "IT Support",
-            "role": "Technical Support",
+            "name": "Web Developer",
+            "role": "Full Stack Developer",
             "avatar": "/images/team/it.jpg"
           },
           {
-            "name": "Student Affairs",
+            "name": "",
             "role": "Service Coordinator",
             "avatar": "/images/team/affairs.jpg"
           }
@@ -161,7 +161,7 @@
       "alt": "University campus with students and lost items",
       "overlay": {
         "enabled": true,
-        "color": "rgba(85, 107, 47, 0.05)",
+        "color": "rgba(27, 94, 32, 0.05)",
         "opacity": 0.9
       }
     }
