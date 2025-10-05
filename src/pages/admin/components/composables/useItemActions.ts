@@ -327,27 +327,27 @@ export const useItemActions = (refreshData?: () => Promise<void>) => {
     }
   }
 
-  const markAsUnclaimed = async (itemId: number) => {
-    updatingItems.value.add(itemId)
+  // const markAsUnclaimed = async (itemId: number) => {
+  //   updatingItems.value.add(itemId)
 
-    try {
-      const { error } = await supabase
-        .from('items')
-        .update({ 
-          claimed_by: null
-        })
-        .eq('id', itemId)
+  //   try {
+  //     const { error } = await supabase
+  //       .from('items')
+  //       .update({ 
+  //         claimed_by: null
+  //       })
+  //       .eq('id', itemId)
 
-      if (error) throw error
+  //     if (error) throw error
 
-      if (refreshData) await refreshData()
-    } catch (error) {
-      console.error('Error marking item as unclaimed:', error)
-      alert('Error updating item status')
-    } finally {
-      updatingItems.value.delete(itemId)
-    }
-  }
+  //     if (refreshData) await refreshData()
+  //   } catch (error) {
+  //     console.error('Error marking item as unclaimed:', error)
+  //     alert('Error updating item status')
+  //   } finally {
+  //     updatingItems.value.delete(itemId)
+  //   }
+  // }
 
   return {
     postingItem,
@@ -363,6 +363,6 @@ export const useItemActions = (refreshData?: () => Promise<void>) => {
     getUserConversations,
     subscribeToMessages,
     markAsClaimed,
-    markAsUnclaimed
+    // markAsUnclaimed
   }
 }

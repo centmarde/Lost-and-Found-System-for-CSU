@@ -1,8 +1,16 @@
+// useUserChat.ts
 import { ref, onUnmounted, nextTick } from 'vue'
 import { useToast } from 'vue-toastification'
-import { supabase } from '@/lib/supabase'
 import type { Item, Conversation, Message } from '@/types/chat'
-
+import { 
+  sendMessage as sendMessageAPI, 
+  loadMessages as loadMessagesAPI,
+  setupMessageSubscription as setupSubscription 
+} from '@/stores/messages'
+import {
+  loadExistingConversation as loadExistingConversationAPI,
+  createConversation as createConversationAPI
+} from '@/stores/conversation'
 
 export function useUserChat(currentUser: any) {
   const toast = useToast()
@@ -31,13 +39,12 @@ export function useUserChat(currentUser: any) {
     messagesLoading.value = true
 
     try {
-      // Check for existing conversation
-      const { data: existingConv } = await supabase
-        .from('conversations')
-        .select('*')
-        .eq('item_id', item.id)
-        .eq('sender_id', currentUser.value.id)
-        .single()
+      // Check for existing conversation using the API
+      const existingConv = await loadExistingConversationAPI(
+        item.id,
+        currentUser.value.id,
+        item.user_id
+      )
 
       if (existingConv) {
         currentConversation.value = existingConv
@@ -53,23 +60,23 @@ export function useUserChat(currentUser: any) {
 
   // Creates a new conversation
   const createConversation = async (item: Item) => {
-    const { data: newConv, error } = await supabase
-      .from('conversations')
-      .insert({
-        item_id: item.id,
-        sender_id: currentUser.value.id,
-        receiver_id: item.user_id,
-      })
-      .select()
-      .single()
-
-    if (error) throw error
-    
-    currentConversation.value = newConv
-    setupMessageSubscription()
-    toast.success('Conversation started!')
-    
-    return newConv
+    try {
+      const newConv = await createConversationAPI(
+        item.id,
+        currentUser.value.id,
+        item.user_id
+      )
+      
+      currentConversation.value = newConv
+      setupMessageSubscription()
+      toast.success('Conversation started!')
+      
+      return newConv
+    } catch (error) {
+      console.error('Error creating conversation:', error)
+      toast.error('Failed to create conversation')
+      throw error
+    }
   }
 
   // Opens chat dialog and loads existing conversation if available
@@ -90,19 +97,13 @@ export function useUserChat(currentUser: any) {
   const loadMessages = async () => {
     if (!currentConversation.value) return
     
-    const { data, error } = await supabase
-      .from('messages')
-      .select('*')
-      .eq('conversation_id', currentConversation.value.id)
-      .order('created_at', { ascending: true })
-
-    if (error) {
+    try {
+      messages.value = await loadMessagesAPI(currentConversation.value.id)
+      scrollToBottom()
+    } catch (error) {
       console.error('Error loading messages:', error)
       toast.error('Failed to load messages')
-      return
     }
-    messages.value = data || []
-    scrollToBottom()
   }
 
   // Sends a new message
@@ -137,18 +138,12 @@ export function useUserChat(currentUser: any) {
         throw new Error('Failed to create or get conversation')
       }
 
-      // Send the message
-      const { data, error } = await supabase
-        .from('messages')
-        .insert({
-          conversation_id: conversation.id,
-          message: messageText,
-          user_id: currentUser.value.id,
-        })
-        .select()
-        .single()
-
-      if (error) throw error
+      // Send the message using the API
+      const data = await sendMessageAPI(
+        conversation.id,
+        messageText,
+        currentUser.value.id
+      )
       
       messages.value.push(data)
       scrollToBottom()
@@ -166,25 +161,16 @@ export function useUserChat(currentUser: any) {
     if (messageSubscription) messageSubscription.unsubscribe()
     if (!currentConversation.value) return
 
-    messageSubscription = supabase
-      .channel(`message_${currentConversation.value.id}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'messages',
-          filter: `conversation_id=eq.${currentConversation.value.id}`,
-        },
-        (payload: any) => {
-          // Only add if it's not from current user (to avoid duplicates)
-          if (payload.new.user_id !== currentUser.value?.id) {
-            messages.value.push(payload.new as Message)
-            scrollToBottom()
-          }
-        }
-      )
-      .subscribe()
+    const onNewMessage = (message: Message) => {
+      messages.value.push(message)
+      scrollToBottom()
+    }
+
+    messageSubscription = setupSubscription(
+      currentConversation.value.id,
+      onNewMessage,
+      currentUser.value.id
+    )
   }
 
   // Closes the chat dialog and cleans up
