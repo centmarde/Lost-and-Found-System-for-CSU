@@ -35,7 +35,7 @@ const isAdmin = computed(() => {
 
 // Computed property for panel title
 const panelTitle = computed(() => {
-  return isAdmin.value ? 'Admin Panel' : 'User Panel';
+  return isAdmin.value ? 'Admin Panel' : 'Student Panel';
 });
 
 // Watch for route changes and keep admin group expanded if we're on an admin route
@@ -62,8 +62,14 @@ watch(
 // Hide sidebar on small screens
 const showSidebar = computed(() => !smAndDown.value);
 
-// Get navigation groups from shared config
-const navigationGroups = computed(() => navigationConfig);
+// Get navigation groups from shared config, filtered by user role
+const navigationGroups = computed(() => {
+  if (isAdmin.value) {
+    return navigationConfig;
+  }
+  // Filter out admin-only groups for non-admin users
+  return navigationConfig.filter(group => group.title !== 'Admin');
+});
 
 // Helper function to get group expansion state
 const getGroupExpansion = (groupTitle: string) => {
