@@ -27,6 +27,17 @@ const organizationGroupExpanded = ref(true);
 // Control my account group expansion - make it persistent
 const myAccountGroupExpanded = ref(true);
 
+// Computed property to check if user is admin
+const isAdmin = computed(() => {
+  const roleId = authStore.userData?.user_metadata?.role;
+  return roleId === 1; // Assuming role ID 1 is admin
+});
+
+// Computed property for panel title
+const panelTitle = computed(() => {
+  return isAdmin.value ? 'Admin Panel' : 'User Panel';
+});
+
 // Watch for route changes and keep admin group expanded if we're on an admin route
 watch(
   () => route.path,
@@ -94,7 +105,7 @@ const handleLogout = async () => {
     <v-list-item class="pa-4">
       <v-list-item-content>
         <v-list-item-title class="text-h6 font-weight-bold primary--text">
-          Admin Panel
+          {{ panelTitle }}
         </v-list-item-title>
         <v-list-item-subtitle class="text-caption grey--text">
           Management System

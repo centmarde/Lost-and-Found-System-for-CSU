@@ -127,7 +127,7 @@ onMounted(async () => {
         <v-row class="mb-6">
           <v-col cols="12">
             <div class="text-center position-relative">
-              <h1 class="text-h3 font-weight-bold text-primary mb-2">
+              <h1 class="text-h3 font-weight-bold text-green-darken-4 mb-2">
                 {{ pageTitle }}
               </h1>
               <p class="text-h6 text-grey-darken-1">

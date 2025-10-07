@@ -86,7 +86,7 @@ onMounted(async () => {
     <template #content>
       <div class="dashboard">
         <div class="d-flex justify-space-between align-center mb-6">
-          <h1 class="text-h4 font-weight-bold text-primary">
+          <h1 class="text-h4 font-weight-bold text-green-darken-4">
             CSU Lost & Found Dashboard
           </h1>
           <div class="d-flex gap-2">
