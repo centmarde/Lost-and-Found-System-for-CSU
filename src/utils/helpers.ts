@@ -333,3 +333,23 @@ export function getStatusIcon(status: string): string {
 export function getStatusColor(status: string): string {
   return status === 'lost' ? 'error' : 'success';
 }
+
+/**
+ * Get the Vuetify color for an item's status (considering claimed state)
+ * @param item - The item object with status and claimed_by properties
+ * @returns A Vuetify color name
+ */
+export function getItemStatusColor(item: { status: string; claimed_by?: string | null }): string {
+  if (item.claimed_by) return "success";
+  return item.status === "lost" ? "error" : "info";
+}
+
+/**
+ * Get the display text for an item's status (considering claimed state)
+ * @param item - The item object with status and claimed_by properties
+ * @returns A status text string
+ */
+export function getItemStatusText(item: { status: string; claimed_by?: string | null }): string {
+  if (item.claimed_by) return "Claimed";
+  return item.status === "lost" ? "Lost" : "Found";
+}

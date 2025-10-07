@@ -1,6 +1,6 @@
 <script lang="ts" setup>
 import { ref, onMounted, onUnmounted, nextTick } from "vue";
-import { formatDate } from "@/utils/helpers";
+import { formatDate, getItemStatusColor, getItemStatusText } from "@/utils/helpers";
 import { supabase } from "@/lib/supabase";
 import { useToast } from "vue-toastification";
 import { 
@@ -50,15 +50,6 @@ const currentUser = ref<any>(null);
 // Real-time subscription
 let messageSubscription: any = null;
 
-const getItemStatusColor = (item: Item) => {
-  if (item.claimed_by) return "success";
-  return item.status === "lost" ? "error" : "info";
-};
-
-const getItemStatusText = (item: Item) => {
-  if (item.claimed_by) return "Claimed";
-  return item.status === "lost" ? "Lost" : "Found";
-};
 
 // Get current user
 const getCurrentUser = async () => {
