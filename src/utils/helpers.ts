@@ -315,3 +315,21 @@ export function useFilterSortPagination<T extends { created_at: string }>(
   }
 }
 
+/**
+ * Get the Material Design icon for a status
+ * @param status - The status type ('lost' or 'found')
+ * @returns A Material Design icon name
+ */
+export function getStatusIcon(status: string): string {
+  return status === 'lost' ? 'mdi-alert-circle' : 'mdi-check-circle';
+}
+
+
+/**
+ * Get the Vuetify color for a status
+ * @param status - The status type ('lost' or 'found')
+ * @returns A Vuetify color name
+ */
+export function getStatusColor(status: string): string {
+  return status === 'lost' ? 'error' : 'success';
+}
