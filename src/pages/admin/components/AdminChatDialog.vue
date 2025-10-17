@@ -221,7 +221,7 @@ const closeDialog = () => {
 }
 
 .my-message .message-content {
-  background-color: #1976d2;
+  background-color: #1b5e20;
   color: white;
 }
 
