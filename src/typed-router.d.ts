@@ -19,9 +19,15 @@ declare module 'vue-router/auto-routes' {
    */
   export interface RouteNamedMap {
     '/': RouteRecordInfo<'/', '/', Record<never, never>, Record<never, never>>,
+    '/admin/components/AdminCard': RouteRecordInfo<'/admin/components/AdminCard', '/admin/components/AdminCard', Record<never, never>, Record<never, never>>,
+    '/admin/components/AdminChatDialog': RouteRecordInfo<'/admin/components/AdminChatDialog', '/admin/components/AdminChatDialog', Record<never, never>, Record<never, never>>,
+    '/admin/components/ClaimItemDialog': RouteRecordInfo<'/admin/components/ClaimItemDialog', '/admin/components/ClaimItemDialog', Record<never, never>, Record<never, never>>,
+    '/admin/components/ConvoDialog': RouteRecordInfo<'/admin/components/ConvoDialog', '/admin/components/ConvoDialog', Record<never, never>, Record<never, never>>,
+    '/admin/components/DashboardItemCards': RouteRecordInfo<'/admin/components/DashboardItemCards', '/admin/components/DashboardItemCards', Record<never, never>, Record<never, never>>,
     '/admin/components/dialogs/AdminUserRolesDialog': RouteRecordInfo<'/admin/components/dialogs/AdminUserRolesDialog', '/admin/components/dialogs/AdminUserRolesDialog', Record<never, never>, Record<never, never>>,
     '/admin/components/dialogs/UserDetailsDialog': RouteRecordInfo<'/admin/components/dialogs/UserDetailsDialog', '/admin/components/dialogs/UserDetailsDialog', Record<never, never>, Record<never, never>>,
     '/admin/components/ItemCard': RouteRecordInfo<'/admin/components/ItemCard', '/admin/components/ItemCard', Record<never, never>, Record<never, never>>,
+    '/admin/components/NotifDialog': RouteRecordInfo<'/admin/components/NotifDialog', '/admin/components/NotifDialog', Record<never, never>, Record<never, never>>,
     '/admin/components/PostItemDialog': RouteRecordInfo<'/admin/components/PostItemDialog', '/admin/components/PostItemDialog', Record<never, never>, Record<never, never>>,
     '/admin/components/ProfileFormUpdate': RouteRecordInfo<'/admin/components/ProfileFormUpdate', '/admin/components/ProfileFormUpdate', Record<never, never>, Record<never, never>>,
     '/admin/components/ProfilesWidget': RouteRecordInfo<'/admin/components/ProfilesWidget', '/admin/components/ProfilesWidget', Record<never, never>, Record<never, never>>,
@@ -31,6 +37,7 @@ declare module 'vue-router/auto-routes' {
     '/admin/components/StatsCards': RouteRecordInfo<'/admin/components/StatsCards', '/admin/components/StatsCards', Record<never, never>, Record<never, never>>,
     '/admin/components/Summary': RouteRecordInfo<'/admin/components/Summary', '/admin/components/Summary', Record<never, never>, Record<never, never>>,
     '/admin/components/SystemStats': RouteRecordInfo<'/admin/components/SystemStats', '/admin/components/SystemStats', Record<never, never>, Record<never, never>>,
+    '/admin/components/userChatDialog': RouteRecordInfo<'/admin/components/userChatDialog', '/admin/components/userChatDialog', Record<never, never>, Record<never, never>>,
     '/admin/components/UsersTable': RouteRecordInfo<'/admin/components/UsersTable', '/admin/components/UsersTable', Record<never, never>, Record<never, never>>,
     '/admin/DashboardView': RouteRecordInfo<'/admin/DashboardView', '/admin/DashboardView', Record<never, never>, Record<never, never>>,
     '/admin/RolePagesView': RouteRecordInfo<'/admin/RolePagesView', '/admin/RolePagesView', Record<never, never>, Record<never, never>>,

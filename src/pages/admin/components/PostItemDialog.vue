@@ -1,26 +1,26 @@
 <script lang="ts" setup>
 interface NewItemForm {
-  title: string
-  description: string
-  status: 'lost' | 'found'
+  title: string;
+  description: string;
+  status: "lost" | "found";
 }
 
 interface Props {
-  posting: boolean
-  form: NewItemForm
+  posting: boolean;
+  form: NewItemForm;
 }
 
-const props = defineProps<Props>()
-const model = defineModel<boolean>()
+const props = defineProps<Props>();
+const model = defineModel<boolean>();
 const emit = defineEmits<{
-  submit: []
-}>()
+  submit: [];
+}>();
 
 const handleSubmit = () => {
   if (props.form.title && props.form.description) {
-    emit('submit')
+    emit("submit");
   }
-}
+};
 </script>
 
 <template>
@@ -37,6 +37,7 @@ const handleSubmit = () => {
             v-model="form.status"
             :items="[
               { title: 'Lost Item', value: 'lost' },
+              { title: 'Found Item', value: 'found' },
             ]"
             label="Item Type"
             prepend-inner-icon="mdi-tag"
@@ -62,37 +63,29 @@ const handleSubmit = () => {
             rows="4"
           />
 
-          <v-alert
-            type="info"
-            variant="tonal"
-            class="mt-3"
-          >
+          <v-alert type="info" variant="tonal" class="mt-3">
             <template #prepend>
               <v-icon>mdi-chat</v-icon>
             </template>
-            Students can start a realtime chat to describe this item for ownership verification.
+            Students can start a realtime chat to describe this item for
+            ownership verification.
           </v-alert>
         </v-form>
       </v-card-text>
 
       <v-card-actions>
         <v-spacer />
-        <v-btn
-          variant="text"
-          @click="model = false"
-          :disabled="posting"
-        >
+        <v-btn variant="text" @click="model = false" :disabled="posting">
           Cancel
         </v-btn>
-       <v-btn
-  color="success"
-  @click="handleSubmit"
-  :loading="posting"
-  :disabled="!form.title || !form.description"
->
-  Post Item
-</v-btn>
-
+        <v-btn
+          color="success"
+          @click="handleSubmit"
+          :loading="posting"
+          :disabled="!form.title || !form.description"
+        >
+          Post Item
+        </v-btn>
       </v-card-actions>
     </v-card>
   </v-dialog>
