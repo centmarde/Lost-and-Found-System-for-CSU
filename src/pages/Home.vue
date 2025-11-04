@@ -57,7 +57,7 @@ const {
 } = useFilterSortPagination(items, 12) // 👈 Implementation of the Composable
 
 // ----------------------------------------------------------------------
-// The following computed properties and watchers are REMOVED 
+// The following computed properties and watchers are REMOVED
 // as they are now handled by useFilterSortPagination:
 //
 // const availableMonths = computed(...)
@@ -123,7 +123,7 @@ const checkIfUserIsAdmin = async (user: any) => {
     if (error) return false
 
     const currentUserData = users?.find(u => u.id === user.id)
-    const roleId = currentUserData?.user_metadata?.role
+    const roleId = currentUserData?.raw_user_meta_data?.role
 
     return roleId === 1
   } catch (error) {
@@ -140,9 +140,9 @@ const getCurrentUser = async () => {
   if (user) {
     isCurrentUserAdmin.value = await checkIfUserIsAdmin(user)
     showNotificationBell.value = !isCurrentUserAdmin.value
-    
+
     if (!isCurrentUserAdmin.value) {
-        await setupItemNotifications() 
+        await setupItemNotifications()
     }
   }
 }
@@ -164,7 +164,7 @@ const fetchItems = async () => {
       }
 
       const adminUsers = users?.filter(user => {
-        const roleId = user.user_metadata?.role
+        const roleId = user.raw_user_meta_data?.role
         return roleId === 1
       }) || []
 
@@ -181,7 +181,7 @@ const fetchItems = async () => {
     }
 
     // Always order by created_at newest first on initial fetch
-    const { data, error } = await query.order('created_at', { ascending: false }) 
+    const { data, error } = await query.order('created_at', { ascending: false })
 
     if (error) {
       console.error('Error fetching items:', error)
@@ -254,8 +254,8 @@ onMounted(async () => {
                 {{ pageSubtitle }}
               </p>
 
-              <div 
-                v-if="showNotificationBell" 
+              <div
+                v-if="showNotificationBell"
                 class="notification-bell"
               >
                 <v-btn
@@ -345,7 +345,7 @@ onMounted(async () => {
                 <v-col cols="12">
                   <div class="d-flex align-center flex-wrap gap-2">
                     <span class="text-caption text-grey-darken-1">Active filters:</span>
-                    
+
                     <v-chip
                       v-if="selectedMonth !== 'all'"
                       closable
@@ -387,7 +387,7 @@ onMounted(async () => {
 
         <v-row>
           <v-col cols="12">
-
+            <v-card elevation="2">
               <v-card-title class="text-h5 font-weight-bold mb-4 d-flex align-center">
                 <v-icon class="me-2" color="primary">mdi-package-variant-closed</v-icon>
                 {{ isCurrentUserAdmin ? 'Your Items' : 'Missing Items' }}
@@ -416,22 +416,22 @@ onMounted(async () => {
                   mdi-package-variant-closed-remove
                 </v-icon>
                 <h3 class="text-h5 text-grey-darken-1 mb-2">
-                  {{ items.length === 0 
+                  {{ items.length === 0
                     ? (isCurrentUserAdmin ? 'No items posted yet' : 'No missing items found')
                     : 'No items match your filters'
                   }}
                 </h3>
                 <p class="text-body-1 text-grey-darken-2 mb-4">
                   {{ items.length === 0
-                    ? (isCurrentUserAdmin 
-                      ? 'You haven\'t posted any missing items yet.' 
+                    ? (isCurrentUserAdmin
+                      ? 'You haven\'t posted any missing items yet.'
                       : 'There are currently no missing items posted by admins.')
                     : 'Try adjusting your filters to see more items.'
                   }}
                 </p>
-                <v-btn 
+                <v-btn
                   v-if="items.length === 0"
-                  color="primary" 
+                  color="primary"
                   variant="outlined"
                   prepend-icon="mdi-refresh"
                   @click="fetchItems"
@@ -467,7 +467,7 @@ onMounted(async () => {
                       @open-conversations="handleOpenConversations"
                       @mark-as-claimed="markAsClaimed"
                     />
-                    
+
                     <UserItemCard
                       v-else
                       :item="item"
@@ -487,7 +487,7 @@ onMounted(async () => {
                         rounded="circle"
                         color="primary"
                       />
-                      
+
                       <div class="text-caption text-grey-darken-1 ml-4">
                         Showing {{ (page - 1) * itemsPerPage + 1 }}-{{ Math.min(page * itemsPerPage, filteredAndSortedItems.length) }} of {{ filteredAndSortedItems.length }}
                       </div>

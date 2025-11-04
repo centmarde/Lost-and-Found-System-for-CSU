@@ -1,12 +1,12 @@
 <script lang="ts" setup>
 import { computed } from 'vue';
-import { 
+import {
   type ActivityItem,
-  getActivityColor, 
-  getActivityIcon, 
+  getActivityColor,
+  getActivityIcon,
   formatTimestamp,
-  filterRecentActivities 
-} from '@/utils/helpers'; 
+  filterRecentActivities
+} from '@/utils/helpers';
 
 interface Props {
   stats: any; // Accept any stats object structure
@@ -34,16 +34,16 @@ const filteredActivity = computed(() => {
         <v-card-title class="text-h6 font-weight-bold mb-4">
           <v-icon class="me-2">mdi-clock-outline</v-icon>
           Recent Activity
-          <v-chip 
-            v-if="filteredActivity.length > 0" 
-            class="ms-2" 
-            size="small" 
+          <v-chip
+            v-if="filteredActivity.length > 0"
+            class="ms-2"
+            size="small"
             color="primary"
           >
             {{ filteredActivity.length }}
           </v-chip>
         </v-card-title>
-        
+
         <div v-if="filteredActivity.length === 0" class="text-center py-8">
           <v-icon size="64" color="grey-lighten-1">mdi-inbox</v-icon>
           <div class="text-h6 text-grey-darken-1 mt-2">No recent activity</div>
@@ -51,7 +51,7 @@ const filteredActivity = computed(() => {
             Items and activities from the last {{ maxDays }} days will appear here
           </div>
         </div>
-        
+
         <v-list v-else>
           <v-list-item
             v-for="activity in filteredActivity"
@@ -74,15 +74,15 @@ const filteredActivity = computed(() => {
               {{ activity.status === 'claimed' ? 'claimed' : '' }} by {{ activity.user }}
             </v-list-item-subtitle>
 
-          <!-- No data slot -->
-          <template v-slot:no-data>
-            <div class="text-center py-8">
-              <v-icon size="64" color="grey-lighten-1">mdi-inbox</v-icon>
-              <div class="text-h6 text-grey-darken-1 mt-2">No recent activity</div>
-              <div class="text-body-2 text-grey-darken-1">Items and activities will appear here</div>
-            </div>
-          </template>
-        </v-data-table>
+            <template #append>
+              <v-list-item-action>
+                <v-chip size="small" variant="text" class="text-caption">
+                  {{ formatTimestamp(activity.timestamp) }}
+                </v-chip>
+              </v-list-item-action>
+            </template>
+          </v-list-item>
+        </v-list>
       </v-card>
     </v-col>
   </v-row>
