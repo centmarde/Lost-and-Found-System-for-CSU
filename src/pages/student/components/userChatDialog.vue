@@ -1,3 +1,4 @@
+//userChatDialog.vue
 <script setup lang="ts">
 import { ref, watchEffect, toRefs } from 'vue'
 import { formatDate } from '@/utils/helpers'

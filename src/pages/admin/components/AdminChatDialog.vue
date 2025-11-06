@@ -1,50 +1,20 @@
+//AdminChatDialog.vue
 <script setup lang="ts">
 import { ref, toRefs, watchEffect } from "vue";
 import { formatDate } from "@/utils/helpers";
 import { supabase } from "@/lib/supabase";
+import type { Conversation, Message, Item } from "@/types/chat"; // <-- use shared types
 
-// Define the interfaces for the props
-interface Sender {
-  id: string;
-  email: string;
-}
-
-interface Conversation {
-  id: string;
-  item_id: number;
-  sender_id: string;
-  receiver_id: string;
-  created_at: string;
-  sender?: Sender;
-}
-
-interface Item {
-  id: number;
-  title: string;
-}
-
-// Add the Message interface
-interface Message {
-  id: string;
-  conversation_id: string;
-  message: string;
-  user_id: string;
-  created_at: string;
-}
-
-const props = defineProps({
-  show: { type: Boolean, required: true },
-  item: { type: Object as () => Item | null, required: true },
-  conversations: { type: Array as () => Conversation[], required: true },
-  messages: { type: Array as () => Message[], required: true },
-  selectedConversation: {
-    type: Object as () => Conversation | null,
-    default: null,
-  },
-  loadingConversations: { type: Boolean, required: true },
-  loadingMessages: { type: Boolean, required: true },
-  sendingMessage: { type: Boolean, required: true },
-});
+const props = defineProps<{
+  show: boolean;
+  item: { id: number; title: string } | null;  // More flexible type
+  conversations: Conversation[];
+  messages: Message[];
+  selectedConversation: Conversation | null;
+  loadingConversations: boolean;
+  loadingMessages: boolean;
+  sendingMessage: boolean;
+}>();
 
 const emit = defineEmits([
   "update:show",
@@ -83,7 +53,7 @@ const handleKeyPress = (event: KeyboardEvent) => {
   }
 };
 
-// Fixed sendMessage function - emit to parent instead of directly mutating props
+// Emit to parent instead of mutating props
 const sendMessage = async () => {
   if (
     !newMessage.value.trim() ||
@@ -92,14 +62,12 @@ const sendMessage = async () => {
   )
     return;
 
-  // Emit the send message event to the parent component
   emit("send-message", {
     conversationId: selectedConversation.value.id,
     message: newMessage.value.trim(),
     userId: currentUser.value.id,
   });
 
-  // Clear the input
   newMessage.value = "";
 };
 
