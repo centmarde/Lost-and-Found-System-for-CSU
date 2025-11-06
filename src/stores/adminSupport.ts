@@ -1,6 +1,5 @@
-// stores/adminSupport.ts
-import { supabase } from '@/lib/supabase'
-import type { Conversation, Message } from '@/types/chat'
+import { supabase } from "@/lib/supabase";
+import type { Conversation, Message } from "@/types/chat";
 
 /**
  * Helper function to get user details via database function
@@ -8,15 +7,17 @@ import type { Conversation, Message } from '@/types/chat'
  */
 async function getUserDetails(userId: string) {
   try {
-    const { data, error } = await supabase.rpc('get_user_details', { user_id: userId })
-    if (error) throw error
-    return data
+    const { data, error } = await supabase.rpc("get_user_details", {
+      user_id: userId,
+    });
+    if (error) throw error;
+    return data;
   } catch (error) {
-    console.warn('Could not fetch user details for', userId)
+    console.warn("Could not fetch user details for", userId);
     return {
-      full_name: 'Unknown User',
-      email: 'No email'
-    }
+      full_name: "Unknown User",
+      email: "No email",
+    };
   }
 }
 
@@ -31,38 +32,38 @@ export async function getOrCreateAdminSupportConversation(
   try {
     // First, try to find existing admin support conversation
     const { data: existingConv, error: findError } = await supabase
-      .from('conversations')
-      .select('*')
-      .is('item_id', null) // Admin support conversations have no item
-      .eq('sender_id', studentId)
-      .eq('receiver_id', adminId)
-      .single()
+      .from("conversations")
+      .select("*")
+      .is("item_id", null) // Admin support conversations have no item
+      .eq("sender_id", studentId)
+      .eq("receiver_id", adminId)
+      .single();
 
     if (existingConv) {
-      return existingConv
+      return existingConv;
     }
 
     // If not found (PGRST116 error), create new conversation
-    if (findError && findError.code !== 'PGRST116') {
-      throw findError
+    if (findError && findError.code !== "PGRST116") {
+      throw findError;
     }
 
     // Create new admin support conversation
     const { data: newConv, error: createError } = await supabase
-      .from('conversations')
+      .from("conversations")
       .insert({
         item_id: null, // NULL indicates admin support chat
         sender_id: studentId,
         receiver_id: adminId,
       })
       .select()
-      .single()
+      .single();
 
-    if (createError) throw createError
-    return newConv
+    if (createError) throw createError;
+    return newConv;
   } catch (error) {
-    console.error('Error getting/creating admin support conversation:', error)
-    throw new Error('Failed to initialize admin support conversation')
+    console.error("Error getting/creating admin support conversation:", error);
+    throw new Error("Failed to initialize admin support conversation");
   }
 }
 
@@ -70,61 +71,67 @@ export async function getOrCreateAdminSupportConversation(
  * Gets all admin support conversations (for admin inbox)
  * Returns conversations where item_id is null
  */
-export async function getAllAdminSupportConversations(): Promise<Conversation[]> {
+export async function getAllAdminSupportConversations(): Promise<
+  Conversation[]
+> {
   try {
     // Get conversations with messages
     const { data: conversations, error } = await supabase
-      .from('conversations')
-      .select(`
+      .from("conversations")
+      .select(
+        `
         *,
         messages (
           message,
           created_at
         )
-      `)
-      .is('item_id', null) // Only get admin support conversations
-      .order('created_at', { ascending: false })
+      `
+      )
+      .is("item_id", null) // Only get admin support conversations
+      .order("created_at", { ascending: false });
 
-    if (error) throw error
+    if (error) throw error;
 
     if (!conversations || conversations.length === 0) {
-      return []
+      return [];
     }
 
     // Get user details for each unique sender
-    const senderIds = [...new Set(conversations.map(conv => conv.sender_id))]
-    const userDetailsPromises = senderIds.map(id => getUserDetails(id))
-    const userDetailsArray = await Promise.all(userDetailsPromises)
-    
+    const senderIds = [...new Set(conversations.map((conv) => conv.sender_id))];
+    const userDetailsPromises = senderIds.map((id) => getUserDetails(id));
+    const userDetailsArray = await Promise.all(userDetailsPromises);
+
     // Create a map of userId -> userDetails
-    const userDataMap = new Map()
+    const userDataMap = new Map();
     senderIds.forEach((id, index) => {
-      userDataMap.set(id, userDetailsArray[index])
-    })
+      userDataMap.set(id, userDetailsArray[index]);
+    });
 
     // Process conversations
-    const processedConversations: Conversation[] = conversations.map((conv: any) => ({
-      id: conv.id,
-      item_id: conv.item_id,
-      sender_id: conv.sender_id,
-      receiver_id: conv.receiver_id,
-      created_at: conv.created_at,
-      sender_profile: userDataMap.get(conv.sender_id) || {
-        full_name: 'Unknown Student',
-        email: 'No email'
-      },
-      messages: conv.messages,
-      latest_message:
-        conv.messages && conv.messages.length > 0
-          ? conv.messages[conv.messages.length - 1]
-          : { message: 'No messages yet', created_at: conv.created_at },
-      message_count: conv.messages?.length || 0,
-    }))
+    const processedConversations: Conversation[] = conversations.map(
+      (conv: any) => ({
+        id: conv.id,
+        item_id: conv.item_id,
+        sender_id: conv.sender_id,
+        receiver_id: conv.receiver_id,
+        created_at: conv.created_at,
+        sender_profile: userDataMap.get(conv.sender_id) || {
+          full_name: "Unknown Student",
+          email: "No email",
+        },
+        messages: conv.messages,
+        latest_message:
+          conv.messages && conv.messages.length > 0
+            ? conv.messages[conv.messages.length - 1]
+            : { message: "No messages yet", created_at: conv.created_at },
+        message_count: conv.messages?.length || 0,
+      })
+    );
 
-    return processedConversations
+    return processedConversations;
   } catch (error) {
-    console.error('Error fetching admin support conversations:', error)
-    throw new Error('Failed to load admin support conversations')
+    console.error("Error fetching admin support conversations:", error);
+    throw new Error("Failed to load admin support conversations");
   }
 }
 
@@ -134,22 +141,24 @@ export async function getAllAdminSupportConversations(): Promise<Conversation[]>
  */
 export async function getAdminUserId(): Promise<string> {
   try {
-    const { data, error } = await supabase.rpc('get_admin_user_id')
-    
+    const { data, error } = await supabase.rpc("get_admin_user_id");
+
     if (error) {
-      console.error('Error calling get_admin_user_id:', error)
-      throw error
+      console.error("Error calling get_admin_user_id:", error);
+      throw error;
     }
 
     if (!data) {
-      throw new Error('No admin user found. Please ensure at least one user has role = 1 in their metadata.')
+      throw new Error(
+        "No admin user found. Please ensure at least one user has role = 1 in their metadata."
+      );
     }
 
-    console.log('Found admin user ID:', data)
-    return data
+    console.log("Found admin user ID:", data);
+    return data;
   } catch (error) {
-    console.error('Error finding admin user:', error)
-    throw new Error('Failed to find admin user. Please contact support.')
+    console.error("Error finding admin user:", error);
+    throw new Error("Failed to find admin user. Please contact support.");
   }
 }
 
@@ -160,63 +169,65 @@ export function setupAdminSupportConversationsSubscription(
   onNewConversation: (conversation: Conversation) => void
 ) {
   return supabase
-    .channel('admin_support_conversations')
+    .channel("admin_support_conversations")
     .on(
-      'postgres_changes',
+      "postgres_changes",
       {
-        event: 'INSERT',
-        schema: 'public',
-        table: 'conversations',
-        filter: 'item_id=is.null',
+        event: "INSERT",
+        schema: "public",
+        table: "conversations",
+        filter: "item_id=is.null",
       },
       async (payload: any) => {
         try {
           // Fetch the conversation
           const { data: conversation } = await supabase
-            .from('conversations')
-            .select('*')
-            .eq('id', payload.new.id)
-            .single()
+            .from("conversations")
+            .select("*")
+            .eq("id", payload.new.id)
+            .single();
 
           if (conversation) {
             // Get sender details
-            const senderProfile = await getUserDetails(conversation.sender_id)
-            
+            const senderProfile = await getUserDetails(conversation.sender_id);
+
             const enrichedConversation = {
               ...conversation,
-              sender_profile: senderProfile
-            }
+              sender_profile: senderProfile,
+            };
 
-            onNewConversation(enrichedConversation as Conversation)
+            onNewConversation(enrichedConversation as Conversation);
           }
         } catch (error) {
-          console.error('Error processing new conversation:', error)
+          console.error("Error processing new conversation:", error);
         }
       }
     )
-    .subscribe()
+    .subscribe();
 }
 
 /**
  * Get unread message count for admin support (optional feature)
  */
-export async function getUnreadAdminSupportCount(adminId: string): Promise<number> {
+export async function getUnreadAdminSupportCount(
+  adminId: string
+): Promise<number> {
   try {
     const { data: conversations, error: convError } = await supabase
-      .from('conversations')
-      .select('id')
-      .is('item_id', null)
-      .eq('receiver_id', adminId)
+      .from("conversations")
+      .select("id")
+      .is("item_id", null)
+      .eq("receiver_id", adminId);
 
-    if (convError) throw convError
+    if (convError) throw convError;
 
     if (!conversations || conversations.length === 0) {
-      return 0
+      return 0;
     }
 
-    return 0
+    return 0;
   } catch (error) {
-    console.error('Error getting unread count:', error)
-    return 0
+    console.error("Error getting unread count:", error);
+    return 0;
   }
 }

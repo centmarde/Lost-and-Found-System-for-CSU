@@ -1,4 +1,3 @@
-// pages/student/components/composables/useAdminSupport.ts
 import { ref, onUnmounted, nextTick } from 'vue'
 import { useToast } from 'vue-toastification'
 import type { Conversation, Message } from '@/types/chat'

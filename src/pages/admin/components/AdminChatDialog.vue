@@ -1,13 +1,12 @@
-//AdminChatDialog.vue
 <script setup lang="ts">
 import { ref, toRefs, watchEffect } from "vue";
 import { formatDate } from "@/utils/helpers";
 import { supabase } from "@/lib/supabase";
-import type { Conversation, Message, Item } from "@/types/chat"; // <-- use shared types
+import type { Conversation, Message, Item } from "@/types/chat"; 
 
 const props = defineProps<{
   show: boolean;
-  item: { id: number; title: string } | null;  // More flexible type
+  item: { id: number; title: string } | null; 
   conversations: Conversation[];
   messages: Message[];
   selectedConversation: Conversation | null;
