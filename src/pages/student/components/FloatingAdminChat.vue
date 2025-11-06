@@ -1,6 +1,5 @@
-//FloatingAdminChat.vue
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { formatDate } from '@/utils/helpers'
 import { supabase } from '@/lib/supabase'
 
@@ -20,7 +19,7 @@ const props = defineProps({
   initializingChat: { type: Boolean, required: true },
 })
 
-const emit = defineEmits(['update:show', 'send-message'])
+const emit = defineEmits(['update:show', 'send-message', 'open-chat'])
 
 const newMessage = ref('')
 const currentUser = ref<any>(null)
@@ -55,6 +54,11 @@ const toggleMinimize = () => {
   isMinimized.value = !isMinimized.value
 }
 
+const openChat = () => {
+  emit('update:show', true)
+  emit('open-chat')
+}
+
 const closeChat = () => {
   emit('update:show', false)
   isMinimized.value = false
@@ -63,6 +67,13 @@ const closeChat = () => {
 const unreadCount = computed(() => {
   // You can implement unread logic here if needed
   return 0
+})
+
+// Watch for show prop changes to trigger initialization
+watch(() => props.show, (newVal) => {
+  if (newVal) {
+    emit('open-chat')
+  }
 })
 </script>
 
@@ -73,7 +84,7 @@ const unreadCount = computed(() => {
       color="primary"
       size="x-large"
       elevation="8"
-      @click="emit('update:show', true)"
+      @click="openChat"
       class="chat-fab"
     >
       <v-badge

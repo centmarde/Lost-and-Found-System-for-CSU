@@ -492,15 +492,16 @@ onMounted(async () => {
         />
 
         <!-- Student Admin Support Chat (Floating) -->
-        <FloatingAdminChat
-          v-if="!isCurrentUserAdmin && currentUser"
-          v-model:show="showSupportChat"
-          :messages="supportMessages"
-          :messages-loading="supportMessagesLoading"
-          :sending-message="sendingSupportMessage"
-          :initializing-chat="initializingChat"
-          @send-message="sendSupportMessage"
-        />
+       <FloatingAdminChat
+  v-if="!isCurrentUserAdmin && currentUser"
+  v-model:show="showSupportChat"
+  :messages="supportMessages"
+  :messages-loading="supportMessagesLoading"
+  :sending-message="sendingSupportMessage"
+  :initializing-chat="initializingChat"
+  @send-message="sendSupportMessage"
+  @open-chat="openSupportChat"
+/>
 
         <!-- Admin Support Inbox -->
         <AdminSupportInbox
