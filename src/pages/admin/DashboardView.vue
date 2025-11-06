@@ -84,7 +84,7 @@ onMounted(async () => {
 <template>
   <InnerLayoutWrapper>
     <template #content>
-      <div class="dashboard">
+      <div  class="dashboard container-fluid mx-5 my-5">
         <div class="d-flex justify-space-between align-center mb-6">
           <h1 class="text-h4 font-weight-bold text-green-darken-4">
             CSU Lost & Found Dashboard

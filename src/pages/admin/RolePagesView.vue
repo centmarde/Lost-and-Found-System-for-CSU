@@ -47,7 +47,7 @@ const {
       <v-col cols="12">
         <div class="d-flex justify-space-between align-center">
           <div>
-            <h1 class="text-h4 font-weight-bold mb-2">User Roles Management</h1>
+            <h1 class="text-h3 text-md-h2 font-weight-bold text-primary mb-2">User Roles Management</h1>
             <p class="text-body-1 text-grey-darken-1">
               Manage system roles and permissions
             </p>

@@ -1,8 +1,10 @@
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { useAuthUserStore } from '@/stores/authUser'
 import { useToast } from 'vue-toastification'
+import { getRoleName, getRoleColor } from '@/utils/usersTableHelpers'
+import UserDetailsDialog from './dialogs/UserDetailsDialog.vue'
 
 // Store and utilities
 const authStore = useAuthUserStore()
@@ -14,6 +16,7 @@ const loading = ref(false)
 const error = ref<string | null>(null)
 const userDialog = ref(false)
 const selectedUser = ref<any>(null)
+const roleCache = ref<Record<number, string>>({}) // Cache for role titles from database
 
 // Table headers
 const headers = [
@@ -44,6 +47,31 @@ const headers = [
 ]
 
 // Methods
+const getRoleTitleAsync = async (roleId: number): Promise<string> => {
+  if (!roleId) return 'No Role'
+
+  // Check cache first
+  if (roleCache.value[roleId]) {
+    return roleCache.value[roleId]
+  }
+
+  try {
+    const result = await authStore.getRoleTitleById(roleId)
+
+    if (result.title) {
+      roleCache.value[roleId] = result.title
+      return result.title
+    } else {
+      // Fallback to helper function if database query fails
+      return getRoleName(roleId)
+    }
+  } catch (error) {
+    console.error('Error fetching role title:', error)
+    // Fallback to helper function
+    return getRoleName(roleId)
+  }
+}
+
 const fetchUsers = async () => {
   loading.value = true
   error.value = null
@@ -59,6 +87,21 @@ const fetchUsers = async () => {
       toast.error('Failed to load users')
     } else if (result.users) {
       users.value = result.users
+
+      // Preload role titles from database for all unique role IDs
+      const roleIds = new Set<number>()
+      result.users.forEach(user => {
+        const roleId = user.raw_user_meta_data?.role
+        if (roleId && typeof roleId === 'number') {
+          roleIds.add(roleId)
+        }
+      })
+
+      // Fetch all role titles from database
+      for (const roleId of roleIds) {
+        await getRoleTitleAsync(roleId)
+      }
+
       //toast.success(`Loaded ${result.users.length} users`)
     }
   } catch (err) {
@@ -68,6 +111,18 @@ const fetchUsers = async () => {
   } finally {
     loading.value = false
   }
+}
+
+const getRoleTitleSync = (roleId: number): string => {
+  if (!roleId) return 'No Role'
+
+  // Return from cache if available (database value)
+  if (roleCache.value[roleId]) {
+    return roleCache.value[roleId]
+  }
+
+  // Fallback to helper function while loading
+  return getRoleName(roleId)
 }
 
 const refreshUsers = () => {
@@ -100,36 +155,6 @@ const formatTime = (dateString: string) => {
   return new Date(dateString).toLocaleTimeString()
 }
 
-const getRoleName = (roleId: number | undefined) => {
-  switch (roleId) {
-    case 1:
-      return 'Admin'
-    case 2:
-      return 'Moderator'
-    case 3:
-      return 'Student'
-    case 4:
-      return 'Faculty'
-    default:
-      return 'Unknown'
-  }
-}
-
-const getRoleColor = (roleId: number | undefined) => {
-  switch (roleId) {
-    case 1:
-      return 'error'
-    case 2:
-      return 'warning'
-    case 3:
-      return 'primary'
-    case 4:
-      return 'success'
-    default:
-      return 'grey'
-  }
-}
-
 // Lifecycle
 onMounted(() => {
   fetchUsers()
@@ -138,7 +163,21 @@ onMounted(() => {
 
 <template>
   <div>
-    <v-card>
+     <!-- Header Section -->
+    <v-row class="mb-6">
+      <v-col cols="12">
+        <div class="d-flex justify-space-between align-center">
+          <div>
+            <h1 class="text-h3 text-md-h2 font-weight-bold text-primary mb-2">User Management</h1>
+            <p class="text-body-1 text-grey-darken-1">
+              Manage system users and details
+            </p>
+          </div>
+
+        </div>
+      </v-col>
+    </v-row>
+
       <v-card-title class="d-flex align-center justify-space-between">
         <div class="text-h5 text-green-darken-4">User Management</div>
         <v-btn
@@ -190,7 +229,7 @@ onMounted(() => {
               <div>
                 <div class="font-weight-medium">{{ item.email }}</div>
                 <div class="text-caption text-medium-emphasis">
-                  {{ item.user_metadata?.full_name || 'No name provided' }}
+                  {{ item.raw_user_meta_data?.full_name || 'No name provided' }}
                 </div>
               </div>
             </div>
@@ -209,11 +248,11 @@ onMounted(() => {
           <!-- Role column -->
           <template v-slot:item.role="{ item }">
             <v-chip
-              :color="getRoleColor(item.user_metadata?.role)"
+              :color="getRoleColor(item.raw_user_meta_data?.role)"
               size="small"
               variant="tonal"
             >
-              {{ getRoleName(item.user_metadata?.role) }}
+              {{ getRoleTitleSync(item.raw_user_meta_data?.role) }}
             </v-chip>
           </template>
 
@@ -278,83 +317,13 @@ onMounted(() => {
           </template>
         </v-data-table>
       </v-card-text>
-    </v-card>
 
-    <!-- User Details Dialog -->
-    <v-dialog v-model="userDialog" max-width="600">
-      <v-card v-if="selectedUser">
-        <v-card-title class="d-flex align-center">
-          <v-icon class="me-2">mdi-account</v-icon>
-          User Details
-        </v-card-title>
+    <!-- User Details Dialog Component -->
+    <UserDetailsDialog
+      v-model="userDialog"
+      :selected-user="selectedUser"
+    />
 
-        <v-card-text>
-          <v-container>
-            <v-row>
-              <v-col cols="12" md="6">
-                <v-text-field
-                  label="ID"
-                  :model-value="selectedUser.id"
-                  readonly
-                  variant="outlined"
-                  density="comfortable"
-                />
-              </v-col>
-              <v-col cols="12" md="6">
-                <v-text-field
-                  label="Email"
-                  :model-value="selectedUser.email"
-                  readonly
-                  variant="outlined"
-                  density="comfortable"
-                />
-              </v-col>
-              <v-col cols="12" md="6">
-                <v-text-field
-                  label="Full Name"
-                  :model-value="selectedUser.user_metadata?.full_name || 'Not provided'"
-                  readonly
-                  variant="outlined"
-                  density="comfortable"
-                />
-              </v-col>
-              <v-col cols="12" md="6">
-                <v-text-field
-                  label="Role"
-                  :model-value="getRoleName(selectedUser.user_metadata?.role)"
-                  readonly
-                  variant="outlined"
-                  density="comfortable"
-                />
-              </v-col>
-              <v-col cols="12" md="6">
-                <v-text-field
-                  label="Created At"
-                  :model-value="formatDate(selectedUser.created_at)"
-                  readonly
-                  variant="outlined"
-                  density="comfortable"
-                />
-              </v-col>
-              <v-col cols="12" md="6">
-                <v-text-field
-                  label="Email Verified"
-                  :model-value="selectedUser.email_confirmed_at ? 'Yes' : 'No'"
-                  readonly
-                  variant="outlined"
-                  density="comfortable"
-                />
-              </v-col>
-            </v-row>
-          </v-container>
-        </v-card-text>
-
-        <v-card-actions>
-          <v-spacer />
-          <v-btn color="primary" @click="userDialog = false">Close</v-btn>
-        </v-card-actions>
-      </v-card>
-    </v-dialog>
   </div>
 </template>
 
