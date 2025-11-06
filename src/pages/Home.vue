@@ -1,3 +1,4 @@
+//Home.vue
 <script setup lang="ts">
 import { ref, onMounted, computed, watch } from "vue";
 import InnerLayoutWrapper from "@/layouts/InnerLayoutWrapper.vue";
@@ -523,7 +524,7 @@ onMounted(async () => {
 .admin-inbox-button {
   position: absolute;
   top: 0;
-  right: 80px;
+  right: 10px;
 }
 
 @media (max-width: 960px) {
