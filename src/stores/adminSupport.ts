@@ -3,6 +3,24 @@ import { supabase } from '@/lib/supabase'
 import type { Conversation, Message } from '@/types/chat'
 
 /**
+ * Helper function to get user details via database function
+ * Creates a function that returns user metadata from auth.users
+ */
+async function getUserDetails(userId: string) {
+  try {
+    const { data, error } = await supabase.rpc('get_user_details', { user_id: userId })
+    if (error) throw error
+    return data
+  } catch (error) {
+    console.warn('Could not fetch user details for', userId)
+    return {
+      full_name: 'Unknown User',
+      email: 'No email'
+    }
+  }
+}
+
+/**
  * Gets or creates an admin support conversation for a student
  * Admin support conversations have item_id = null
  */
@@ -54,14 +72,11 @@ export async function getOrCreateAdminSupportConversation(
  */
 export async function getAllAdminSupportConversations(): Promise<Conversation[]> {
   try {
-    const { data, error } = await supabase
+    // Get conversations with messages
+    const { data: conversations, error } = await supabase
       .from('conversations')
       .select(`
         *,
-        sender_profile:profiles!conversations_sender_id_fkey (
-          full_name,
-          email
-        ),
         messages (
           message,
           created_at
@@ -72,14 +87,32 @@ export async function getAllAdminSupportConversations(): Promise<Conversation[]>
 
     if (error) throw error
 
-    // Process conversations to add latest message info
-    const processedConversations: Conversation[] = (data || []).map((conv: any) => ({
+    if (!conversations || conversations.length === 0) {
+      return []
+    }
+
+    // Get user details for each unique sender
+    const senderIds = [...new Set(conversations.map(conv => conv.sender_id))]
+    const userDetailsPromises = senderIds.map(id => getUserDetails(id))
+    const userDetailsArray = await Promise.all(userDetailsPromises)
+    
+    // Create a map of userId -> userDetails
+    const userDataMap = new Map()
+    senderIds.forEach((id, index) => {
+      userDataMap.set(id, userDetailsArray[index])
+    })
+
+    // Process conversations
+    const processedConversations: Conversation[] = conversations.map((conv: any) => ({
       id: conv.id,
       item_id: conv.item_id,
       sender_id: conv.sender_id,
       receiver_id: conv.receiver_id,
       created_at: conv.created_at,
-      sender_profile: conv.sender_profile,
+      sender_profile: userDataMap.get(conv.sender_id) || {
+        full_name: 'Unknown Student',
+        email: 'No email'
+      },
       messages: conv.messages,
       latest_message:
         conv.messages && conv.messages.length > 0
@@ -98,31 +131,9 @@ export async function getAllAdminSupportConversations(): Promise<Conversation[]>
 /**
  * Gets the admin user ID using a database function
  * This queries auth.users to find user with role = 1 in metadata
- * 
- * IMPORTANT: You need to create this database function first!
- * Run this SQL in your Supabase SQL Editor:
- * 
- * CREATE OR REPLACE FUNCTION get_admin_user_id()
- * RETURNS uuid
- * LANGUAGE plpgsql
- * SECURITY DEFINER
- * AS $$
- * BEGIN
- *   RETURN (
- *     SELECT id 
- *     FROM auth.users 
- *     WHERE (raw_user_meta_data->>'role')::int = 1
- *     LIMIT 1
- *   );
- * END;
- * $$;
- * 
- * -- Grant execute permission to authenticated users
- * GRANT EXECUTE ON FUNCTION get_admin_user_id() TO authenticated;
  */
 export async function getAdminUserId(): Promise<string> {
   try {
-    // Call the database function to get admin user ID
     const { data, error } = await supabase.rpc('get_admin_user_id')
     
     if (error) {
@@ -144,7 +155,6 @@ export async function getAdminUserId(): Promise<string> {
 
 /**
  * Setup real-time subscription for admin support conversations
- * This notifies admin when new support conversations are created
  */
 export function setupAdminSupportConversationsSubscription(
   onNewConversation: (conversation: Conversation) => void
@@ -160,21 +170,27 @@ export function setupAdminSupportConversationsSubscription(
         filter: 'item_id=is.null',
       },
       async (payload: any) => {
-        // Fetch the full conversation with sender details
-        const { data } = await supabase
-          .from('conversations')
-          .select(`
-            *,
-            sender_profile:profiles!conversations_sender_id_fkey (
-              full_name,
-              email
-            )
-          `)
-          .eq('id', payload.new.id)
-          .single()
+        try {
+          // Fetch the conversation
+          const { data: conversation } = await supabase
+            .from('conversations')
+            .select('*')
+            .eq('id', payload.new.id)
+            .single()
 
-        if (data) {
-          onNewConversation(data as Conversation)
+          if (conversation) {
+            // Get sender details
+            const senderProfile = await getUserDetails(conversation.sender_id)
+            
+            const enrichedConversation = {
+              ...conversation,
+              sender_profile: senderProfile
+            }
+
+            onNewConversation(enrichedConversation as Conversation)
+          }
+        } catch (error) {
+          console.error('Error processing new conversation:', error)
         }
       }
     )
@@ -186,7 +202,6 @@ export function setupAdminSupportConversationsSubscription(
  */
 export async function getUnreadAdminSupportCount(adminId: string): Promise<number> {
   try {
-    // Get all admin support conversations
     const { data: conversations, error: convError } = await supabase
       .from('conversations')
       .select('id')
@@ -199,8 +214,6 @@ export async function getUnreadAdminSupportCount(adminId: string): Promise<numbe
       return 0
     }
 
-    // Count unread messages (you'll need to add a 'read' field to messages table for this)
-    // For now, returning 0 as placeholder
     return 0
   } catch (error) {
     console.error('Error getting unread count:', error)
