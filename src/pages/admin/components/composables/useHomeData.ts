@@ -18,7 +18,7 @@ export interface Item {
 
 export default function useHomeData() {
   const toast = useToast()
-  
+
   // --- Global State ---
   const items = ref<Item[]>([])
   const itemsLoading = ref(false)
@@ -33,7 +33,7 @@ export default function useHomeData() {
   const sortBy = ref<'newest' | 'oldest'>('newest')
   const filterByMonth = ref<string>('all')
   const searchQuery = ref('')
-  
+
   // --- Initialize Notifications (For setup purposes) ---
   // NOTE: This setup is here because it depends on currentUser and isCurrentUserAdmin
   // The actual notification data and functions will be used in Home.vue
@@ -57,7 +57,7 @@ export default function useHomeData() {
       if (error) return false
 
       const currentUserData = users?.find(u => u.id === user.id)
-      const roleId = currentUserData?.user_metadata?.role
+      const roleId = currentUserData?.raw_user_meta_data?.role
 
       return roleId === 1
     } catch (error) {
@@ -76,9 +76,9 @@ export default function useHomeData() {
     if (user) {
       isCurrentUserAdmin.value = await checkIfUserIsAdmin(user)
       showNotificationBell.value = !isCurrentUserAdmin.value
-      
+
       if (!isCurrentUserAdmin.value) {
-        await setupItemNotifications() 
+        await setupItemNotifications()
       }
     }
   }
@@ -103,7 +103,7 @@ export default function useHomeData() {
           return
         }
 
-        const adminUsers = users?.filter(user => user.user_metadata?.role === 1) || []
+        const adminUsers = users?.filter(user => user.raw_user_meta_data?.role === 1) || []
 
         if (adminUsers.length === 0) {
           items.value = []
@@ -176,7 +176,7 @@ export default function useHomeData() {
     // 1. Filter by search query
     if (searchQuery.value.trim()) {
       const query = searchQuery.value.toLowerCase()
-      filtered = filtered.filter(item => 
+      filtered = filtered.filter(item =>
         item.title.toLowerCase().includes(query) ||
         item.description.toLowerCase().includes(query)
       )
@@ -221,14 +221,14 @@ export default function useHomeData() {
    * Dynamic title for the page header.
    */
   const pageTitle = computed(() => isCurrentUserAdmin.value ? 'Manage Lost & Found Items' : 'Lost & Found')
-  
+
   /**
    * Dynamic subtitle for the page header.
    */
   const pageSubtitle = computed(() => isCurrentUserAdmin.value ? 'Manage your posted items and view conversations' : 'Find your lost items or help others find theirs')
 
   // --- Watchers and Lifecycle ---
-  
+
   // Reset page when filters change
   watch([filterByMonth, sortBy, searchQuery], () => {
     page.value = 1
@@ -239,18 +239,18 @@ export default function useHomeData() {
     if (user) {
         // Re-run setupItemNotifications if user changes and they are not an admin
         if (!isAdmin) {
-             await setupItemNotifications() 
+             await setupItemNotifications()
         }
         await fetchItems()
     }
   }, { immediate: false })
-  
+
   onMounted(async () => {
     // Initial fetch of user and data on component mount
     await getCurrentUser()
     // Initial fetchItems is handled by the watch on currentUser/isCurrentUserAdmin
   })
-  
+
   // Expose all necessary state and methods
   return {
     // State
@@ -259,7 +259,7 @@ export default function useHomeData() {
     currentUser,
     showNotificationBell,
     showNotificationDialog, // Still needed in Home.vue for the dialog v-model
-    
+
     // Data
     filteredItems,
     paginatedItems,
@@ -273,11 +273,11 @@ export default function useHomeData() {
     searchQuery,
     totalPages,
     getMonthName,
-    
+
     // Actions
     fetchItems,
     clearAllFilters,
-    
+
     // Computed Properties for UI
     pageTitle,
     pageSubtitle,
