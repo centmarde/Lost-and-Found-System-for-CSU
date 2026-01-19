@@ -55,7 +55,7 @@ export async function markItemAsClaimed(
   claimedByUserId: string
 ): Promise<void> {
   updatingItems.value.add(itemId)
-  
+
   try {
     const { error } = await supabase
       .from('items')
@@ -84,7 +84,7 @@ export const markAsClaimedBy = markItemAsClaimed
  */
 export async function markItemAsUnclaimed(itemId: number): Promise<void> {
   updatingItems.value.add(itemId)
-  
+
   try {
     const { error } = await supabase
       .from('items')
@@ -98,6 +98,27 @@ export async function markItemAsUnclaimed(itemId: number): Promise<void> {
   } catch (error) {
     console.error('Error marking item as unclaimed:', error)
     throw new Error('Failed to update item status to unclaimed')
+  } finally {
+    updatingItems.value.delete(itemId)
+  }
+}
+
+/**
+ * Deletes an item from the database
+ */
+export async function deleteItem(itemId: number): Promise<void> {
+  updatingItems.value.add(itemId)
+
+  try {
+    const { error } = await supabase
+      .from('items')
+      .delete()
+      .eq('id', itemId)
+
+    if (error) throw error
+  } catch (error) {
+    console.error('Error deleting item:', error)
+    throw new Error('Failed to delete item')
   } finally {
     updatingItems.value.delete(itemId)
   }

@@ -26,7 +26,13 @@ export const individualNavItems: NavigationItem[] = [
     icon: 'mdi-account',
     route: '/profiles',
     permission: 'app.profiles.access'
-  }
+  },
+   {
+        title: 'Support Inbox',
+        icon: 'mdi-inbox',
+        route: '/admin/support-inbox',
+        permission: 'admin.support.manage'
+      }
 ]
 
 // Grouped navigation items
@@ -54,6 +60,7 @@ export const navigationConfig: NavigationGroup[] = [
         route: '/admin/roles',
         permission: 'admin.roles.manage'
       }
+
     ]
   }
 ]

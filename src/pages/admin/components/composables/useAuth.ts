@@ -19,7 +19,7 @@ export function useAuth() {
       if (error) return false
 
       const currentUserData = users?.find(u => u.id === user.id)
-      const roleId = currentUserData?.user_metadata?.role
+      const roleId = currentUserData?.raw_user_meta_data?.role
 
       return roleId === 1
     } catch (error) {

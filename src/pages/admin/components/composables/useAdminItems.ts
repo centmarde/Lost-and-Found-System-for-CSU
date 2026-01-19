@@ -1,18 +1,19 @@
 import { ref } from 'vue'
 import { supabase } from '@/lib/supabase'
-import { 
-  createItem, 
-  markItemAsClaimed, 
+import {
+  createItem,
+  markItemAsClaimed,
   markItemAsUnclaimed,
+  deleteItem,
   updatingItems,
   type NewItemForm,
   type Item
 } from '@/stores/items'
 import { loadConversationsForItem } from '@/stores/conversation'
-import { 
-  loadMessages, 
-  sendMessage, 
-  setupMessageSubscription 
+import {
+  loadMessages,
+  sendMessage,
+  setupMessageSubscription
 } from '@/stores/messages'
 import type { Message, Conversation } from '@/types/chat'
 
@@ -26,6 +27,10 @@ export const useAdminItemActions = (refreshData: () => Promise<void>) => {
     status: 'lost'
   })
 
+  // Error handling state
+  const showErrorDialog = ref(false)
+  const errorMessage = ref('')
+
   // Conversations state
   const showConversationsDialog = ref(false)
   const selectedItem = ref<Item | null>(null)
@@ -38,6 +43,12 @@ export const useAdminItemActions = (refreshData: () => Promise<void>) => {
   const sendingMessage = ref(false)
 
   let messageSubscription: any = null
+
+  // Show error dialog helper
+  const showError = (message: string) => {
+    errorMessage.value = message
+    showErrorDialog.value = true
+  }
 
   // Post a new missing/found item using store function
   const postMissingItem = async () => {
@@ -68,8 +79,8 @@ export const useAdminItemActions = (refreshData: () => Promise<void>) => {
 
     } catch (error) {
       console.error('Error posting item:', error)
-      const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred'
-      alert(`Error posting item: ${errorMessage}`)
+      const errorMsg = error instanceof Error ? error.message : 'An unknown error occurred'
+      showError(`Error posting item: ${errorMsg}`)
     } finally {
       postingItem.value = false
     }
@@ -136,7 +147,7 @@ export const useAdminItemActions = (refreshData: () => Promise<void>) => {
 
     try {
       const { data: { user } } = await supabase.auth.getUser()
-      
+
       if (!user) {
         throw new Error('User not authenticated')
       }
@@ -163,7 +174,7 @@ export const useAdminItemActions = (refreshData: () => Promise<void>) => {
   const setupMessageSubscriptionForConversation = async (conversationId: string) => {
     try {
       const { data: { user } } = await supabase.auth.getUser()
-      
+
       if (!user) return
 
       messageSubscription = setupMessageSubscription(
@@ -210,7 +221,7 @@ export const useAdminItemActions = (refreshData: () => Promise<void>) => {
       await refreshData()
     } catch (error) {
       console.error('Error marking item as claimed:', error)
-      alert('Error updating item status')
+      showError('Error updating item status')
     }
   }
 
@@ -221,7 +232,18 @@ export const useAdminItemActions = (refreshData: () => Promise<void>) => {
       await refreshData()
     } catch (error) {
       console.error('Error marking item as unclaimed:', error)
-      alert('Error updating item status')
+      showError('Error updating item status')
+    }
+  }
+
+  // Delete item using store function
+  const deleteItemById = async (itemId: number) => {
+    try {
+      await deleteItem(itemId)
+      await refreshData()
+    } catch (error) {
+      console.error('Error deleting item:', error)
+      showError('Error deleting item')
     }
   }
 
@@ -231,12 +253,17 @@ export const useAdminItemActions = (refreshData: () => Promise<void>) => {
     showPostDialog,
     newItemForm,
     postMissingItem,
-    
+
     // Item status
     updatingItems,
     markAsClaimed,
     markAsUnclaimed,
-    
+    deleteItemById,
+
+    // Error handling
+    showErrorDialog,
+    errorMessage,
+
     // Conversations
     showConversationsDialog,
     selectedItem,

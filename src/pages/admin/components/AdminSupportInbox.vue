@@ -20,6 +20,12 @@ interface Conversation {
     full_name?: string
     email: string
   }
+  item?: {
+    id: number
+    title: string
+    description?: string
+    status: 'lost' | 'found'
+  } | null
   latest_message?: {
     message: string
     created_at: string
@@ -72,8 +78,8 @@ const closeDialog = () => {
 }
 
 const getStudentName = (conversation: Conversation) => {
-  return conversation.sender_profile?.full_name || 
-         conversation.sender_profile?.email || 
+  return conversation.sender_profile?.full_name ||
+         conversation.sender_profile?.email ||
          'Unknown Student'
 }
 
@@ -142,21 +148,66 @@ const getLatestMessagePreview = (conversation: Conversation) => {
               :key="conversation.id"
               @click="emit('select-conversation', conversation)"
               :active="selectedConversation?.id === conversation.id"
-              class="conversation-item"
+              class="conversation-item py-3"
+              lines="three"
             >
               <template #prepend>
-                <v-avatar color="primary" size="40">
-                  <v-icon color="white">mdi-account</v-icon>
+                <v-avatar
+                  :color="conversation.item ? (conversation.item.status === 'lost' ? 'error' : 'success') : 'primary'"
+                  size="45"
+                  class="me-3"
+                >
+                  <v-icon color="white">
+                    {{ conversation.item ? (conversation.item.status === 'lost' ? 'mdi-help-circle' : 'mdi-check-circle') : 'mdi-account' }}
+                  </v-icon>
                 </v-avatar>
               </template>
 
-              <v-list-item-title class="text-subtitle-2 font-weight-medium mb-1">
-                {{ getStudentName(conversation) }}
-              </v-list-item-title>
-              
-              <v-list-item-subtitle class="text-caption text-grey-darken-1">
-                {{ getLatestMessagePreview(conversation) }}
-              </v-list-item-subtitle>
+              <!-- Main Content -->
+              <div class="d-flex flex-column">
+                <!-- User Name -->
+                <v-list-item-title class="text-subtitle-2 font-weight-bold mb-1">
+                  {{ getStudentName(conversation) }}
+                </v-list-item-title>
+
+                <!-- Item Information - Made More Prominent -->
+                <div v-if="conversation.item" class="mb-2">
+                  <v-chip
+                    :color="conversation.item.status === 'lost' ? 'error' : 'success'"
+                    variant="elevated"
+                    size="small"
+                    class="me-2 font-weight-bold"
+                  >
+                    <v-icon start>
+                      {{ conversation.item.status === 'lost' ? 'mdi-help-circle' : 'mdi-check-circle' }}
+                    </v-icon>
+                    {{ conversation.item.status.toUpperCase() }} ITEM
+                  </v-chip>
+                  <div class="text-subtitle-2 font-weight-medium text-primary mt-1">
+                    📦 {{ conversation.item.title }}
+                  </div>
+                  <div v-if="conversation.item.description" class="text-caption text-grey-darken-1 mt-1">
+                    {{ conversation.item.description.substring(0, 50) }}{{ conversation.item.description.length > 50 ? '...' : '' }}
+                  </div>
+                </div>
+
+                <div v-else class="mb-2">
+                  <v-chip
+                    color="info"
+                    variant="elevated"
+                    size="small"
+                    class="font-weight-bold"
+                  >
+                    <v-icon start>mdi-lifebuoy</v-icon>
+                    GENERAL SUPPORT
+                  </v-chip>
+                </div>
+
+                <!-- Latest Message Preview -->
+                <v-list-item-subtitle class="text-caption text-grey-darken-1">
+                  {{ getLatestMessagePreview(conversation) }}
+                </v-list-item-subtitle>
+              </div>
 
               <template #append>
                 <div class="text-caption text-grey">
@@ -188,18 +239,63 @@ const getLatestMessagePreview = (conversation: Conversation) => {
           <!-- Conversation Selected -->
           <template v-else>
             <!-- Conversation Header -->
-            <div class="conversation-header pa-4 bg-grey-lighten-5 d-flex align-center">
-              <v-avatar color="primary" size="40" class="me-3">
-                <v-icon color="white">mdi-account</v-icon>
-              </v-avatar>
-              <div>
-                <div class="text-subtitle-1 font-weight-medium">
-                  {{ getStudentName(selectedConversation) }}
-                </div>
-                <div class="text-caption text-grey-darken-1">
-                  {{ selectedConversation.sender_profile?.email }}
+            <div class="conversation-header pa-4 bg-grey-lighten-5">
+              <!-- User Info Header -->
+              <div class="d-flex align-center mb-3">
+                <v-avatar
+                  :color="selectedConversation.item ? (selectedConversation.item.status === 'lost' ? 'error' : 'success') : 'primary'"
+                  size="40"
+                  class="me-3"
+                >
+                  <v-icon color="white">
+                    {{ selectedConversation.item ? (selectedConversation.item.status === 'lost' ? 'mdi-help-circle' : 'mdi-check-circle') : 'mdi-account' }}
+                  </v-icon>
+                </v-avatar>
+                <div>
+                  <div class="text-subtitle-1 font-weight-bold">
+                    {{ getStudentName(selectedConversation) }}
+                  </div>
+                  <div class="text-caption text-grey-darken-1">
+                    {{ selectedConversation.sender_profile?.email }}
+                  </div>
                 </div>
               </div>
+
+              <!-- Item Information Card -->
+              <v-card v-if="selectedConversation.item" variant="tonal" :color="selectedConversation.item.status === 'lost' ? 'error' : 'success'" class="pa-3 mb-2">
+                <div class="d-flex align-center mb-2">
+                  <v-chip
+                    :color="selectedConversation.item.status === 'lost' ? 'error' : 'success'"
+                    variant="elevated"
+                    size="small"
+                    class="font-weight-bold"
+                  >
+                    <v-icon start>
+                      {{ selectedConversation.item.status === 'lost' ? 'mdi-help-circle' : 'mdi-check-circle' }}
+                    </v-icon>
+                    {{ selectedConversation.item.status.toUpperCase() }} ITEM
+                  </v-chip>
+                </div>
+                <div class="text-subtitle-2 font-weight-bold mb-1">
+                  📦 {{ selectedConversation.item.title }}
+                </div>
+                <div v-if="selectedConversation.item.description" class="text-body-2">
+                  {{ selectedConversation.item.description }}
+                </div>
+              </v-card>
+
+              <!-- General Support Card -->
+              <v-card v-else variant="tonal" color="info" class="pa-3 mb-2">
+                <div class="d-flex align-center mb-2">
+                  <v-chip color="info" variant="elevated" size="small" class="font-weight-bold">
+                    <v-icon start>mdi-lifebuoy</v-icon>
+                    GENERAL SUPPORT
+                  </v-chip>
+                </div>
+                <div class="text-body-2">
+                  General support conversation - No specific item involved
+                </div>
+              </v-card>
             </div>
 
             <!-- Messages Container -->
@@ -284,11 +380,22 @@ const getLatestMessagePreview = (conversation: Conversation) => {
 .conversation-item {
   cursor: pointer;
   border-bottom: 1px solid #f0f0f0;
-  min-height: 80px !important;
+  min-height: 100px !important;
+  padding: 12px 16px !important;
+  transition: all 0.3s ease;
 }
 
 .conversation-item:hover {
   background-color: rgb(var(--v-theme-primary) / 0.08);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.conversation-item:active,
+.conversation-item.active {
+  background-color: rgb(var(--v-theme-primary) / 0.15);
+  border-right: 4px solid rgb(var(--v-theme-primary));
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.15);
 }
 
 .messages-area {

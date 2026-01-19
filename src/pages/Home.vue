@@ -8,7 +8,6 @@ import UserChatDialog from "@/pages/student/components/userChatDialog.vue";
 import AdminChatDialog from "@/pages/admin/components/AdminChatDialog.vue";
 import NotificationDialog from "@/pages/student/components/NotifDialog.vue";
 import FloatingAdminChat from "@/pages/student/components/FloatingAdminChat.vue";
-import AdminSupportInbox from "@/pages/admin/components/AdminSupportInbox.vue";
 
 // Composables
 import { useAuth } from "@/pages/admin/components/composables/useAuth";
@@ -19,7 +18,6 @@ import { useAdminChat } from "@/pages/admin/components/composables/useAdminChat"
 import { useAdminItemActions } from "@/pages/admin/components/composables/useAdminItems";
 import { useNotifications } from "@/pages/student/components/composables/useNotification";
 import { useAdminSupport } from "@/pages/student/components/composables/useAdminSupport";
-import { useAdminSupportInbox } from "@/pages/admin/components/composables/useAdminSupportInbox";
 import { useFilterSortPagination } from "@/utils/helpers";
 
 import "@/styles/home.css";
@@ -44,6 +42,7 @@ const {
   sortBy,
   selectedMonth,
   selectedDay,
+  searchQuery,
   availableMonths,
   availableDays,
   filteredAndSortedItems,
@@ -52,6 +51,21 @@ const {
   formatMonthLabel,
   formatDayLabel,
 } = useFilterSortPagination(items, 12);
+
+// Current date helpers
+const currentDate = new Date();
+const currentMonthValue = computed(() =>
+  `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}`
+);
+const currentDayValue = computed(() =>
+  `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}-${String(currentDate.getDate()).padStart(2, '0')}`
+);
+const currentMonthLabel = computed(() =>
+  currentDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+);
+const currentDayLabel = computed(() =>
+  currentDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+);
 
 // User chat composable
 const {
@@ -125,21 +139,6 @@ const {
   closeSupportChat,
 } = useAdminSupport(currentUser);
 
-// Admin Support Inbox
-const {
-  showInbox: showAdminSupportInbox,
-  supportConversations,
-  selectedConversation: selectedSupportConversation,
-  messages: supportInboxMessages,
-  loadingConversations: loadingSupportConversations,
-  loadingMessages: loadingSupportMessages,
-  sendingMessage: sendingSupportInboxMessage,
-  openInbox,
-  closeInbox,
-  selectConversation: selectSupportConversation,
-  sendMessageToStudent,
-} = useAdminSupportInbox(currentUser);
-
 // Watch for user changes to setup notifications and show support button
 watch(
   [currentUser, isCurrentUserAdmin],
@@ -167,31 +166,6 @@ onMounted(async () => {
         <v-row class="mb-6">
           <v-col cols="12">
             <div class="pa-6 pa-sm-8 pa-md-12 position-relative">
-              <!-- Admin Support Inbox Button (positioned absolutely) -->
-              <div v-if="isCurrentUserAdmin" class="position-absolute" style="top: 24px; right: 24px;">
-                <v-btn
-                  color="primary"
-                  variant="elevated"
-                  prepend-icon="mdi-inbox"
-                  @click="openInbox"
-                  size="default"
-                  class="d-none d-sm-flex"
-                >
-                  <span class="d-none d-md-inline">Support Inbox</span>
-                  <span class="d-md-none">Inbox</span>
-                </v-btn>
-
-                <!-- Mobile admin button -->
-                <v-btn
-                  color="primary"
-                  variant="elevated"
-                  icon="mdi-inbox"
-                  @click="openInbox"
-                  size="small"
-                  class="d-sm-none"
-                />
-              </div>
-
               <!-- Perfectly Centered Header Content -->
               <div class="text-center mb-4 mb-md-6">
                 <h1 class="text-h2 text-sm-h1 font-weight-bold text-green-darken-4 mb-2">
@@ -227,6 +201,23 @@ onMounted(async () => {
         <v-row class="mb-4">
           <v-col cols="12">
             <v-card elevation="1" class="pa-4">
+              <!-- Search Bar - Full width at top -->
+              <v-row class="mb-4">
+                <v-col cols="12">
+                  <v-text-field
+                    v-model="searchQuery"
+                    label="Search items..."
+                    placeholder="Search by title, description, location, or user..."
+                    variant="outlined"
+                    density="comfortable"
+                    prepend-inner-icon="mdi-magnify"
+                    clearable
+                    hide-details
+                  />
+                </v-col>
+              </v-row>
+
+              <!-- Existing filters row -->
               <v-row align="center">
                 <v-col cols="12" sm="6" md="3">
                   <v-select
@@ -248,10 +239,16 @@ onMounted(async () => {
                     v-model="selectedMonth"
                     :items="[
                       { title: 'All Months', value: 'all' },
-                      ...availableMonths.map((m) => ({
-                        title: formatMonthLabel(m),
-                        value: m,
-                      })),
+                      {
+                        title: `Current Month (${currentMonthLabel})`,
+                        value: currentMonthValue
+                      },
+                      ...availableMonths
+                        .filter(m => m !== currentMonthValue)
+                        .map((m) => ({
+                          title: formatMonthLabel(m),
+                          value: m,
+                        })),
                     ]"
                     label="Filter by Month"
                     variant="outlined"
@@ -266,10 +263,18 @@ onMounted(async () => {
                     v-model="selectedDay"
                     :items="[
                       { title: 'All Days', value: 'all' },
-                      ...availableDays.map((d) => ({
-                        title: formatDayLabel(d),
-                        value: d,
-                      })),
+                      ...(selectedMonth === currentMonthValue
+                        ? [{
+                            title: `Today (${currentDayLabel})`,
+                            value: currentDayValue
+                          }]
+                        : []),
+                      ...availableDays
+                        .filter(d => selectedMonth !== currentMonthValue || d !== currentDayValue)
+                        .map((d) => ({
+                          title: formatDayLabel(d),
+                          value: d,
+                        })),
                     ]"
                     label="Filter by Day"
                     variant="outlined"
@@ -296,7 +301,7 @@ onMounted(async () => {
               </v-row>
 
               <v-row
-                v-if="selectedMonth !== 'all' || selectedDay !== 'all'"
+                v-if="selectedMonth !== 'all' || selectedDay !== 'all' || searchQuery.trim()"
                 class="mt-2"
               >
                 <v-col cols="12">
@@ -304,6 +309,18 @@ onMounted(async () => {
                     <span class="text-caption text-grey-darken-1"
                       >Active filters:</span
                     >
+
+                    <v-chip
+                      v-if="searchQuery.trim()"
+                      closable
+                      size="small"
+                      color="primary"
+                      variant="tonal"
+                      @click:close="searchQuery = ''"
+                    >
+                      <v-icon start size="small">mdi-magnify</v-icon>
+                      "{{ searchQuery.trim() }}"
+                    </v-chip>
 
                     <v-chip
                       v-if="selectedMonth !== 'all'"
@@ -336,6 +353,7 @@ onMounted(async () => {
                       @click="
                         selectedMonth = 'all';
                         selectedDay = 'all';
+                        searchQuery = '';
                       "
                     >
                       Clear all
@@ -398,7 +416,7 @@ onMounted(async () => {
                   {{
                     items.length === 0
                       ? emptyStateConfig.noItemsMessage
-                      : "Try adjusting your filters to see more items."
+                      : "Try adjusting your search or filters to see more items."
                   }}
                 </p>
                 <v-btn
@@ -418,6 +436,7 @@ onMounted(async () => {
                   @click="
                     selectedMonth = 'all';
                     selectedDay = 'all';
+                    searchQuery = '';
                   "
                 >
                   Clear Filters
@@ -522,20 +541,6 @@ onMounted(async () => {
           :initializing-chat="initializingChat"
           @send-message="sendSupportMessage"
           @open-chat="openSupportChat"
-        />
-
-        <!-- Admin Support Inbox -->
-        <AdminSupportInbox
-          v-if="isCurrentUserAdmin"
-          v-model:show="showAdminSupportInbox"
-          :conversations="supportConversations"
-          :selected-conversation="selectedSupportConversation"
-          :messages="supportInboxMessages"
-          :loading-conversations="loadingSupportConversations"
-          :loading-messages="loadingSupportMessages"
-          :sending-message="sendingSupportInboxMessage"
-          @select-conversation="selectSupportConversation"
-          @send-message="sendMessageToStudent"
         />
       </v-container>
     </template>
