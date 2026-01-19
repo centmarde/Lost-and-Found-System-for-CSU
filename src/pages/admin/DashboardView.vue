@@ -140,18 +140,7 @@ onMounted(async () => {
               <span class="d-none d-sm-inline">Post Missing Item</span>
               <span class="d-inline d-sm-none">Post Item</span>
             </v-btn>
-            <v-btn
-              color="primary"
-              variant="outlined"
-              prepend-icon="mdi-refresh"
-              @click="fetchDashboardStats"
-              :loading="loading"
-              size="small"
-              class="text-caption text-sm-body-2"
-              block
-            >
-              Refresh
-            </v-btn>
+
           </div>
         </div>
 

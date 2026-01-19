@@ -8,7 +8,6 @@ import UserChatDialog from "@/pages/student/components/userChatDialog.vue";
 import AdminChatDialog from "@/pages/admin/components/AdminChatDialog.vue";
 import NotificationDialog from "@/pages/student/components/NotifDialog.vue";
 import FloatingAdminChat from "@/pages/student/components/FloatingAdminChat.vue";
-import AdminSupportInbox from "@/pages/admin/components/AdminSupportInbox.vue";
 
 // Composables
 import { useAuth } from "@/pages/admin/components/composables/useAuth";
@@ -19,7 +18,6 @@ import { useAdminChat } from "@/pages/admin/components/composables/useAdminChat"
 import { useAdminItemActions } from "@/pages/admin/components/composables/useAdminItems";
 import { useNotifications } from "@/pages/student/components/composables/useNotification";
 import { useAdminSupport } from "@/pages/student/components/composables/useAdminSupport";
-import { useAdminSupportInbox } from "@/pages/admin/components/composables/useAdminSupportInbox";
 import { useFilterSortPagination } from "@/utils/helpers";
 
 import "@/styles/home.css";
@@ -141,21 +139,6 @@ const {
   closeSupportChat,
 } = useAdminSupport(currentUser);
 
-// Admin Support Inbox
-const {
-  showInbox: showAdminSupportInbox,
-  supportConversations,
-  selectedConversation: selectedSupportConversation,
-  messages: supportInboxMessages,
-  loadingConversations: loadingSupportConversations,
-  loadingMessages: loadingSupportMessages,
-  sendingMessage: sendingSupportInboxMessage,
-  openInbox,
-  closeInbox,
-  selectConversation: selectSupportConversation,
-  sendMessageToStudent,
-} = useAdminSupportInbox(currentUser);
-
 // Watch for user changes to setup notifications and show support button
 watch(
   [currentUser, isCurrentUserAdmin],
@@ -183,31 +166,6 @@ onMounted(async () => {
         <v-row class="mb-6">
           <v-col cols="12">
             <div class="pa-6 pa-sm-8 pa-md-12 position-relative">
-              <!-- Admin Support Inbox Button (positioned absolutely) -->
-              <div v-if="isCurrentUserAdmin" class="position-absolute" style="top: 24px; right: 24px;">
-                <v-btn
-                  color="primary"
-                  variant="elevated"
-                  prepend-icon="mdi-inbox"
-                  @click="openInbox"
-                  size="default"
-                  class="d-none d-sm-flex"
-                >
-                  <span class="d-none d-md-inline">Support Inbox</span>
-                  <span class="d-md-none">Inbox</span>
-                </v-btn>
-
-                <!-- Mobile admin button -->
-                <v-btn
-                  color="primary"
-                  variant="elevated"
-                  icon="mdi-inbox"
-                  @click="openInbox"
-                  size="small"
-                  class="d-sm-none"
-                />
-              </div>
-
               <!-- Perfectly Centered Header Content -->
               <div class="text-center mb-4 mb-md-6">
                 <h1 class="text-h2 text-sm-h1 font-weight-bold text-green-darken-4 mb-2">
@@ -583,20 +541,6 @@ onMounted(async () => {
           :initializing-chat="initializingChat"
           @send-message="sendSupportMessage"
           @open-chat="openSupportChat"
-        />
-
-        <!-- Admin Support Inbox -->
-        <AdminSupportInbox
-          v-if="isCurrentUserAdmin"
-          v-model:show="showAdminSupportInbox"
-          :conversations="supportConversations"
-          :selected-conversation="selectedSupportConversation"
-          :messages="supportInboxMessages"
-          :loading-conversations="loadingSupportConversations"
-          :loading-messages="loadingSupportMessages"
-          :sending-message="sendingSupportInboxMessage"
-          @select-conversation="selectSupportConversation"
-          @send-message="sendMessageToStudent"
         />
       </v-container>
     </template>

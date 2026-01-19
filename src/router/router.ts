@@ -12,6 +12,7 @@ import ProfilesView from '@/pages/ProfilesView.vue';
 
 import UserManagement from '@/pages/admin/UserManagement.vue';
 import RolePagesView from '@/pages/admin/RolePagesView.vue';
+import SupportInboxView from '@/pages/admin/SupportInboxView.vue';
 // TODO: Add these components when they're created
 // import UserManagementView from '@/pages/admin/UserManagementView.vue';
 // import RolePagesView from '@/pages/admin/RolePagesView.vue';
@@ -51,6 +52,11 @@ const routes = setupLayouts([
   {
     path: '/admin/roles',
     component: RolePagesView,
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/admin/support-inbox',
+    component: SupportInboxView,
     meta: { requiresAuth: true }
   },
 
