@@ -20,7 +20,7 @@ interface Notification {
   read: boolean
 }
 
-export function useNotifications(currentUserRef: Ref<any>, isCurrentUserAdminRef: Ref<boolean>) { 
+export function useNotifications(currentUserRef: Ref<any>, isCurrentUserAdminRef: Ref<boolean>) {
   const toast = useToast()
   let itemSubscription: any = null
   const notifications = ref<Notification[]>([])
@@ -37,7 +37,7 @@ export function useNotifications(currentUserRef: Ref<any>, isCurrentUserAdminRef
       }
 
       const userData = users?.find(u => u.id === userId)
-      const roleId = userData?.user_metadata?.role
+      const roleId = userData?.raw_user_meta_data?.role
 
       return roleId === 1
     } catch (error) {
@@ -74,7 +74,7 @@ export function useNotifications(currentUserRef: Ref<any>, isCurrentUserAdminRef
           },
           async (payload) => {
             console.log('Received new item notification:', payload)
-            
+
             try {
               const newItem = payload.new as Item
 
@@ -86,7 +86,7 @@ export function useNotifications(currentUserRef: Ref<any>, isCurrentUserAdminRef
                 // Show notification to user
                 const statusText = newItem.status === 'lost' ? 'Lost Item' : 'Found Item'
                 const statusIcon = newItem.status === 'lost' ? '🔴' : '🟢'
-                
+
                 toast.info(
                   `${statusIcon} New ${statusText}: ${newItem.title}`,
                   {
