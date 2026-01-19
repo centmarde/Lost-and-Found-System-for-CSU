@@ -119,17 +119,7 @@ onMounted(() => {
               <v-col cols="12" lg="10" xl="8">
                 <div class="hero-content">
                   <!-- Badge -->
-                  <div class="hero-badge" :class="{ visible: isVisible }">
-                    <v-chip
-                      size="large"
-                      rounded="xl"
-                      color="primary"
-                      variant="tonal"
-                    >
-                      <v-icon start>mdi-trending-up</v-icon>
-                      Lost & Found CSU
-                    </v-chip>
-                  </div>
+                  
 
                   <!-- Main Title -->
                   <div class="hero-title-section">

@@ -19,9 +19,18 @@ declare module 'vue-router/auto-routes' {
    */
   export interface RouteNamedMap {
     '/': RouteRecordInfo<'/', '/', Record<never, never>, Record<never, never>>,
+    '/admin/components/AdminCard': RouteRecordInfo<'/admin/components/AdminCard', '/admin/components/AdminCard', Record<never, never>, Record<never, never>>,
+    '/admin/components/AdminChatDialog': RouteRecordInfo<'/admin/components/AdminChatDialog', '/admin/components/AdminChatDialog', Record<never, never>, Record<never, never>>,
+    '/admin/components/AdminSupportInbox': RouteRecordInfo<'/admin/components/AdminSupportInbox', '/admin/components/AdminSupportInbox', Record<never, never>, Record<never, never>>,
+    '/admin/components/ClaimItemDialog': RouteRecordInfo<'/admin/components/ClaimItemDialog', '/admin/components/ClaimItemDialog', Record<never, never>, Record<never, never>>,
+    '/admin/components/ConvoDialog': RouteRecordInfo<'/admin/components/ConvoDialog', '/admin/components/ConvoDialog', Record<never, never>, Record<never, never>>,
+    '/admin/components/DashboardItemCards': RouteRecordInfo<'/admin/components/DashboardItemCards', '/admin/components/DashboardItemCards', Record<never, never>, Record<never, never>>,
     '/admin/components/dialogs/AdminUserRolesDialog': RouteRecordInfo<'/admin/components/dialogs/AdminUserRolesDialog', '/admin/components/dialogs/AdminUserRolesDialog', Record<never, never>, Record<never, never>>,
-    '/admin/components/ItemCard': RouteRecordInfo<'/admin/components/ItemCard', '/admin/components/ItemCard', Record<never, never>, Record<never, never>>,
+    '/admin/components/dialogs/UserDetailsDialog': RouteRecordInfo<'/admin/components/dialogs/UserDetailsDialog', '/admin/components/dialogs/UserDetailsDialog', Record<never, never>, Record<never, never>>,
     '/admin/components/PostItemDialog': RouteRecordInfo<'/admin/components/PostItemDialog', '/admin/components/PostItemDialog', Record<never, never>, Record<never, never>>,
+    '/admin/components/ProfileFormUpdate': RouteRecordInfo<'/admin/components/ProfileFormUpdate', '/admin/components/ProfileFormUpdate', Record<never, never>, Record<never, never>>,
+    '/admin/components/ProfilesWidget': RouteRecordInfo<'/admin/components/ProfilesWidget', '/admin/components/ProfilesWidget', Record<never, never>, Record<never, never>>,
+    '/admin/components/ProfilesWidget.example': RouteRecordInfo<'/admin/components/ProfilesWidget.example', '/admin/components/ProfilesWidget/example', Record<never, never>, Record<never, never>>,
     '/admin/components/RecentActivity': RouteRecordInfo<'/admin/components/RecentActivity', '/admin/components/RecentActivity', Record<never, never>, Record<never, never>>,
     '/admin/components/SearchBar': RouteRecordInfo<'/admin/components/SearchBar', '/admin/components/SearchBar', Record<never, never>, Record<never, never>>,
     '/admin/components/StatsCards': RouteRecordInfo<'/admin/components/StatsCards', '/admin/components/StatsCards', Record<never, never>, Record<never, never>>,
@@ -36,5 +45,9 @@ declare module 'vue-router/auto-routes' {
     '/Home': RouteRecordInfo<'/Home', '/Home', Record<never, never>, Record<never, never>>,
     '/NotFound': RouteRecordInfo<'/NotFound', '/NotFound', Record<never, never>, Record<never, never>>,
     '/ProfilesView': RouteRecordInfo<'/ProfilesView', '/ProfilesView', Record<never, never>, Record<never, never>>,
+    '/student/components/FloatingAdminChat': RouteRecordInfo<'/student/components/FloatingAdminChat', '/student/components/FloatingAdminChat', Record<never, never>, Record<never, never>>,
+    '/student/components/ItemCard': RouteRecordInfo<'/student/components/ItemCard', '/student/components/ItemCard', Record<never, never>, Record<never, never>>,
+    '/student/components/NotifDialog': RouteRecordInfo<'/student/components/NotifDialog', '/student/components/NotifDialog', Record<never, never>, Record<never, never>>,
+    '/student/components/userChatDialog': RouteRecordInfo<'/student/components/userChatDialog', '/student/components/userChatDialog', Record<never, never>, Record<never, never>>,
   }
 }

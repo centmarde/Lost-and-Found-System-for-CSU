@@ -281,7 +281,7 @@ function scrollToSection(sectionId: string) {
       <!-- Mobile Navigation Items -->
       <v-list class="pa-4" nav>
         <!-- Navigation Links -->
-        <v-list-item
+        <!-- <v-list-item
           v-for="item in navbarConfig.navigationItems"
           :key="item.label"
           :title="item.label"
@@ -292,9 +292,9 @@ function scrollToSection(sectionId: string) {
           <template #prepend>
             <v-icon size="20">mdi-chevron-right</v-icon>
           </template>
-        </v-list-item>
+        </v-list-item> -->
 
-        <v-divider class="my-4" />
+        <!-- <v-divider class="my-4" /> -->
 
         <!-- Theme Toggle -->
         <v-list-item
