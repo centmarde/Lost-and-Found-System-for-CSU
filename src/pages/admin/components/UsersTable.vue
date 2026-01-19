@@ -164,31 +164,36 @@ onMounted(() => {
 <template>
   <div>
      <!-- Header Section -->
-    <v-row class="mb-6">
+    <v-row class="mb-4 mb-md-6">
       <v-col cols="12">
-        <div class="d-flex justify-space-between align-center">
-          <div>
-            <h1 class="text-h3 text-md-h2 font-weight-bold text-primary mb-2">User Management</h1>
-            <p class="text-body-1 text-grey-darken-1">
+        <div class="d-flex flex-column flex-sm-row justify-center justify-sm-space-between align-center gap-3 gap-sm-0">
+          <div class="flex-grow-1 text-center text-sm-start">
+            <h1 class="text-h5 text-sm-h4 text-md-h3 text-lg-h2 font-weight-bold text-primary mb-1 mb-sm-2 user-management-title">
+              User Management
+            </h1>
+            <p class="text-body-2 text-sm-body-1 text-grey-darken-1 mb-0">
               Manage system users and details
             </p>
           </div>
 
+          <!-- Refresh button -->
+          <div class="d-flex align-center flex-shrink-0">
+            <v-btn
+              color="primary"
+              variant="tonal"
+              @click="refreshUsers"
+              :loading="loading"
+              class="refresh-btn"
+              size="small"
+            >
+              Refresh
+            </v-btn>
+          </div>
         </div>
       </v-col>
     </v-row>
 
-      <v-card-title class="d-flex align-center justify-space-between">
-        <div class="text-h5 text-green-darken-4">User Management</div>
-        <v-btn
-          color="primary"
-          prepend-icon="mdi-refresh"
-          @click="refreshUsers"
-          :loading="loading"
-        >
-          Refresh
-        </v-btn>
-      </v-card-title>
+
 
       <v-card-text>
         <!-- Loading indicator -->
@@ -500,8 +505,55 @@ onMounted(() => {
   }
 }
 
-/* Extra small screens */
+/* Header responsive styles */
+.user-management-title {
+  word-break: break-word;
+  line-height: 1.2;
+}
+
+.refresh-btn {
+  flex-shrink: 0 !important;
+  min-width: 36px !important;
+  height: 36px !important;
+}
+
+/* Ensure button is visible on all screen sizes */
+.refresh-btn .v-btn__content {
+  display: flex !important;
+  align-items: center !important;
+  gap: 4px !important;
+}
+
+/* Mobile-first responsive breakpoints */
+@media (max-width: 599px) {
+  .user-management-title {
+    font-size: 1.25rem !important;
+    line-height: 1.3;
+    margin-bottom: 4px !important;
+  }
+
+  .refresh-btn {
+    min-width: auto !important;
+    padding: 0 12px !important;
+  }
+
+  .refresh-btn .v-btn__content {
+    font-size: 0.875rem;
+  }
+}
+
+/* Small screens */
 @media (max-width: 480px) {
+  .user-management-title {
+    font-size: 1.125rem !important;
+    line-height: 1.4;
+  }
+
+  .refresh-btn {
+    min-width: 32px !important;
+    padding: 0 8px !important;
+  }
+
   .mobile-action-btn {
     padding: 1px 4px !important;
     height: 22px !important;
@@ -513,6 +565,13 @@ onMounted(() => {
 
   .mobile-actions-container {
     gap: 1px;
+  }
+}
+
+/* Medium screens and up */
+@media (min-width: 600px) {
+  .user-management-title {
+    line-height: 1.2;
   }
 }
 </style>
