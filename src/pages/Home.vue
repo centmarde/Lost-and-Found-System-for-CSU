@@ -44,6 +44,7 @@ const {
   sortBy,
   selectedMonth,
   selectedDay,
+  searchQuery,
   availableMonths,
   availableDays,
   filteredAndSortedItems,
@@ -52,6 +53,21 @@ const {
   formatMonthLabel,
   formatDayLabel,
 } = useFilterSortPagination(items, 12);
+
+// Current date helpers
+const currentDate = new Date();
+const currentMonthValue = computed(() =>
+  `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}`
+);
+const currentDayValue = computed(() =>
+  `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}-${String(currentDate.getDate()).padStart(2, '0')}`
+);
+const currentMonthLabel = computed(() =>
+  currentDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+);
+const currentDayLabel = computed(() =>
+  currentDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+);
 
 // User chat composable
 const {
@@ -227,6 +243,23 @@ onMounted(async () => {
         <v-row class="mb-4">
           <v-col cols="12">
             <v-card elevation="1" class="pa-4">
+              <!-- Search Bar - Full width at top -->
+              <v-row class="mb-4">
+                <v-col cols="12">
+                  <v-text-field
+                    v-model="searchQuery"
+                    label="Search items..."
+                    placeholder="Search by title, description, location, or user..."
+                    variant="outlined"
+                    density="comfortable"
+                    prepend-inner-icon="mdi-magnify"
+                    clearable
+                    hide-details
+                  />
+                </v-col>
+              </v-row>
+
+              <!-- Existing filters row -->
               <v-row align="center">
                 <v-col cols="12" sm="6" md="3">
                   <v-select
@@ -248,10 +281,16 @@ onMounted(async () => {
                     v-model="selectedMonth"
                     :items="[
                       { title: 'All Months', value: 'all' },
-                      ...availableMonths.map((m) => ({
-                        title: formatMonthLabel(m),
-                        value: m,
-                      })),
+                      {
+                        title: `Current Month (${currentMonthLabel})`,
+                        value: currentMonthValue
+                      },
+                      ...availableMonths
+                        .filter(m => m !== currentMonthValue)
+                        .map((m) => ({
+                          title: formatMonthLabel(m),
+                          value: m,
+                        })),
                     ]"
                     label="Filter by Month"
                     variant="outlined"
@@ -266,10 +305,18 @@ onMounted(async () => {
                     v-model="selectedDay"
                     :items="[
                       { title: 'All Days', value: 'all' },
-                      ...availableDays.map((d) => ({
-                        title: formatDayLabel(d),
-                        value: d,
-                      })),
+                      ...(selectedMonth === currentMonthValue
+                        ? [{
+                            title: `Today (${currentDayLabel})`,
+                            value: currentDayValue
+                          }]
+                        : []),
+                      ...availableDays
+                        .filter(d => selectedMonth !== currentMonthValue || d !== currentDayValue)
+                        .map((d) => ({
+                          title: formatDayLabel(d),
+                          value: d,
+                        })),
                     ]"
                     label="Filter by Day"
                     variant="outlined"
@@ -296,7 +343,7 @@ onMounted(async () => {
               </v-row>
 
               <v-row
-                v-if="selectedMonth !== 'all' || selectedDay !== 'all'"
+                v-if="selectedMonth !== 'all' || selectedDay !== 'all' || searchQuery.trim()"
                 class="mt-2"
               >
                 <v-col cols="12">
@@ -304,6 +351,18 @@ onMounted(async () => {
                     <span class="text-caption text-grey-darken-1"
                       >Active filters:</span
                     >
+
+                    <v-chip
+                      v-if="searchQuery.trim()"
+                      closable
+                      size="small"
+                      color="primary"
+                      variant="tonal"
+                      @click:close="searchQuery = ''"
+                    >
+                      <v-icon start size="small">mdi-magnify</v-icon>
+                      "{{ searchQuery.trim() }}"
+                    </v-chip>
 
                     <v-chip
                       v-if="selectedMonth !== 'all'"
@@ -336,6 +395,7 @@ onMounted(async () => {
                       @click="
                         selectedMonth = 'all';
                         selectedDay = 'all';
+                        searchQuery = '';
                       "
                     >
                       Clear all
@@ -398,7 +458,7 @@ onMounted(async () => {
                   {{
                     items.length === 0
                       ? emptyStateConfig.noItemsMessage
-                      : "Try adjusting your filters to see more items."
+                      : "Try adjusting your search or filters to see more items."
                   }}
                 </p>
                 <v-btn
@@ -418,6 +478,7 @@ onMounted(async () => {
                   @click="
                     selectedMonth = 'all';
                     selectedDay = 'all';
+                    searchQuery = '';
                   "
                 >
                   Clear Filters

@@ -38,7 +38,7 @@ export function useItems(isCurrentUserAdmin: any, currentUser: any) {
         }
 
         const adminUsers = users?.filter(user => {
-          const roleId = user.user_metadata?.role
+          const roleId = user.raw_user_meta_data?.role
           return roleId === 1
         }) || []
 

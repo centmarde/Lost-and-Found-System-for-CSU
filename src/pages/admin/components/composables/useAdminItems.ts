@@ -1,18 +1,19 @@
 import { ref } from 'vue'
 import { supabase } from '@/lib/supabase'
-import { 
-  createItem, 
-  markItemAsClaimed, 
+import {
+  createItem,
+  markItemAsClaimed,
   markItemAsUnclaimed,
+  deleteItem,
   updatingItems,
   type NewItemForm,
   type Item
 } from '@/stores/items'
 import { loadConversationsForItem } from '@/stores/conversation'
-import { 
-  loadMessages, 
-  sendMessage, 
-  setupMessageSubscription 
+import {
+  loadMessages,
+  sendMessage,
+  setupMessageSubscription
 } from '@/stores/messages'
 import type { Message, Conversation } from '@/types/chat'
 
@@ -136,7 +137,7 @@ export const useAdminItemActions = (refreshData: () => Promise<void>) => {
 
     try {
       const { data: { user } } = await supabase.auth.getUser()
-      
+
       if (!user) {
         throw new Error('User not authenticated')
       }
@@ -163,7 +164,7 @@ export const useAdminItemActions = (refreshData: () => Promise<void>) => {
   const setupMessageSubscriptionForConversation = async (conversationId: string) => {
     try {
       const { data: { user } } = await supabase.auth.getUser()
-      
+
       if (!user) return
 
       messageSubscription = setupMessageSubscription(
@@ -225,18 +226,30 @@ export const useAdminItemActions = (refreshData: () => Promise<void>) => {
     }
   }
 
+  // Delete item using store function
+  const deleteItemById = async (itemId: number) => {
+    try {
+      await deleteItem(itemId)
+      await refreshData()
+    } catch (error) {
+      console.error('Error deleting item:', error)
+      alert('Error deleting item')
+    }
+  }
+
   return {
     // Item posting
     postingItem,
     showPostDialog,
     newItemForm,
     postMissingItem,
-    
+
     // Item status
     updatingItems,
     markAsClaimed,
     markAsUnclaimed,
-    
+    deleteItemById,
+
     // Conversations
     showConversationsDialog,
     selectedItem,

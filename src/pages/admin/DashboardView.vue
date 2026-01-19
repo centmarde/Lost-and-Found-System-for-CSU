@@ -40,7 +40,8 @@ const {
   showPostDialog,
   updatingItems,
   newItemForm,
-  postMissingItem
+  postMissingItem,
+  deleteItemById
 } = useAdminItemActions(fetchDashboardStats)
 
 // Claim dialog state
@@ -57,6 +58,14 @@ const handleShowClaimDialog = (item: Item) => {
 const onClaimItem = async (itemId: number, claimedBy: string) => {
   await markItemAsClaimed(itemId, claimedBy)
   await fetchDashboardStats()
+}
+
+// Handle delete item with confirmation
+const handleDeleteItem = async (item: Item) => {
+  const confirmed = confirm(`Are you sure you want to delete "${item.title}"? This action cannot be undone.`)
+  if (confirmed) {
+    await deleteItemById(item.id)
+  }
 }
 
 const searchQuery = ref('')
@@ -158,6 +167,7 @@ onMounted(async () => {
                       :item="item"
                       :is-updating="updatingItems.has(item.id)"
                       @show-claim-dialog="handleShowClaimDialog"
+                      @delete-item="handleDeleteItem"
                     />
                   </v-col>
                 </v-row>

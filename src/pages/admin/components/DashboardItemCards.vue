@@ -20,6 +20,7 @@ defineProps<Props>()
 
 defineEmits<{
   showClaimDialog: [item: Item]
+  deleteItem: [item: Item]
 }>()
 
 const getItemStatusColor = (item: Item) => {
@@ -42,14 +43,24 @@ const getItemStatusIcon = (item: Item) => {
   <v-card class="item-card h-100" elevation="2">
     <v-card-title class="d-flex justify-space-between align-start">
       <div class="text-h6 font-weight-bold">{{ item.title }}</div>
-      <v-chip
-        :color="getItemStatusColor(item)"
-        size="small"
-        variant="flat"
-        :prepend-icon="getItemStatusIcon(item)"
-      >
-        {{ getItemStatusText(item) }}
-      </v-chip>
+      <div class="d-flex align-center gap-2">
+        <v-chip
+          :color="getItemStatusColor(item)"
+          size="small"
+          variant="flat"
+          :prepend-icon="getItemStatusIcon(item)"
+        >
+          {{ getItemStatusText(item) }}
+        </v-chip>
+        <v-btn
+          icon="mdi-delete"
+          size="small"
+          color="error"
+          variant="text"
+          :loading="isUpdating"
+          @click="$emit('deleteItem', item)"
+        />
+      </div>
     </v-card-title>
 
     <v-card-text>
@@ -102,5 +113,10 @@ const getItemStatusIcon = (item: Item) => {
 
 .gap-2 {
   gap: 8px;
+}
+
+.v-btn--icon.v-btn--size-small {
+  width: 32px;
+  height: 32px;
 }
 </style>
