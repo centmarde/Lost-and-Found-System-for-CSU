@@ -1,46 +1,43 @@
+//Home.vue
 <script setup lang="ts">
-import { ref, onMounted, computed, watch } from 'vue'
-import { useToast } from 'vue-toastification'
-import InnerLayoutWrapper from '@/layouts/InnerLayoutWrapper.vue'
-import AdminItemCard from '@/pages/admin/components/AdminCard.vue'
-import UserItemCard from '@/pages/admin/components/ItemCard.vue'
-import UserChatDialog from '@/pages/admin/components/userChatDialog.vue'
-import AdminChatDialog from '@/pages/admin/components/AdminChatDialog.vue'
-import NotificationDialog from '@/pages/admin/components/NotifDialog.vue'
-import { supabase } from '@/lib/supabase'
-import { useAuthUserStore } from '@/stores/authUser'
-import { useUserChat } from '@/pages/admin/components/composables/useUserChat'
-import { useAdminChat } from '@/pages/admin/components/composables/useAdminChat'
-import { useAdminItemActions } from '@/pages/admin/components/composables/useAdminItems'
-import { useNotifications } from '@/pages/admin/components/composables/useNotification'
-import { useFilterSortPagination } from '@/utils/helpers'
-import { markItemAsClaimed } from '@/stores/items'
-import '@/styles/home.css'
+import { ref, onMounted, computed, watch } from "vue";
+import InnerLayoutWrapper from "@/layouts/InnerLayoutWrapper.vue";
+import AdminItemCard from "@/pages/admin/components/AdminCard.vue";
+import UserItemCard from "@/pages/student/components/ItemCard.vue";
+import UserChatDialog from "@/pages/student/components/userChatDialog.vue";
+import AdminChatDialog from "@/pages/admin/components/AdminChatDialog.vue";
+import NotificationDialog from "@/pages/student/components/NotifDialog.vue";
+import FloatingAdminChat from "@/pages/student/components/FloatingAdminChat.vue";
+import AdminSupportInbox from "@/pages/admin/components/AdminSupportInbox.vue";
 
-interface Item {
-  id: number
-  title: string
-  description: string
-  status: 'lost' | 'found'
-  user_id: string
-  claimed_by: string
-  created_at: string
-}
+// Composables
+import { useAuth } from "@/pages/admin/components/composables/useAuth";
+import { useItems } from "@/pages/admin/components/composables/useItem";
+import { usePageConfig } from "@/pages/admin/components/composables/usePageConfig";
+import { useUserChat } from "@/pages/student/components/composables/useUserChat";
+import { useAdminChat } from "@/pages/admin/components/composables/useAdminChat";
+import { useAdminItemActions } from "@/pages/admin/components/composables/useAdminItems";
+import { useNotifications } from "@/pages/student/components/composables/useNotification";
+import { useAdminSupport } from "@/pages/student/components/composables/useAdminSupport";
+import { useAdminSupportInbox } from "@/pages/admin/components/composables/useAdminSupportInbox";
+import { useFilterSortPagination } from "@/utils/helpers";
 
-const toast = useToast()
+import "@/styles/home.css";
 
-// Global state
-const items = ref<Item[]>([])
-const itemsLoading = ref(false)
-const currentUser = ref<any>(null)
-const isCurrentUserAdmin = ref(false)
-const showNotificationBell = ref(false)
-const showNotificationDialog = ref(false)
+// Auth composable
+const { currentUser, isCurrentUserAdmin, getCurrentUser } = useAuth();
 
-// ----------------------------------------------------------------------
-// Filter, Sort, and Pagination Composable
-// ----------------------------------------------------------------------
-// Note: We initialize this with the items ref and the default itemsPerPage (12)
+// Items composable
+const { items, itemsLoading, fetchItems } = useItems(
+  isCurrentUserAdmin,
+  currentUser
+);
+
+// Page config composable
+const { pageTitle, pageSubtitle, emptyStateConfig } =
+  usePageConfig(isCurrentUserAdmin);
+
+// Filter, Sort, and Pagination
 const {
   page,
   itemsPerPage,
@@ -54,24 +51,9 @@ const {
   totalPages,
   formatMonthLabel,
   formatDayLabel,
-} = useFilterSortPagination(items, 12) // 👈 Implementation of the Composable
+} = useFilterSortPagination(items, 12);
 
-// ----------------------------------------------------------------------
-// The following computed properties and watchers are REMOVED
-// as they are now handled by useFilterSortPagination:
-//
-// const availableMonths = computed(...)
-// const availableDays = computed(...)
-// const filteredAndSortedItems = computed(...)
-// const paginatedItems = computed(...)
-// const totalPages = computed(...)
-// const formatMonthLabel = (monthValue: string) => {...}
-// const formatDayLabel = (dayValue: string) => {...}
-// watch([selectedMonth, selectedDay, sortBy, itemsPerPage], ...)
-// watch(selectedMonth, () => ...)
-// ----------------------------------------------------------------------
-
-// Use the new composables
+// User chat composable
 const {
   showChatDialog,
   selectedItem,
@@ -81,8 +63,9 @@ const {
   handleContact,
   sendMessage,
   closeChatDialog,
-} = useUserChat(currentUser)
+} = useUserChat(currentUser);
 
+// Admin chat composable
 const {
   showAdminConversationsDialog,
   selectedItemForConversations,
@@ -97,147 +80,84 @@ const {
   selectAdminConversation,
   sendAdminMessage,
   closeAdminConversationsDialog,
-} = useAdminChat(currentUser)
+} = useAdminChat(currentUser);
 
-// Initialize notifications composable
+// Admin actions composable
+const { updatingItems, markAsClaimed } = useAdminItemActions(fetchItems);
+
+// Notifications composable
+const showNotificationBell = ref(false);
+const showNotificationDialog = ref(false);
+
 const {
   notifications,
   setupItemNotifications,
   markAsRead,
   clearNotifications,
-  cleanup
-} = useNotifications(currentUser, isCurrentUserAdmin)
+  cleanup,
+} = useNotifications(currentUser, isCurrentUserAdmin);
 
-// ---
-// Define core functions here
-// ---
-
-// Check if current user is admin
-const checkIfUserIsAdmin = async (user: any) => {
-  if (!user) return false
-
-  try {
-    const authStore = useAuthUserStore()
-    const { users, error } = await authStore.getAllUsers()
-
-    if (error) return false
-
-    const currentUserData = users?.find(u => u.id === user.id)
-    const roleId = currentUserData?.raw_user_meta_data?.role
-
-    return roleId === 1
-  } catch (error) {
-    console.error('Error checking admin status:', error)
-    return false
-  }
-}
-
-// Get current user and check admin status
-const getCurrentUser = async () => {
-  const { data: { user } } = await supabase.auth.getUser()
-  currentUser.value = user
-
-  if (user) {
-    isCurrentUserAdmin.value = await checkIfUserIsAdmin(user)
-    showNotificationBell.value = !isCurrentUserAdmin.value
-
-    if (!isCurrentUserAdmin.value) {
-        await setupItemNotifications()
-    }
-  }
-}
-
-// Fetch items from database
-const fetchItems = async () => {
-  itemsLoading.value = true
-  try {
-    let query = supabase.from('items').select('*')
-
-    if (!isCurrentUserAdmin.value) {
-      const authStore = useAuthUserStore()
-      const { users, error: usersError } = await authStore.getAllUsers()
-
-      if (usersError) {
-        console.error('Error fetching users:', usersError)
-        toast.error('Failed to load admin users')
-        return
-      }
-
-      const adminUsers = users?.filter(user => {
-        const roleId = user.raw_user_meta_data?.role
-        return roleId === 1
-      }) || []
-
-      if (adminUsers.length === 0) {
-        items.value = []
-        return
-      }
-
-      const adminUserIds = adminUsers.map(admin => admin.id)
-      query = query.in('user_id', adminUserIds)
-    } else {
-      // Only fetch items posted by the current admin user
-      query = query.eq('user_id', currentUser.value.id)
-    }
-
-    // Always order by created_at newest first on initial fetch
-    const { data, error } = await query.order('created_at', { ascending: false })
-
-    if (error) {
-      console.error('Error fetching items:', error)
-      toast.error('Failed to load items')
-      return
-    }
-
-    items.value = data || []
-  } catch (error) {
-    console.error('Error:', error)
-    toast.error('An unexpected error occurred while loading items')
-  } finally {
-    itemsLoading.value = false
-  }
-}
-
-const {
-  updatingItems,
-  markAsClaimed,
-} = useAdminItemActions(fetchItems)
-
-
-
-
-
-// Notification functions
 const unreadCount = computed(() => {
-  return notifications.value.filter(n => !n.read).length
-})
+  return notifications.value.filter((n) => !n.read).length;
+});
 
 const toggleNotifications = () => {
-  showNotificationDialog.value = true
-}
+  showNotificationDialog.value = true;
+};
 
 const handleMarkAsRead = (notificationId: number) => {
-  markAsRead(notificationId)
-}
+  markAsRead(notificationId);
+};
 
 const handleClearAllNotifications = () => {
-  clearNotifications()
-}
+  clearNotifications();
+};
 
-const pageTitle = computed(() => isCurrentUserAdmin.value ? 'Manage Lost & Found Items' : 'Lost & Found')
-const pageSubtitle = computed(() => isCurrentUserAdmin.value ? 'Manage your posted items and view conversations' : 'Find your lost items or help others find theirs')
+// Student Admin Support Chat
+const {
+  showSupportChat,
+  supportMessages,
+  messagesLoading: supportMessagesLoading,
+  sendingMessage: sendingSupportMessage,
+  initializingChat,
+  openSupportChat,
+  sendSupportMessage,
+  closeSupportChat,
+} = useAdminSupport(currentUser);
 
-// Watch for user changes to setup notifications
-watch([currentUser, isCurrentUserAdmin], async ([user, isAdmin]) => {
-  if (user && !isAdmin) {
-    await setupItemNotifications()
-  }
-}, { immediate: false })
+// Admin Support Inbox
+const {
+  showInbox: showAdminSupportInbox,
+  supportConversations,
+  selectedConversation: selectedSupportConversation,
+  messages: supportInboxMessages,
+  loadingConversations: loadingSupportConversations,
+  loadingMessages: loadingSupportMessages,
+  sendingMessage: sendingSupportInboxMessage,
+  openInbox,
+  closeInbox,
+  selectConversation: selectSupportConversation,
+  sendMessageToStudent,
+} = useAdminSupportInbox(currentUser);
+
+// Watch for user changes to setup notifications and show support button
+watch(
+  [currentUser, isCurrentUserAdmin],
+  async ([user, isAdmin]) => {
+    if (user && !isAdmin) {
+      await setupItemNotifications();
+      showNotificationBell.value = true;
+    } else {
+      showNotificationBell.value = false;
+    }
+  },
+  { immediate: false }
+);
 
 onMounted(async () => {
-  await getCurrentUser()
-  await fetchItems()
-})
+  await getCurrentUser();
+  await fetchItems();
+});
 </script>
 
 <template>
@@ -247,17 +167,15 @@ onMounted(async () => {
         <v-row class="mb-6">
           <v-col cols="12">
             <div class="text-center position-relative">
-              <h1 class="text-h3 font-weight-bold text-primary mb-2">
+              <h1 class="text-h3 font-weight-bold text-green-darken-4 mb-2">
                 {{ pageTitle }}
               </h1>
               <p class="text-h6 text-grey-darken-1">
                 {{ pageSubtitle }}
               </p>
 
-              <div
-                v-if="showNotificationBell"
-                class="notification-bell"
-              >
+              <!-- Notification Bell for Students -->
+              <div v-if="showNotificationBell" class="notification-bell">
                 <v-btn
                   icon
                   size="large"
@@ -274,6 +192,19 @@ onMounted(async () => {
                   </v-badge>
                 </v-btn>
               </div>
+
+              <!-- Admin Support Inbox Button (for admins) -->
+              <div v-if="isCurrentUserAdmin" class="admin-inbox-button">
+                <v-btn
+                  color="primary"
+                  variant="elevated"
+                  prepend-icon="mdi-inbox"
+                  @click="openInbox"
+                  size="large"
+                >
+                  Support Inbox
+                </v-btn>
+              </div>
             </div>
           </v-col>
         </v-row>
@@ -287,7 +218,7 @@ onMounted(async () => {
                     v-model="sortBy"
                     :items="[
                       { title: 'Newest First', value: 'newest' },
-                      { title: 'Oldest First', value: 'oldest' }
+                      { title: 'Oldest First', value: 'oldest' },
                     ]"
                     label="Sort By"
                     variant="outlined"
@@ -302,7 +233,10 @@ onMounted(async () => {
                     v-model="selectedMonth"
                     :items="[
                       { title: 'All Months', value: 'all' },
-                      ...availableMonths.map(m => ({ title: formatMonthLabel(m), value: m }))
+                      ...availableMonths.map((m) => ({
+                        title: formatMonthLabel(m),
+                        value: m,
+                      })),
                     ]"
                     label="Filter by Month"
                     variant="outlined"
@@ -317,13 +251,18 @@ onMounted(async () => {
                     v-model="selectedDay"
                     :items="[
                       { title: 'All Days', value: 'all' },
-                      ...availableDays.map(d => ({ title: formatDayLabel(d), value: d }))
+                      ...availableDays.map((d) => ({
+                        title: formatDayLabel(d),
+                        value: d,
+                      })),
                     ]"
                     label="Filter by Day"
                     variant="outlined"
                     density="comfortable"
                     prepend-inner-icon="mdi-calendar"
-                    :disabled="selectedMonth === 'all' || availableDays.length === 0"
+                    :disabled="
+                      selectedMonth === 'all' || availableDays.length === 0
+                    "
                     hide-details
                   />
                 </v-col>
@@ -341,10 +280,15 @@ onMounted(async () => {
                 </v-col>
               </v-row>
 
-              <v-row v-if="selectedMonth !== 'all' || selectedDay !== 'all'" class="mt-2">
+              <v-row
+                v-if="selectedMonth !== 'all' || selectedDay !== 'all'"
+                class="mt-2"
+              >
                 <v-col cols="12">
                   <div class="d-flex align-center flex-wrap gap-2">
-                    <span class="text-caption text-grey-darken-1">Active filters:</span>
+                    <span class="text-caption text-grey-darken-1"
+                      >Active filters:</span
+                    >
 
                     <v-chip
                       v-if="selectedMonth !== 'all'"
@@ -374,7 +318,10 @@ onMounted(async () => {
                       size="small"
                       variant="text"
                       color="error"
-                      @click="selectedMonth = 'all'; selectedDay = 'all'"
+                      @click="
+                        selectedMonth = 'all';
+                        selectedDay = 'all';
+                      "
                     >
                       Clear all
                     </v-btn>
@@ -387,10 +334,14 @@ onMounted(async () => {
 
         <v-row>
           <v-col cols="12">
-            <v-card elevation="2">
-              <v-card-title class="text-h5 font-weight-bold mb-4 d-flex align-center">
-                <v-icon class="me-2" color="primary">mdi-package-variant-closed</v-icon>
-                {{ isCurrentUserAdmin ? 'Your Items' : 'Missing Items' }}
+            <v-card elevation="2" class="pa-4">
+              <v-card-title
+                class="text-h5 font-weight-bold mb-4 d-flex align-center"
+              >
+                <v-icon class="me-2" color="primary"
+                  >mdi-package-variant-closed</v-icon
+                >
+                {{ emptyStateConfig.sectionTitle }}
                 <v-spacer />
                 <v-chip
                   v-if="!itemsLoading"
@@ -398,35 +349,35 @@ onMounted(async () => {
                   variant="tonal"
                   size="small"
                 >
-                  {{ filteredAndSortedItems.length }} of {{ items.length }} items
+                  {{ filteredAndSortedItems.length }} of
+                  {{ items.length }} items
                 </v-chip>
               </v-card-title>
 
               <div v-if="itemsLoading" class="text-center py-12">
-                <v-progress-circular
-                  indeterminate
-                  color="primary"
-                  size="48"
-                />
+                <v-progress-circular indeterminate color="primary" size="48" />
                 <p class="text-body-1 mt-4">Loading items...</p>
               </div>
 
-              <div v-else-if="filteredAndSortedItems.length === 0" class="text-center py-12">
+              <div
+                v-else-if="filteredAndSortedItems.length === 0"
+                class="text-center py-12"
+              >
                 <v-icon size="80" color="grey-lighten-1" class="mb-4">
                   mdi-package-variant-closed-remove
                 </v-icon>
                 <h3 class="text-h5 text-grey-darken-1 mb-2">
-                  {{ items.length === 0
-                    ? (isCurrentUserAdmin ? 'No items posted yet' : 'No missing items found')
-                    : 'No items match your filters'
+                  {{
+                    items.length === 0
+                      ? emptyStateConfig.noItemsTitle
+                      : "No items match your filters"
                   }}
                 </h3>
                 <p class="text-body-1 text-grey-darken-2 mb-4">
-                  {{ items.length === 0
-                    ? (isCurrentUserAdmin
-                      ? 'You haven\'t posted any missing items yet.'
-                      : 'There are currently no missing items posted by admins.')
-                    : 'Try adjusting your filters to see more items.'
+                  {{
+                    items.length === 0
+                      ? emptyStateConfig.noItemsMessage
+                      : "Try adjusting your filters to see more items."
                   }}
                 </p>
                 <v-btn
@@ -443,7 +394,10 @@ onMounted(async () => {
                   color="primary"
                   variant="outlined"
                   prepend-icon="mdi-filter-remove"
-                  @click="selectedMonth = 'all'; selectedDay = 'all'"
+                  @click="
+                    selectedMonth = 'all';
+                    selectedDay = 'all';
+                  "
                 >
                   Clear Filters
                 </v-btn>
@@ -479,7 +433,9 @@ onMounted(async () => {
 
                 <v-row v-if="totalPages > 1" class="mt-6">
                   <v-col cols="12">
-                    <div class="d-flex justify-center align-center flex-wrap gap-2">
+                    <div
+                      class="d-flex justify-center align-center flex-wrap gap-2"
+                    >
                       <v-pagination
                         v-model="page"
                         :length="totalPages"
@@ -489,7 +445,13 @@ onMounted(async () => {
                       />
 
                       <div class="text-caption text-grey-darken-1 ml-4">
-                        Showing {{ (page - 1) * itemsPerPage + 1 }}-{{ Math.min(page * itemsPerPage, filteredAndSortedItems.length) }} of {{ filteredAndSortedItems.length }}
+                        Showing {{ (page - 1) * itemsPerPage + 1 }}-{{
+                          Math.min(
+                            page * itemsPerPage,
+                            filteredAndSortedItems.length
+                          )
+                        }}
+                        of {{ filteredAndSortedItems.length }}
                       </div>
                     </div>
                   </v-col>
@@ -499,6 +461,7 @@ onMounted(async () => {
           </v-col>
         </v-row>
 
+        <!-- Item-based Chat Dialogs -->
         <UserChatDialog
           v-model:show="showChatDialog"
           :item="selectedItem"
@@ -527,7 +490,48 @@ onMounted(async () => {
           @mark-as-read="handleMarkAsRead"
           @clear-all="handleClearAllNotifications"
         />
+
+        <!-- Student Admin Support Chat (Floating) -->
+        <FloatingAdminChat
+          v-if="!isCurrentUserAdmin && currentUser"
+          v-model:show="showSupportChat"
+          :messages="supportMessages"
+          :messages-loading="supportMessagesLoading"
+          :sending-message="sendingSupportMessage"
+          :initializing-chat="initializingChat"
+          @send-message="sendSupportMessage"
+          @open-chat="openSupportChat"
+        />
+
+        <!-- Admin Support Inbox -->
+        <AdminSupportInbox
+          v-if="isCurrentUserAdmin"
+          v-model:show="showAdminSupportInbox"
+          :conversations="supportConversations"
+          :selected-conversation="selectedSupportConversation"
+          :messages="supportInboxMessages"
+          :loading-conversations="loadingSupportConversations"
+          :loading-messages="loadingSupportMessages"
+          :sending-message="sendingSupportInboxMessage"
+          @select-conversation="selectSupportConversation"
+          @send-message="sendMessageToStudent"
+        />
       </v-container>
     </template>
   </InnerLayoutWrapper>
 </template>
+
+<style scoped>
+.admin-inbox-button {
+  position: absolute;
+  top: 0;
+  right: 10px;
+}
+
+@media (max-width: 960px) {
+  .admin-inbox-button {
+    position: static;
+    margin-top: 16px;
+  }
+}
+</style>

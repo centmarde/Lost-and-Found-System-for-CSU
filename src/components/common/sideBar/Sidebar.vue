@@ -27,6 +27,17 @@ const organizationGroupExpanded = ref(true);
 // Control my account group expansion - make it persistent
 const myAccountGroupExpanded = ref(true);
 
+// Computed property to check if user is admin
+const isAdmin = computed(() => {
+  const roleId = authStore.userData?.user_metadata?.role;
+  return roleId === 1; // Assuming role ID 1 is admin
+});
+
+// Computed property for panel title
+const panelTitle = computed(() => {
+  return isAdmin.value ? 'Admin Panel' : 'Student Panel';
+});
+
 // Watch for route changes and keep admin group expanded if we're on an admin route
 watch(
   () => route.path,
@@ -51,8 +62,14 @@ watch(
 // Hide sidebar on small screens
 const showSidebar = computed(() => !smAndDown.value);
 
-// Get navigation groups from shared config
-const navigationGroups = computed(() => navigationConfig);
+// Get navigation groups from shared config, filtered by user role
+const navigationGroups = computed(() => {
+  if (isAdmin.value) {
+    return navigationConfig;
+  }
+  // Filter out admin-only groups for non-admin users
+  return navigationConfig.filter(group => group.title !== 'Admin');
+});
 
 // Helper function to get group expansion state
 const getGroupExpansion = (groupTitle: string) => {
@@ -94,7 +111,7 @@ const handleLogout = async () => {
     <v-list-item class="pa-4">
       <v-list-item-content>
         <v-list-item-title class="text-h6 font-weight-bold primary--text">
-          Admin Panel
+          {{ panelTitle }}
         </v-list-item-title>
         <v-list-item-subtitle class="text-caption grey--text">
           Management System

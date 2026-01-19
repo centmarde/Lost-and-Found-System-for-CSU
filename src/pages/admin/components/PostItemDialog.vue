@@ -56,10 +56,10 @@ const handleSubmit = () => {
 
           <v-textarea
             v-model="form.description"
-            label="Item Description"
+            label="Location"
             prepend-inner-icon="mdi-text-long"
             variant="outlined"
-            placeholder="Detailed description including color, brand, location found/lost, distinguishing features..."
+            placeholder="Location where the item was lost or found"
             rows="4"
           />
 

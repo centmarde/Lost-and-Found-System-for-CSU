@@ -1,16 +1,20 @@
 <script lang="ts" setup>
 import { ref, onMounted, onUnmounted, nextTick } from "vue";
-import { formatDate } from "@/utils/helpers";
+import {
+  formatDate,
+  getItemStatusColor,
+  getItemStatusText,
+} from "@/utils/helpers";
 import { supabase } from "@/lib/supabase";
 import { useToast } from "vue-toastification";
-import { 
-  loadExistingConversation, 
-  createConversation 
+import {
+  loadExistingConversation,
+  createConversation,
 } from "@/stores/conversation";
-import { 
+import {
   sendMessage as sendMessageToConversation,
   loadMessages as loadMessagesFromConversation,
-  setupMessageSubscription as setupRealtimeSubscription
+  setupMessageSubscription as setupRealtimeSubscription,
 } from "@/stores/messages";
 import type { Message, Conversation } from "@/types/chat";
 
@@ -49,16 +53,6 @@ const currentUser = ref<any>(null);
 
 // Real-time subscription
 let messageSubscription: any = null;
-
-const getItemStatusColor = (item: Item) => {
-  if (item.claimed_by) return "success";
-  return item.status === "lost" ? "error" : "info";
-};
-
-const getItemStatusText = (item: Item) => {
-  if (item.claimed_by) return "Claimed";
-  return item.status === "lost" ? "Lost" : "Found";
-};
 
 // Get current user
 const getCurrentUser = async () => {
@@ -99,7 +93,9 @@ const loadMessages = async () => {
   if (!conversation.value) return;
 
   try {
-    const loadedMessages = await loadMessagesFromConversation(conversation.value.id);
+    const loadedMessages = await loadMessagesFromConversation(
+      conversation.value.id
+    );
     messages.value = loadedMessages;
 
     await nextTick();
@@ -125,7 +121,7 @@ const sendMessage = async () => {
 
   try {
     let currentConversation = conversation.value;
-    
+
     // Create conversation if it doesn't exist
     if (!currentConversation) {
       currentConversation = await createConversation(
@@ -185,7 +181,7 @@ const handleContact = async () => {
   }
 
   showChatDialog.value = true;
-  
+
   // Load existing conversation if it exists
   await loadExistingConv();
 };
@@ -361,57 +357,62 @@ onUnmounted(() => {
 
 <style scoped>
 .item-card {
-  transition: transform 0.2s ease-in-out;
+ transition: transform 0.2s ease-in-out;
 }
 
 .item-card:hover {
-  transform: translateY(-2px);
+ transform: translateY(-2px);
 }
 
 .chat-dialog {
-  border-radius: 12px !important;
-  overflow: hidden;
+ border-radius: 12px !important;
+ overflow: hidden;
 }
 
 .messages-container {
-  background: #f5f5f5;
+ /* In a proper dark mode setup, this background should change.
+     For now, we ensure message text is readable. */
+ background: #f5f5f5;
 }
 
 .message-bubble {
-  display: flex;
+ display: flex;
 }
 
 .message-bubble.my-message {
-  justify-content: flex-end;
+ justify-content: flex-end;
 }
 
 .message-content {
-  max-width: 70%;
-  background: white;
-  border-radius: 18px;
-  padding: 12px 16px;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+ max-width: 70%;
+ background: white;
+ border-radius: 18px;
+ padding: 12px 16px;
+ box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+ color: #212121;
 }
 
 .my-message .message-content {
-  background: #1976d2;
-  color: white;
+ background: #1b5e20;
+ color: white; 
 }
 
 .message-text {
-  font-size: 14px;
-  line-height: 1.4;
-  word-wrap: break-word;
+ font-size: 14px;
+ line-height: 1.4;
+ word-wrap: break-word;
 }
 
 .message-time {
-  font-size: 11px;
-  opacity: 0.7;
-  margin-top: 4px;
-  text-align: right;
+ font-size: 11px;
+ opacity: 0.7;
+ margin-top: 4px;
+ text-align: right;
+ color: #616161; 
 }
 
 .my-message .message-time {
-  color: rgba(255, 255, 255, 0.7);
+
+ color: rgba(255, 255, 255, 0.7);
 }
 </style>

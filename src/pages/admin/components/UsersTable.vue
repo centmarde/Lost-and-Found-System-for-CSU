@@ -179,7 +179,7 @@ onMounted(() => {
     </v-row>
 
       <v-card-title class="d-flex align-center justify-space-between">
-        <div class="text-h5">User Management</div>
+        <div class="text-h5 text-green-darken-4">User Management</div>
         <v-btn
           color="primary"
           prepend-icon="mdi-refresh"

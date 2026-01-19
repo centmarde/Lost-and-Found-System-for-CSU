@@ -1,6 +1,6 @@
 <script lang="ts" setup>
 import { computed } from 'vue'
-import { formatDate } from '@/utils/helpers'
+import { formatDate, getStatusIcon, getStatusColor } from '@/utils/helpers'
 
 interface Notification {
   id: number
@@ -37,13 +37,6 @@ const sortedNotifications = computed(() => {
   })
 })
 
-const getStatusIcon = (status: string) => {
-  return status === 'lost' ? 'mdi-alert-circle' : 'mdi-check-circle'
-}
-
-const getStatusColor = (status: string) => {
-  return status === 'lost' ? 'error' : 'success'
-}
 
 const handleMarkAsRead = (notification: Notification) => {
   if (!notification.read) {

@@ -75,6 +75,11 @@ export async function markItemAsClaimed(
 }
 
 /**
+ * Alias for markItemAsClaimed - used for awarding items to specific users
+ */
+export const markAsClaimedBy = markItemAsClaimed
+
+/**
  * Marks an item as unclaimed
  */
 export async function markItemAsUnclaimed(itemId: number): Promise<void> {

@@ -1,11 +1,6 @@
 <script lang="ts" setup>
 import { ref, watch } from 'vue'
-import { createClient } from '@supabase/supabase-js'
-import { useAuthUserStore } from '@/stores/authUser'
-
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
-const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY
-const supabase = createClient(supabaseUrl, supabaseKey)
+import { loadConversationsForItem } from '@/stores/conversation'
 
 interface Item {
   id: number
@@ -39,21 +34,15 @@ const emit = defineEmits<{
   'claim-item': [itemId: number, claimedBy: string]
 }>()
 
-const authStore = useAuthUserStore()
 const conversations = ref<Conversation[]>([])
 const loadingConversations = ref(false)
 const selectedClaimant = ref<string>('')
 
-// Load conversations when dialog opens
-const loadConversationsForItem = async (itemId: number) => {
+// Load conversations when dialog opens using store function
+const loadConversations = async (itemId: number) => {
   loadingConversations.value = true
   try {
-    const { data: conversationData, error } = await supabase
-      .from('conversations')
-      .select('id, sender_id')
-      .eq('item_id', itemId)
-
-    if (error) throw error
+    const conversationData = await loadConversationsForItem(itemId)
 
     // Get unique senders (people who contacted about this item)
     const uniqueSenders = new Map()
@@ -61,17 +50,7 @@ const loadConversationsForItem = async (itemId: number) => {
       uniqueSenders.set(conv.sender_id, conv)
     })
 
-    // Get user details for all senders
-    const { users: allUsers, error: usersError } = await authStore.getAllUsers()
-    if (usersError) console.warn('Could not load user details:', usersError)
-
-    conversations.value = Array.from(uniqueSenders.values()).map(conv => ({
-      ...conv,
-      sender: allUsers?.find(user => user.id === conv.sender_id) || { 
-        id: conv.sender_id, 
-        email: 'Unknown User' 
-      }
-    }))
+    conversations.value = Array.from(uniqueSenders.values())
 
   } catch (error) {
     console.error('Error loading conversations:', error)
@@ -86,7 +65,7 @@ watch(
   () => ({ isOpen: props.modelValue, item: props.item }),
   ({ isOpen, item }) => {
     if (isOpen && item) {
-      loadConversationsForItem(item.id)
+      loadConversations(item.id)
       selectedClaimant.value = ''
     }
   }

@@ -3,7 +3,7 @@ import { ref, onMounted, computed, watch } from 'vue'
 import { useToast } from 'vue-toastification'
 import { supabase } from '@/lib/supabase'
 import { useAuthUserStore } from '@/stores/authUser'
-import { useNotifications } from '@/pages/admin/components/composables/useNotification'
+import { useNotifications } from '@/pages/student/components/composables/useNotification'
 
 // Interface for type safety
 export interface Item {

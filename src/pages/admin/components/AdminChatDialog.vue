@@ -1,49 +1,25 @@
 <script setup lang="ts">
-import { ref, toRefs, watchEffect } from 'vue'
-import { formatDate } from '@/utils/helpers'
-import { supabase } from '@/lib/supabase'
+import { ref, toRefs, watchEffect } from "vue";
+import { formatDate } from "@/utils/helpers";
+import { supabase } from "@/lib/supabase";
+import type { Conversation, Message, Item } from "@/types/chat"; 
 
-// Define the interfaces for the props
-interface Sender {
-  id: string;
-  email: string;
-}
+const props = defineProps<{
+  show: boolean;
+  item: { id: number; title: string } | null; 
+  conversations: Conversation[];
+  messages: Message[];
+  selectedConversation: Conversation | null;
+  loadingConversations: boolean;
+  loadingMessages: boolean;
+  sendingMessage: boolean;
+}>();
 
-interface Conversation {
-  id: string;
-  item_id: number;
-  sender_id: string;
-  receiver_id: string;
-  created_at: string;
-  sender?: Sender;
-}
-
-interface Item {
-  id: number;
-  title: string;
-}
-
-// Add the Message interface
-interface Message {
-  id: string;
-  conversation_id: string;
-  message: string;
-  user_id: string;
-  created_at: string;
-}
-
-const props = defineProps({
-  show: { type: Boolean, required: true },
-  item: { type: Object as () => Item | null, required: true },
-  conversations: { type: Array as () => Conversation[], required: true },
-  messages: { type: Array as () => Message[], required: true },
-  selectedConversation: { type: Object as () => Conversation | null, default: null },
-  loadingConversations: { type: Boolean, required: true },
-  loadingMessages: { type: Boolean, required: true },
-  sendingMessage: { type: Boolean, required: true },
-})
-
-const emit = defineEmits(['update:show', 'select-conversation', 'send-message'])
+const emit = defineEmits([
+  "update:show",
+  "select-conversation",
+  "send-message",
+]);
 
 const {
   show,
@@ -53,49 +29,54 @@ const {
   selectedConversation,
   loadingConversations,
   loadingMessages,
-  sendingMessage
-} = toRefs(props)
+  sendingMessage,
+} = toRefs(props);
 
-const newMessage = ref('')
-const currentUser = ref<any>(null)
+const newMessage = ref("");
+const currentUser = ref<any>(null);
 
 // Get the current user on mount
 watchEffect(async () => {
   if (show.value) {
-    const { data: { user } } = await supabase.auth.getUser()
-    currentUser.value = user
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    currentUser.value = user;
   }
-})
+});
 
 const handleKeyPress = (event: KeyboardEvent) => {
-  if (event.key === 'Enter' && !event.shiftKey) {
-    event.preventDefault()
-    sendMessage()
+  if (event.key === "Enter" && !event.shiftKey) {
+    event.preventDefault();
+    sendMessage();
   }
-}
+};
 
-// Fixed sendMessage function - emit to parent instead of directly mutating props
+// Emit to parent instead of mutating props
 const sendMessage = async () => {
-  if (!newMessage.value.trim() || !selectedConversation.value || !currentUser.value) return
+  if (
+    !newMessage.value.trim() ||
+    !selectedConversation.value ||
+    !currentUser.value
+  )
+    return;
 
-  // Emit the send message event to the parent component
-  emit('send-message', {
+  emit("send-message", {
     conversationId: selectedConversation.value.id,
     message: newMessage.value.trim(),
-    userId: currentUser.value.id
-  })
+    userId: currentUser.value.id,
+  });
 
-  // Clear the input
-  newMessage.value = ''
-}
+  newMessage.value = "";
+};
 
 const isMyMessage = (message: Message) => {
-  return message.user_id === currentUser.value?.id
-}
+  return message.user_id === currentUser.value?.id;
+};
 
 const closeDialog = () => {
-  emit('update:show', false)
-}
+  emit("update:show", false);
+};
 </script>
 
 <template>
@@ -110,17 +91,36 @@ const closeDialog = () => {
           </div>
         </div>
         <v-spacer />
-        <v-btn icon="mdi-close" variant="text" color="white" @click="closeDialog" />
+        <v-btn
+          icon="mdi-close"
+          variant="text"
+          color="white"
+          @click="closeDialog"
+        />
       </v-card-title>
 
-      <div class="d-flex" style="height: 500px;">
-        <div class="conversations-list" style="width: 300px; border-right: 1px solid #e0e0e0; overflow-y: auto;">
-          <div v-if="loadingConversations" class="d-flex justify-center align-center pa-8">
+      <div class="d-flex" style="height: 500px">
+        <div
+          class="conversations-list"
+          style="
+            width: 300px;
+            border-right: 1px solid #e0e0e0;
+            overflow-y: auto;
+          "
+        >
+          <div
+            v-if="loadingConversations"
+            class="d-flex justify-center align-center pa-8"
+          >
             <v-progress-circular indeterminate color="primary" size="32" />
           </div>
           <div v-else-if="conversations.length === 0" class="text-center pa-8">
-            <v-icon size="48" color="grey-lighten-1">mdi-message-outline</v-icon>
-            <div class="text-body-2 text-grey-darken-1 mt-2">No conversations yet</div>
+            <v-icon size="48" color="grey-lighten-1"
+              >mdi-message-outline</v-icon
+            >
+            <div class="text-body-2 text-grey-darken-1 mt-2">
+              No conversations yet
+            </div>
           </div>
           <v-list v-else class="pa-0">
             <v-list-item
@@ -130,26 +130,45 @@ const closeDialog = () => {
               :active="selectedConversation?.id === conversation.id"
               class="conversation-item"
             >
-              <v-list-item-title class="text-subtitle-2">{{ conversation.sender?.email }}</v-list-item-title>
-              <v-list-item-subtitle class="text-caption">{{ formatDate(conversation.created_at) }}</v-list-item-subtitle>
+              <v-list-item-title class="text-subtitle-2">{{
+                conversation.sender?.email
+              }}</v-list-item-title>
+              <v-list-item-subtitle class="text-caption">{{
+                formatDate(conversation.created_at)
+              }}</v-list-item-subtitle>
             </v-list-item>
           </v-list>
         </div>
 
         <div class="flex-grow-1 d-flex flex-column">
-          <div v-if="!selectedConversation" class="d-flex justify-center align-center flex-grow-1">
+          <div
+            v-if="!selectedConversation"
+            class="d-flex justify-center align-center flex-grow-1"
+          >
             <div class="text-center">
-              <v-icon size="64" color="grey-lighten-1">mdi-message-text-outline</v-icon>
-              <div class="text-body-1 text-grey-darken-1 mt-2">Select a conversation to view messages</div>
+              <v-icon size="64" color="grey-lighten-1"
+                >mdi-message-text-outline</v-icon
+              >
+              <div class="text-body-1 text-grey-darken-1 mt-2">
+                Select a conversation to view messages
+              </div>
             </div>
           </div>
           <template v-else>
-            <div class="admin-messages-container flex-grow-1 pa-4" style="overflow-y: auto;">
-              <div v-if="loadingMessages" class="d-flex justify-center align-center pa-8">
+            <div
+              class="admin-messages-container flex-grow-1 pa-4"
+              style="overflow-y: auto"
+            >
+              <div
+                v-if="loadingMessages"
+                class="d-flex justify-center align-center pa-8"
+              >
                 <v-progress-circular indeterminate color="primary" />
               </div>
               <div v-else-if="messages.length === 0" class="text-center pa-8">
-                <div class="text-body-2 text-grey-darken-1">No messages in this conversation yet</div>
+                <div class="text-body-2 text-grey-darken-1">
+                  No messages in this conversation yet
+                </div>
               </div>
               <div v-else>
                 <div
@@ -160,13 +179,18 @@ const closeDialog = () => {
                 >
                   <div class="message-content">
                     <div class="message-text">{{ message.message }}</div>
-                    <div class="message-time">{{ formatDate(message.created_at) }}</div>
+                    <div class="message-time">
+                      {{ formatDate(message.created_at) }}
+                    </div>
                   </div>
                 </div>
               </div>
             </div>
 
-            <div class="pa-4 bg-grey-lighten-5" style="border-top: 1px solid #e0e0e0;">
+            <div
+              class="pa-4 bg-grey-lighten-5"
+              style="border-top: 1px solid #e0e0e0"
+            >
               <div class="d-flex align-center">
                 <v-text-field
                   v-model="newMessage"
@@ -196,60 +220,69 @@ const closeDialog = () => {
 
 <style scoped>
 .conversation-item {
-  cursor: pointer;
-  border-bottom: 1px solid #f5f5f5;
+ cursor: pointer;
+ border-bottom: 1px solid #f5f5f5;
 }
 
 .conversation-item:hover {
-  background-color: #f8f9fa;
-}
+background-color: rgb(var(--v-theme-primary) / 0.08);}
 
 .message-bubble {
-  display: flex;
-  margin-bottom: 12px;
+ display: flex;
+ margin-bottom: 12px;
 }
 
 .message-bubble.my-message {
-  justify-content: flex-end;
+ justify-content: flex-end;
 }
 
 .message-content {
-  max-width: 70%;
-  padding: 12px 16px;
-  border-radius: 18px;
-  background-color: #f1f3f4;
+ max-width: 70%;
+ padding: 12px 16px;
+ border-radius: 18px;
+ background-color: #f1f3f4;
+ /* 💡 FIX 1: Set text color for non-user message to a dark color */
+ color: #212121;
 }
 
 .my-message .message-content {
-  background-color: #1976d2;
-  color: white;
+ background-color: #1b5e20;
+ /* The message text is already white, but explicitly setting it is good practice */
+ color: white;
 }
 
 .message-text {
-  word-wrap: break-word;
+ word-wrap: break-word;
 }
 
 .message-time {
-  font-size: 0.75rem;
-  opacity: 0.7;
-  margin-top: 4px;
+ font-size: 0.75rem;
+ opacity: 0.7;
+ margin-top: 4px;
+ /* 💡 FIX 2: Set timestamp color for non-user message (light bubble) to a darker grey */
+ color: #616161;
+}
+
+.my-message .message-time {
+ /* 💡 FIX 3: Set timestamp color for user message (dark green bubble) to a light color */
+ color: rgba(255, 255, 255, 0.7);
 }
 
 .admin-messages-container {
-  scrollbar-width: thin;
-  scrollbar-color: #ccc transparent;
+ scrollbar-width: thin;
+ scrollbar-color: #ccc transparent;
 }
 
 .admin-messages-container::-webkit-scrollbar {
-  width: 6px;
+ width: 6px;
 }
 
 .admin-messages-container::-webkit-scrollbar-track {
-  background: transparent;
+ background: transparent;
 }
 
 .admin-messages-container::-webkit-scrollbar-thumb {
-  background-color: #ccc;
-  border-radius: 3px;
+ background-color: #ccc;
+ border-radius: 3px;
 }
 </style>
