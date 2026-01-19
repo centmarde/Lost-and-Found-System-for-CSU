@@ -2,6 +2,7 @@
 export interface Item {
   id: number
   title: string
+  description?: string
   status: 'lost' | 'found'
   user_id: string
 }
@@ -23,6 +24,7 @@ export interface Conversation {
     full_name?: string
     email: string
   }
+  item?: Item | null // Include item details when available
   latest_message?: {
     message: string
     created_at: string

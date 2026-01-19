@@ -68,14 +68,41 @@ export async function getOrCreateAdminSupportConversation(
 }
 
 /**
- * Gets all admin support conversations (for admin inbox)
- * Returns conversations where item_id is null
+ * Gets all admin support conversations (for admin inbox) with pagination
+ * Returns conversations where item_id is null and conversations with items
+ * Excludes conversations where the current user is the sender
  */
-export async function getAllAdminSupportConversations(): Promise<
-  Conversation[]
-> {
+export async function getAllAdminSupportConversations(
+  page: number = 1,
+  pageSize: number = 10
+): Promise<{
+  conversations: Conversation[];
+  totalCount: number;
+  totalPages: number;
+  currentPage: number;
+}> {
   try {
-    // Get conversations with messages
+    // Get current user
+    const { data: { user: currentUser } } = await supabase.auth.getUser();
+
+    if (!currentUser) {
+      throw new Error("No authenticated user found");
+    }
+
+    // First, get the total count of conversations
+    const { count: totalCount, error: countError } = await supabase
+      .from("conversations")
+      .select("*", { count: "exact", head: true })
+      .neq("sender_id", currentUser.id);
+
+    if (countError) throw countError;
+
+    const totalPages = Math.ceil((totalCount || 0) / pageSize);
+
+    // Calculate offset for pagination
+    const offset = (page - 1) * pageSize;
+
+    // Get conversations with messages and item details, excluding current user as sender
     const { data: conversations, error } = await supabase
       .from("conversations")
       .select(
@@ -84,16 +111,28 @@ export async function getAllAdminSupportConversations(): Promise<
         messages (
           message,
           created_at
+        ),
+        items:item_id (
+          id,
+          title,
+          description,
+          status
         )
       `
       )
-      .is("item_id", null) // Only get admin support conversations
-      .order("created_at", { ascending: false });
+      .neq("sender_id", currentUser.id) // Exclude conversations where current user is sender
+      .order("created_at", { ascending: false })
+      .range(offset, offset + pageSize - 1);
 
     if (error) throw error;
 
     if (!conversations || conversations.length === 0) {
-      return [];
+      return {
+        conversations: [],
+        totalCount: totalCount || 0,
+        totalPages,
+        currentPage: page,
+      };
     }
 
     // Get user details for each unique sender
@@ -119,6 +158,7 @@ export async function getAllAdminSupportConversations(): Promise<
           full_name: "Unknown Student",
           email: "No email",
         },
+        item: conv.items || null, // Include item details if available
         messages: conv.messages,
         latest_message:
           conv.messages && conv.messages.length > 0
@@ -128,7 +168,12 @@ export async function getAllAdminSupportConversations(): Promise<
       })
     );
 
-    return processedConversations;
+    return {
+      conversations: processedConversations,
+      totalCount: totalCount || 0,
+      totalPages,
+      currentPage: page,
+    };
   } catch (error) {
     console.error("Error fetching admin support conversations:", error);
     throw new Error("Failed to load admin support conversations");
