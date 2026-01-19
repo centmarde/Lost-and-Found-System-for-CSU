@@ -25,6 +25,12 @@ export function useAdminSupportInbox(currentUser: any) {
   const loadingMessages = ref(false)
   const sendingMessage = ref(false)
 
+  // Pagination state
+  const currentPage = ref(1)
+  const pageSize = ref(10)
+  const totalCount = ref(0)
+  const totalPages = ref(0)
+
   let messageSubscription: any = null
   let conversationsSubscription: any = null
   let currentConversationId: string | null = null
@@ -39,13 +45,16 @@ export function useAdminSupportInbox(currentUser: any) {
     })
   }
 
-  // Load all admin support conversations
-  const loadSupportConversations = async () => {
+  // Load all admin support conversations with pagination
+  const loadSupportConversations = async (page: number = currentPage.value) => {
     loadingConversations.value = true
     try {
-      const conversations = await getAllAdminSupportConversations()
-      supportConversations.value = conversations
-      console.log('Loaded support conversations:', conversations.length)
+      const result = await getAllAdminSupportConversations(page, pageSize.value)
+      supportConversations.value = result.conversations
+      totalCount.value = result.totalCount
+      totalPages.value = result.totalPages
+      currentPage.value = result.currentPage
+      console.log('Loaded support conversations:', result.conversations.length, 'Total:', result.totalCount)
     } catch (error) {
       console.error('Error loading support conversations:', error)
       toast.error('Failed to load support conversations')
@@ -179,6 +188,31 @@ export function useAdminSupportInbox(currentUser: any) {
     )
   }
 
+  // Pagination functions
+  const goToPage = async (page: number) => {
+    if (page >= 1 && page <= totalPages.value) {
+      await loadSupportConversations(page)
+    }
+  }
+
+  const nextPage = async () => {
+    if (currentPage.value < totalPages.value) {
+      await goToPage(currentPage.value + 1)
+    }
+  }
+
+  const previousPage = async () => {
+    if (currentPage.value > 1) {
+      await goToPage(currentPage.value - 1)
+    }
+  }
+
+  const changePageSize = async (newPageSize: number) => {
+    pageSize.value = newPageSize
+    currentPage.value = 1 // Reset to first page
+    await loadSupportConversations(1)
+  }
+
   // Open inbox dialog
   const openInbox = async () => {
     showInbox.value = true
@@ -226,9 +260,21 @@ export function useAdminSupportInbox(currentUser: any) {
     loadingConversations,
     loadingMessages,
     sendingMessage,
+    // Pagination state
+    currentPage,
+    pageSize,
+    totalCount,
+    totalPages,
+    // Functions
     openInbox,
     closeInbox,
     selectConversation,
     sendMessageToStudent,
+    loadSupportConversations,
+    // Pagination functions
+    goToPage,
+    nextPage,
+    previousPage,
+    changePageSize,
   }
 }

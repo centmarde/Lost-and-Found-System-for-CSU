@@ -11,50 +11,26 @@ interface Item {
   user_id: string
   claimed_by: string
   created_at: string
+  user_email?: string  // Add user email field
 }
 
 export function useItems(isCurrentUserAdmin: any, currentUser: any) {
   const toast = useToast()
+  const authStore = useAuthUserStore()
   const items = ref<Item[]>([])
   const itemsLoading = ref(false)
 
   /**
-   * Fetch items from database based on user role
+   * Fetch all items from database with user email information (no role-based filtering)
    */
   const fetchItems = async () => {
     itemsLoading.value = true
     try {
-      let query = supabase.from('items').select('*')
-
-      if (!isCurrentUserAdmin.value) {
-        // Regular users: fetch items posted by admins
-        const authStore = useAuthUserStore()
-        const { users, error: usersError } = await authStore.getAllUsers()
-
-        if (usersError) {
-          console.error('Error fetching users:', usersError)
-          toast.error('Failed to load admin users')
-          return
-        }
-
-        const adminUsers = users?.filter(user => {
-          const roleId = user.user_metadata?.role
-          return roleId === 1
-        }) || []
-
-        if (adminUsers.length === 0) {
-          items.value = []
-          return
-        }
-
-        const adminUserIds = adminUsers.map(admin => admin.id)
-        query = query.in('user_id', adminUserIds)
-      } else {
-        // Admin users: only fetch their own items
-        query = query.eq('user_id', currentUser.value.id)
-      }
-
-      const { data, error } = await query.order('created_at', { ascending: false })
+      // Fetch all items without any role-based filtering
+      const { data, error } = await supabase
+        .from('items')
+        .select('*')
+        .order('created_at', { ascending: false })
 
       if (error) {
         console.error('Error fetching items:', error)
@@ -62,7 +38,36 @@ export function useItems(isCurrentUserAdmin: any, currentUser: any) {
         return
       }
 
-      items.value = data || []
+      // Fetch user emails for all items using authUser store
+      if (data && data.length > 0) {
+        const userIds = [...new Set(data.map(item => item.user_id))]
+
+        // Use authUser store to get all users
+        const { users, error: usersError } = await authStore.getAllUsers()
+
+        if (usersError) {
+          console.warn('Could not fetch user emails:', usersError)
+          // Still show items even if we can't get user emails
+          items.value = data || []
+          return
+        }
+
+        // Create a map of user_id to email
+        const userEmailMap = new Map()
+        users?.forEach(user => {
+          userEmailMap.set(user.id, user.email)
+        })
+
+        // Add user_email to each item
+        const itemsWithEmails = data.map(item => ({
+          ...item,
+          user_email: userEmailMap.get(item.user_id) || 'Email not found'
+        }))
+
+        items.value = itemsWithEmails
+      } else {
+        items.value = data || []
+      }
     } catch (error) {
       console.error('Error:', error)
       toast.error('An unexpected error occurred while loading items')

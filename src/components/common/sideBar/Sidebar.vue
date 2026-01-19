@@ -43,9 +43,10 @@ watch(
   () => route.path,
   (newPath) => {
     if (
-      newPath === "/dashboard" ||
-      newPath === "/usermanagement" ||
-      newPath === "/rolepages"
+      newPath === "/admin/dashboard" ||
+      newPath === "/admin/users" ||
+      newPath === "/admin/roles" ||
+      newPath === "/admin/support-inbox"
     ) {
       adminGroupExpanded.value = true;
     }

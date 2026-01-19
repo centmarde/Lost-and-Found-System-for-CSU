@@ -26,6 +26,7 @@ interface Item {
   user_id: string;
   claimed_by: string;
   created_at: string;
+  user_email?: string;  // Add user email field
 }
 
 interface Props {
@@ -244,6 +245,14 @@ onUnmounted(() => {
 
     <v-card-text>
       <p class="text-body-2 mb-3">{{ item.description }}</p>
+
+      <!-- User Email -->
+      <div class="d-flex align-center text-caption text-grey-darken-1 mb-2">
+        <v-icon size="16" class="me-1">mdi-account-circle</v-icon>
+        Posted by: {{ item.user_email || 'Unknown user' }}
+      </div>
+
+      <!-- Created Date -->
       <div class="d-flex align-center text-caption text-grey-darken-1">
         <v-icon size="16" class="me-1">mdi-clock-outline</v-icon>
         {{ formatDate(item.created_at) }}
@@ -394,7 +403,7 @@ onUnmounted(() => {
 
 .my-message .message-content {
  background: #1b5e20;
- color: white; 
+ color: white;
 }
 
 .message-text {
@@ -408,7 +417,7 @@ onUnmounted(() => {
  opacity: 0.7;
  margin-top: 4px;
  text-align: right;
- color: #616161; 
+ color: #616161;
 }
 
 .my-message .message-time {

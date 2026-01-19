@@ -9,6 +9,8 @@ import SystemStats from '@/pages/admin/components/SystemStats.vue'
 import QuickSummary from '@/pages/admin/components/Summary.vue'
 import RecentActivity from '@/pages/admin/components/RecentActivity.vue'
 import PostItemDialog from '@/pages/admin/components/PostItemDialog.vue'
+import ConfirmationDialog from '@/components/common/ConfirmationDialog.vue'
+import ErrorDialog from '@/components/common/ErrorDialog.vue'
 import { useDashboardData } from '@/pages/admin/components/composables/useDashboardData'
 import { useAdminItemActions } from '@/pages/admin/components/composables/useAdminItems'
 // import { handleClaimItem } from '@/stores/items'
@@ -40,12 +42,20 @@ const {
   showPostDialog,
   updatingItems,
   newItemForm,
-  postMissingItem
+  postMissingItem,
+  deleteItemById,
+  showErrorDialog,
+  errorMessage
 } = useAdminItemActions(fetchDashboardStats)
 
 // Claim dialog state
 const showClaimDialog = ref(false)
 const selectedItemForClaim = ref<Item | null>(null)
+
+// Delete confirmation dialog state
+const showDeleteDialog = ref(false)
+const selectedItemForDelete = ref<Item | null>(null)
+const deletingItem = ref(false)
 
 // Handle showing claim dialog
 const handleShowClaimDialog = (item: Item) => {
@@ -57,6 +67,33 @@ const handleShowClaimDialog = (item: Item) => {
 const onClaimItem = async (itemId: number, claimedBy: string) => {
   await markItemAsClaimed(itemId, claimedBy)
   await fetchDashboardStats()
+}
+
+// Handle delete item with confirmation
+const handleDeleteItem = async (item: Item) => {
+  selectedItemForDelete.value = item
+  showDeleteDialog.value = true
+}
+
+// Confirm delete item
+const confirmDeleteItem = async () => {
+  if (!selectedItemForDelete.value) return
+
+  deletingItem.value = true
+  try {
+    await deleteItemById(selectedItemForDelete.value.id)
+    showDeleteDialog.value = false
+    selectedItemForDelete.value = null
+  } catch (error) {
+    // Error is handled by the composable
+  } finally {
+    deletingItem.value = false
+  }
+}
+
+// Cancel delete item
+const cancelDeleteItem = () => {
+  selectedItemForDelete.value = null
 }
 
 const searchQuery = ref('')
@@ -103,18 +140,7 @@ onMounted(async () => {
               <span class="d-none d-sm-inline">Post Missing Item</span>
               <span class="d-inline d-sm-none">Post Item</span>
             </v-btn>
-            <v-btn
-              color="primary"
-              variant="outlined"
-              prepend-icon="mdi-refresh"
-              @click="fetchDashboardStats"
-              :loading="loading"
-              size="small"
-              class="text-caption text-sm-body-2"
-              block
-            >
-              Refresh
-            </v-btn>
+
           </div>
         </div>
 
@@ -158,6 +184,7 @@ onMounted(async () => {
                       :item="item"
                       :is-updating="updatingItems.has(item.id)"
                       @show-claim-dialog="handleShowClaimDialog"
+                      @delete-item="handleDeleteItem"
                     />
                   </v-col>
                 </v-row>
@@ -185,6 +212,23 @@ onMounted(async () => {
           :item="selectedItemForClaim"
           :loading="selectedItemForClaim ? updatingItems.has(selectedItemForClaim.id) : false"
           @claim-item="onClaimItem"
+        />
+
+        <ConfirmationDialog
+          v-model="showDeleteDialog"
+          title="Delete Item"
+          :message="`Are you sure you want to delete '${selectedItemForDelete?.title}'? This action cannot be undone.`"
+          confirm-text="Delete"
+          cancel-text="Cancel"
+          confirm-color="error"
+          :loading="deletingItem"
+          @confirm="confirmDeleteItem"
+          @cancel="cancelDeleteItem"
+        />
+
+        <ErrorDialog
+          v-model="showErrorDialog"
+          :message="errorMessage"
         />
       </div>
     </template>

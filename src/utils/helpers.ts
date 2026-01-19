@@ -194,7 +194,7 @@ type SortBy = 'newest' | 'oldest';
  * @param items - A reactive reference to the array of items.
  * @returns An object containing reactive state and computed properties.
  */
-export function useFilterSortPagination<T extends { created_at: string }>(
+export function useFilterSortPagination<T extends { created_at: string; title?: string; description?: string; location?: string; user?: any }>(
   items: Ref<T[]>,
   initialItemsPerPage: number = 10
 ) {
@@ -204,10 +204,18 @@ export function useFilterSortPagination<T extends { created_at: string }>(
   const sortBy = ref<SortBy>('newest');
   const page = ref(1);
   const itemsPerPage = ref(initialItemsPerPage);
+  const searchQuery = ref('');
 
   // --- Computed properties for filtering and sorting ---
   const availableMonths = computed(() => {
     const months = new Set<string>()
+
+    // Always include current month
+    const currentDate = new Date()
+    const currentMonthYear = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}`
+    months.add(currentMonthYear)
+
+    // Add months from existing items
     items.value.forEach(item => {
       // Ensure the property is correct, assuming T extends the ActivityItem's date structure
       const date = new Date(item.created_at)
@@ -221,6 +229,16 @@ export function useFilterSortPagination<T extends { created_at: string }>(
     if (selectedMonth.value === 'all') return []
 
     const days = new Set<string>()
+    const currentDate = new Date()
+    const currentMonthYear = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}`
+
+    // If current month is selected, always include today
+    if (selectedMonth.value === currentMonthYear) {
+      const today = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}-${String(currentDate.getDate()).padStart(2, '0')}`
+      days.add(today)
+    }
+
+    // Add days from existing items
     items.value.forEach(item => {
       const date = new Date(item.created_at)
       const monthYear = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
@@ -235,6 +253,38 @@ export function useFilterSortPagination<T extends { created_at: string }>(
 
   const filteredAndSortedItems = computed(() => {
     let filtered = [...items.value]
+
+    // Filter by search query
+    if (searchQuery.value.trim()) {
+      const query = searchQuery.value.toLowerCase().trim()
+      filtered = filtered.filter(item => {
+        // Search in title
+        if (item.title && item.title.toLowerCase().includes(query)) {
+          return true
+        }
+
+        // Search in description if available
+        if (item.description && item.description.toLowerCase().includes(query)) {
+          return true
+        }
+
+        // Search in location if available
+        if (item.location && item.location.toLowerCase().includes(query)) {
+          return true
+        }
+
+        // Search in user information if available
+        if (item.user) {
+          const userStr = typeof item.user === 'string' ? item.user :
+                          item.user.email || item.user.name || ''
+          if (userStr.toLowerCase().includes(query)) {
+            return true
+          }
+        }
+
+        return false
+      })
+    }
 
     // Filter by month
     if (selectedMonth.value !== 'all') {
@@ -289,7 +339,7 @@ export function useFilterSortPagination<T extends { created_at: string }>(
 
   // --- Watchers for State Reset ---
   // Reset pagination when filters change
-  watch([selectedMonth, selectedDay, sortBy, itemsPerPage], () => {
+  watch([selectedMonth, selectedDay, sortBy, itemsPerPage, searchQuery], () => {
     page.value = 1
   })
 
@@ -305,6 +355,7 @@ export function useFilterSortPagination<T extends { created_at: string }>(
     sortBy,
     page,
     itemsPerPage,
+    searchQuery,
     availableMonths,
     availableDays,
     filteredAndSortedItems,

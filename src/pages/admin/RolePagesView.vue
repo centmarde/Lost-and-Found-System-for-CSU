@@ -114,8 +114,7 @@ const {
                 <v-btn
                   icon
                   size="small"
-                  variant="text"
-                  color="primary"
+
                   @click="openEditDialog(role)"
                   :loading="loading"
                 >
