@@ -27,6 +27,10 @@ export const useAdminItemActions = (refreshData: () => Promise<void>) => {
     status: 'lost'
   })
 
+  // Error handling state
+  const showErrorDialog = ref(false)
+  const errorMessage = ref('')
+
   // Conversations state
   const showConversationsDialog = ref(false)
   const selectedItem = ref<Item | null>(null)
@@ -39,6 +43,12 @@ export const useAdminItemActions = (refreshData: () => Promise<void>) => {
   const sendingMessage = ref(false)
 
   let messageSubscription: any = null
+
+  // Show error dialog helper
+  const showError = (message: string) => {
+    errorMessage.value = message
+    showErrorDialog.value = true
+  }
 
   // Post a new missing/found item using store function
   const postMissingItem = async () => {
@@ -69,8 +79,8 @@ export const useAdminItemActions = (refreshData: () => Promise<void>) => {
 
     } catch (error) {
       console.error('Error posting item:', error)
-      const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred'
-      alert(`Error posting item: ${errorMessage}`)
+      const errorMsg = error instanceof Error ? error.message : 'An unknown error occurred'
+      showError(`Error posting item: ${errorMsg}`)
     } finally {
       postingItem.value = false
     }
@@ -211,7 +221,7 @@ export const useAdminItemActions = (refreshData: () => Promise<void>) => {
       await refreshData()
     } catch (error) {
       console.error('Error marking item as claimed:', error)
-      alert('Error updating item status')
+      showError('Error updating item status')
     }
   }
 
@@ -222,7 +232,7 @@ export const useAdminItemActions = (refreshData: () => Promise<void>) => {
       await refreshData()
     } catch (error) {
       console.error('Error marking item as unclaimed:', error)
-      alert('Error updating item status')
+      showError('Error updating item status')
     }
   }
 
@@ -233,7 +243,7 @@ export const useAdminItemActions = (refreshData: () => Promise<void>) => {
       await refreshData()
     } catch (error) {
       console.error('Error deleting item:', error)
-      alert('Error deleting item')
+      showError('Error deleting item')
     }
   }
 
@@ -249,6 +259,10 @@ export const useAdminItemActions = (refreshData: () => Promise<void>) => {
     markAsClaimed,
     markAsUnclaimed,
     deleteItemById,
+
+    // Error handling
+    showErrorDialog,
+    errorMessage,
 
     // Conversations
     showConversationsDialog,
