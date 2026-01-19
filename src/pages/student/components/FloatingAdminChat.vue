@@ -82,10 +82,10 @@ watch(() => props.show, (newVal) => {
   <div v-if="!show" class="floating-chat-button">
     <v-btn
       color="primary"
-      size="x-large"
       elevation="8"
       @click="openChat"
       class="chat-fab"
+      icon
     >
       <v-badge
         v-if="unreadCount > 0"
@@ -93,9 +93,9 @@ watch(() => props.show, (newVal) => {
         color="error"
         overlap
       >
-        <v-icon size="32">mdi-message-text</v-icon>
+        <v-icon size="24">mdi-message-text</v-icon>
       </v-badge>
-      <v-icon v-else size="32">mdi-message-text</v-icon>
+      <v-icon v-else size="24">mdi-message-text</v-icon>
     </v-btn>
     <div class="chat-tooltip">Contact Admin</div>
   </div>
@@ -108,13 +108,13 @@ watch(() => props.show, (newVal) => {
     elevation="16"
   >
     <!-- Header -->
-    <v-card-title class="chat-header d-flex align-center pa-3 bg-primary">
-      <v-avatar size="32" class="me-2">
-        <v-icon color="white">mdi-account-circle</v-icon>
+    <v-card-title class="chat-header d-flex align-center pa-2 bg-primary">
+      <v-avatar size="28" class="me-2">
+        <v-icon color="white" size="20">mdi-account-circle</v-icon>
       </v-avatar>
       <div class="text-white flex-grow-1">
-        <div class="text-subtitle-1 font-weight-bold">Admin Support</div>
-        <div class="text-caption opacity-80">
+        <div class="text-subtitle-2 font-weight-bold">Admin Support</div>
+        <div class="text-caption opacity-80" style="font-size: 0.7rem;">
           {{ initializingChat ? 'Connecting...' : 'Online' }}
         </div>
       </div>
@@ -140,7 +140,7 @@ watch(() => props.show, (newVal) => {
 
     <!-- Messages Container -->
     <div v-show="!isMinimized" class="chat-body">
-      <div class="support-messages-container pa-4">
+      <div class="support-messages-container pa-3">
         <!-- Loading State -->
         <div v-if="messagesLoading || initializingChat" class="d-flex justify-center align-center" style="height: 100%;">
           <div class="text-center">
@@ -179,8 +179,8 @@ watch(() => props.show, (newVal) => {
       </div>
 
       <!-- Input Area -->
-      <div class="chat-footer pa-3 bg-grey-lighten-4">
-        <div class="d-flex align-center gap-2">
+      <div class="chat-footer pa-2 bg-grey-lighten-4">
+        <div class="d-flex align-center gap-1">
           <v-text-field
             v-model="newMessage"
             placeholder="Type your message..."
@@ -190,15 +190,17 @@ watch(() => props.show, (newVal) => {
             @keypress="handleKeyPress"
             :disabled="sendingMessage || initializingChat"
             class="flex-grow-1"
+            style="font-size: 0.85rem;"
           />
           <v-btn
             color="primary"
             icon
+            size="small"
             :loading="sendingMessage"
             :disabled="!newMessage.trim() || initializingChat"
             @click="sendMessage"
           >
-            <v-icon>mdi-send</v-icon>
+            <v-icon size="18">mdi-send</v-icon>
           </v-btn>
         </div>
       </div>
@@ -209,15 +211,18 @@ watch(() => props.show, (newVal) => {
 <style scoped>
 .floating-chat-button {
   position: fixed;
-  bottom: 24px;
-  right: 24px;
+  bottom: 20px;
+  right: 20px;
   z-index: 1000;
 }
 
 .chat-fab {
   border-radius: 50% !important;
-  width: 64px !important;
-  height: 64px !important;
+  width: 56px !important;
+  height: 56px !important;
+  min-width: 56px !important;
+  padding: 0 !important;
+  aspect-ratio: 1 / 1;
 }
 
 .chat-tooltip {
@@ -225,11 +230,11 @@ watch(() => props.show, (newVal) => {
   bottom: 100%;
   right: 0;
   margin-bottom: 8px;
-  padding: 8px 12px;
+  padding: 6px 10px;
   background-color: rgba(0, 0, 0, 0.8);
   color: white;
-  border-radius: 4px;
-  font-size: 12px;
+  border-radius: 12px;
+  font-size: 11px;
   white-space: nowrap;
   opacity: 0;
   pointer-events: none;
@@ -242,19 +247,19 @@ watch(() => props.show, (newVal) => {
 
 .floating-chat-window {
   position: fixed;
-  bottom: 24px;
-  right: 24px;
-  width: 380px;
-  max-width: calc(100vw - 48px);
+  bottom: 20px;
+  right: 20px;
+  width: 320px;
+  max-width: calc(100vw - 40px);
   z-index: 1000;
-  border-radius: 12px !important;
+  border-radius: 24px !important;
   overflow: hidden;
   transition: height 0.3s ease;
 }
 
 .floating-chat-window:not(.minimized) {
-  height: 600px;
-  max-height: calc(100vh - 100px);
+  height: 480px;
+  max-height: calc(100vh - 80px);
 }
 
 .floating-chat-window.minimized {
@@ -269,7 +274,7 @@ watch(() => props.show, (newVal) => {
 .chat-body {
   display: flex;
   flex-direction: column;
-  height: calc(100% - 64px);
+  height: calc(100% - 56px);
 }
 
 .support-messages-container {
@@ -312,8 +317,8 @@ watch(() => props.show, (newVal) => {
 
 .message-content {
   max-width: 75%;
-  padding: 10px 14px;
-  border-radius: 16px;
+  padding: 8px 12px;
+  border-radius: 20px;
   background-color: #f1f3f4;
   color: #212121;
 }
@@ -351,12 +356,23 @@ watch(() => props.show, (newVal) => {
     left: 0;
     width: 100%;
     max-width: 100%;
-    border-radius: 12px 12px 0 0 !important;
+    border-radius: 20px 20px 0 0 !important;
+  }
+
+  .floating-chat-window:not(.minimized) {
+    height: 400px;
+    max-height: calc(100vh - 60px);
   }
 
   .floating-chat-button {
     bottom: 16px;
     right: 16px;
+  }
+
+  .chat-fab {
+    width: 48px !important;
+    height: 48px !important;
+    min-width: 48px !important;
   }
 }
 </style>

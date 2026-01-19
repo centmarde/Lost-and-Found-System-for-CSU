@@ -166,21 +166,49 @@ onMounted(async () => {
       <v-container fluid class="pa-6">
         <v-row class="mb-6">
           <v-col cols="12">
-            <div class="text-center position-relative">
-              <h1 class="text-h3 font-weight-bold text-green-darken-4 mb-2">
-                {{ pageTitle }}
-              </h1>
-              <p class="text-h6 text-grey-darken-1">
-                {{ pageSubtitle }}
-              </p>
+            <div class="pa-6 pa-sm-8 pa-md-12 position-relative">
+              <!-- Admin Support Inbox Button (positioned absolutely) -->
+              <div v-if="isCurrentUserAdmin" class="position-absolute" style="top: 24px; right: 24px;">
+                <v-btn
+                  color="primary"
+                  variant="elevated"
+                  prepend-icon="mdi-inbox"
+                  @click="openInbox"
+                  size="default"
+                  class="d-none d-sm-flex"
+                >
+                  <span class="d-none d-md-inline">Support Inbox</span>
+                  <span class="d-md-none">Inbox</span>
+                </v-btn>
 
-              <!-- Notification Bell for Students -->
-              <div v-if="showNotificationBell" class="notification-bell">
+                <!-- Mobile admin button -->
+                <v-btn
+                  color="primary"
+                  variant="elevated"
+                  icon="mdi-inbox"
+                  @click="openInbox"
+                  size="small"
+                  class="d-sm-none"
+                />
+              </div>
+
+              <!-- Perfectly Centered Header Content -->
+              <div class="text-center mb-4 mb-md-6">
+                <h1 class="text-h2 text-sm-h1 font-weight-bold text-green-darken-4 mb-2">
+                  {{ pageTitle }}
+                </h1>
+                <p class="text-h6 text-sm-h5 text-grey-darken-1 mb-0">
+                  {{ pageSubtitle }}
+                </p>
+              </div>
+
+              <!-- Centered Notification Bell for Students -->
+              <div v-if="showNotificationBell" class="text-center mt-3 mt-md-4">
                 <v-btn
                   icon
-                  size="large"
                   @click="toggleNotifications"
                   :color="unreadCount > 0 ? 'primary' : 'default'"
+                  :size="$vuetify.display.xs ? 'small' : $vuetify.display.sm ? 'default' : 'large'"
                 >
                   <v-badge
                     :content="unreadCount"
@@ -188,21 +216,8 @@ onMounted(async () => {
                     color="error"
                     overlap
                   >
-                    <v-icon>mdi-bell</v-icon>
+                    <v-icon :size="$vuetify.display.xs ? 'small' : 'default'">mdi-bell</v-icon>
                   </v-badge>
-                </v-btn>
-              </div>
-
-              <!-- Admin Support Inbox Button (for admins) -->
-              <div v-if="isCurrentUserAdmin" class="admin-inbox-button">
-                <v-btn
-                  color="primary"
-                  variant="elevated"
-                  prepend-icon="mdi-inbox"
-                  @click="openInbox"
-                  size="large"
-                >
-                  Support Inbox
                 </v-btn>
               </div>
             </div>
@@ -347,10 +362,16 @@ onMounted(async () => {
                   v-if="!itemsLoading"
                   color="info"
                   variant="tonal"
-                  size="small"
+                  :size="$vuetify.display.xs ? 'x-small' : 'small'"
                 >
-                  {{ filteredAndSortedItems.length }} of
-                  {{ items.length }} items
+                  <!-- Mobile view: shorter text -->
+                  <span class="d-sm-none">
+                    {{ filteredAndSortedItems.length }}/{{ items.length }}
+                  </span>
+                  <!-- Desktop view: full text -->
+                  <span class="d-none d-sm-inline">
+                    {{ filteredAndSortedItems.length }} of {{ items.length }} items
+                  </span>
                 </v-chip>
               </v-card-title>
 
@@ -522,16 +543,5 @@ onMounted(async () => {
 </template>
 
 <style scoped>
-.admin-inbox-button {
-  position: absolute;
-  top: 0;
-  right: 10px;
-}
-
-@media (max-width: 960px) {
-  .admin-inbox-button {
-    position: static;
-    margin-top: 16px;
-  }
-}
+/* Only keeping non-header related styles if any exist */
 </style>
