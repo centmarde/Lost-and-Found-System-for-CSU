@@ -362,10 +362,16 @@ onMounted(async () => {
                   v-if="!itemsLoading"
                   color="info"
                   variant="tonal"
-                  size="small"
+                  :size="$vuetify.display.xs ? 'x-small' : 'small'"
                 >
-                  {{ filteredAndSortedItems.length }} of
-                  {{ items.length }} items
+                  <!-- Mobile view: shorter text -->
+                  <span class="d-sm-none">
+                    {{ filteredAndSortedItems.length }}/{{ items.length }}
+                  </span>
+                  <!-- Desktop view: full text -->
+                  <span class="d-none d-sm-inline">
+                    {{ filteredAndSortedItems.length }} of {{ items.length }} items
+                  </span>
                 </v-chip>
               </v-card-title>
 
