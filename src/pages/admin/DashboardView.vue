@@ -84,18 +84,24 @@ onMounted(async () => {
 <template>
   <InnerLayoutWrapper>
     <template #content>
-      <div  class="dashboard container-fluid mx-5 my-5">
-        <div class="d-flex justify-space-between align-center mb-6">
-          <h1 class="text-h4 font-weight-bold text-green-darken-4">
-            CSU Lost & Found Dashboard
+      <div  class="dashboard container-fluid mx-2 mx-md-5 my-3 my-md-5">
+        <div class="d-flex flex-column flex-sm-row justify-space-between align-start align-sm-center mb-4 mb-md-6 gap-3">
+          <h1 class="text-h5 text-sm-h4 font-weight-bold text-green-darken-4">
+            <span class="d-none d-sm-inline">CSU Lost & Found Dashboard</span>
+            <span class="d-inline d-sm-none">CSU Dashboard</span>
           </h1>
-          <div class="d-flex gap-2">
+          <div class="d-flex flex-column flex-sm-row gap-2 w-100 w-sm-auto">
             <v-btn
               color="success"
               prepend-icon="mdi-plus-circle"
               @click="showPostDialog = true"
+              size="small"
+              class="text-caption text-sm-body-2"
+              block
+              :class="{ 'mb-2 mb-sm-0': true }"
             >
-              Post Missing Item
+              <span class="d-none d-sm-inline">Post Missing Item</span>
+              <span class="d-inline d-sm-none">Post Item</span>
             </v-btn>
             <v-btn
               color="primary"
@@ -103,6 +109,9 @@ onMounted(async () => {
               prepend-icon="mdi-refresh"
               @click="fetchDashboardStats"
               :loading="loading"
+              size="small"
+              class="text-caption text-sm-body-2"
+              block
             >
               Refresh
             </v-btn>
