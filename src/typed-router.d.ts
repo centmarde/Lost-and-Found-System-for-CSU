@@ -26,6 +26,8 @@ declare module 'vue-router/auto-routes' {
     '/admin/components/ConvoDialog': RouteRecordInfo<'/admin/components/ConvoDialog', '/admin/components/ConvoDialog', Record<never, never>, Record<never, never>>,
     '/admin/components/DashboardItemCards': RouteRecordInfo<'/admin/components/DashboardItemCards', '/admin/components/DashboardItemCards', Record<never, never>, Record<never, never>>,
     '/admin/components/dialogs/AdminUserRolesDialog': RouteRecordInfo<'/admin/components/dialogs/AdminUserRolesDialog', '/admin/components/dialogs/AdminUserRolesDialog', Record<never, never>, Record<never, never>>,
+    '/admin/components/dialogs/ConfirmationDialog': RouteRecordInfo<'/admin/components/dialogs/ConfirmationDialog', '/admin/components/dialogs/ConfirmationDialog', Record<never, never>, Record<never, never>>,
+    '/admin/components/dialogs/EditUserDialog': RouteRecordInfo<'/admin/components/dialogs/EditUserDialog', '/admin/components/dialogs/EditUserDialog', Record<never, never>, Record<never, never>>,
     '/admin/components/dialogs/UserDetailsDialog': RouteRecordInfo<'/admin/components/dialogs/UserDetailsDialog', '/admin/components/dialogs/UserDetailsDialog', Record<never, never>, Record<never, never>>,
     '/admin/components/PostItemDialog': RouteRecordInfo<'/admin/components/PostItemDialog', '/admin/components/PostItemDialog', Record<never, never>, Record<never, never>>,
     '/admin/components/ProfileFormUpdate': RouteRecordInfo<'/admin/components/ProfileFormUpdate', '/admin/components/ProfileFormUpdate', Record<never, never>, Record<never, never>>,

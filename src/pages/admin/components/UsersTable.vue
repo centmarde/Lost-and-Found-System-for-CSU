@@ -4,11 +4,36 @@ import { ref, onMounted, computed } from 'vue'
 import { useAuthUserStore } from '@/stores/authUser'
 import { useToast } from 'vue-toastification'
 import { getRoleName, getRoleColor } from '@/utils/usersTableHelpers'
+import { useUserActions } from '@/composables/useUserActions'
 import UserDetailsDialog from './dialogs/UserDetailsDialog.vue'
+import EditUserDialog from './dialogs/EditUserDialog.vue'
+import ConfirmationDialog from './dialogs/ConfirmationDialog.vue'
 
 // Store and utilities
 const authStore = useAuthUserStore()
 const toast = useToast()
+
+// User actions composable
+const {
+  // Loading states
+  editingUser,
+  deletingUser,
+  // Dialog states
+  showEditDialog,
+  showConfirmationDialog,
+  // Form data
+  selectedUser: editingSelectedUser,
+  editForm,
+  // Actions
+  openEditDialog,
+  closeEditDialog,
+  updateUser,
+  confirmDeleteUser,
+  confirmBanUser,
+  confirmUnbanUser,
+  closeConfirmationDialog,
+  executeConfirmedAction,
+} = useUserActions()
 
 // Reactive state
 const users = ref<any[]>([])
@@ -135,13 +160,25 @@ const viewUser = (user: any) => {
 }
 
 const editUser = (user: any) => {
-  // TODO: Implement edit functionality
-  toast.info(`Edit functionality for ${user.email} coming soon`)
+  openEditDialog(user)
 }
 
 const deleteUser = (user: any) => {
-  // TODO: Implement delete functionality
-  toast.warning(`Delete functionality for ${user.email} coming soon`)
+  confirmDeleteUser(user)
+}
+
+// Handle user update with refresh
+const handleUserUpdate = async () => {
+  const result = await updateUser()
+  if (result.success) {
+    await fetchUsers() // Refresh the users list
+  }
+}
+
+// Handle user deletion with refresh
+const handleUserDeletion = async () => {
+  await executeConfirmedAction()
+  await fetchUsers() // Refresh the users list
 }
 
 // Utility functions
@@ -253,13 +290,26 @@ onMounted(() => {
 
             <!-- Role column -->
             <template v-slot:item.role="{ item }">
-              <v-chip
-                :color="getRoleColor(item.raw_user_meta_data?.role || item.raw_app_meta_data?.role)"
-                size="small"
-                variant="tonal"
-              >
-                {{ getRoleTitleSync(item.raw_user_meta_data?.role || item.raw_app_meta_data?.role) }}
-              </v-chip>
+              <div class="d-flex flex-column align-center gap-1">
+                <v-chip
+                  :color="getRoleColor(item.raw_user_meta_data?.role || item.raw_app_meta_data?.role)"
+                  size="small"
+                  variant="tonal"
+                >
+                  {{ getRoleTitleSync(item.raw_user_meta_data?.role || item.raw_app_meta_data?.role) }}
+                </v-chip>
+
+                <!-- Ban status indicator -->
+                <v-chip
+                  v-if="item.raw_app_meta_data?.banned"
+                  color="error"
+                  size="x-small"
+                  variant="tonal"
+                >
+                  <v-icon start size="12">mdi-account-cancel</v-icon>
+                  Banned
+                </v-chip>
+              </div>
             </template>
 
             <!-- Actions column -->
@@ -284,6 +334,7 @@ onMounted(() => {
                   variant="text"
                   color="orange"
                   @click="editUser(item)"
+                  :loading="editingUser"
                 >
                   <v-icon>mdi-pencil</v-icon>
                   <v-tooltip activator="parent" location="top">
@@ -291,18 +342,55 @@ onMounted(() => {
                   </v-tooltip>
                 </v-btn>
 
-                <v-btn
-                  icon="mdi-delete"
-                  size="small"
-                  variant="text"
-                  color="error"
-                  @click="deleteUser(item)"
-                >
-                  <v-icon>mdi-delete</v-icon>
-                  <v-tooltip activator="parent" location="top">
-                    Delete User
-                  </v-tooltip>
-                </v-btn>
+                <!-- Action Menu -->
+                <v-menu>
+                  <template v-slot:activator="{ props: menuProps }">
+                    <v-btn
+                      icon="mdi-dots-vertical"
+                      size="small"
+                      variant="text"
+                      color="grey"
+                      v-bind="menuProps"
+                    >
+                      <v-icon>mdi-dots-vertical</v-icon>
+                      <v-tooltip activator="parent" location="top">
+                        More Actions
+                      </v-tooltip>
+                    </v-btn>
+                  </template>
+
+                  <v-list density="compact" min-width="160">
+                    <!-- Ban/Unban Actions -->
+                    <v-list-item
+                      v-if="!item.raw_app_meta_data?.banned"
+                      @click="confirmBanUser(item)"
+                      prepend-icon="mdi-account-cancel"
+                    >
+                      <v-list-item-title>Ban User</v-list-item-title>
+                    </v-list-item>
+
+                    <v-list-item
+                      v-else
+                      @click="confirmUnbanUser(item)"
+                      prepend-icon="mdi-account-check"
+                      class="text-success"
+                    >
+                      <v-list-item-title>Unban User</v-list-item-title>
+                    </v-list-item>
+
+                    <v-divider class="my-1"></v-divider>
+
+                    <!-- Delete Action -->
+                    <v-list-item
+                      @click="deleteUser(item)"
+                      prepend-icon="mdi-delete"
+                      class="text-error"
+                      :disabled="deletingUser"
+                    >
+                      <v-list-item-title>Delete User</v-list-item-title>
+                    </v-list-item>
+                  </v-list>
+                </v-menu>
               </div>
             </template>
 
@@ -367,13 +455,24 @@ onMounted(() => {
                       {{ user.raw_user_meta_data?.full_name || 'No name provided' }}
                     </div>
                     <!-- Role chip moved below user info -->
-                    <div class="mt-2">
+                    <div class="mt-2 d-flex flex-wrap gap-1">
                       <v-chip
                         :color="getRoleColor(user.raw_user_meta_data?.role)"
                         size="small"
                         variant="tonal"
                       >
                         {{ getRoleTitleSync(user.raw_user_meta_data?.role) }}
+                      </v-chip>
+
+                      <!-- Ban status indicator -->
+                      <v-chip
+                        v-if="user.raw_app_meta_data?.banned"
+                        color="error"
+                        size="small"
+                        variant="tonal"
+                      >
+                        <v-icon start size="12">mdi-account-cancel</v-icon>
+                        Banned
                       </v-chip>
                     </div>
                   </div>
@@ -411,22 +510,63 @@ onMounted(() => {
                     @click="editUser(user)"
                     class="mobile-action-btn mx-2"
                     density="compact"
+                    :loading="editingUser"
                   >
                     <v-icon size="14" class="me-1">mdi-pencil</v-icon>
                     <span class="mobile-btn-text">Edit</span>
                   </v-btn>
 
-                  <v-btn
-                    size="x-small"
-                    variant="text"
-                    color="error"
-                    @click="deleteUser(user)"
-                    class="mobile-action-btn mobile-delete-btn"
-                    density="compact"
-                    icon
-                  >
-                    <v-icon size="14">mdi-delete</v-icon>
-                  </v-btn>
+                  <!-- Action Menu for mobile -->
+                  <v-menu>
+                    <template v-slot:activator="{ props: menuProps }">
+                      <v-btn
+                        size="x-small"
+                        variant="text"
+                        color="grey"
+                        class="mobile-action-btn"
+                        density="compact"
+                        v-bind="menuProps"
+                        icon
+                      >
+                        <v-icon size="14">mdi-dots-vertical</v-icon>
+                      </v-btn>
+                    </template>
+
+                    <v-list density="compact" min-width="140">
+                      <!-- Ban/Unban Actions -->
+                      <v-list-item
+                        v-if="!user.raw_app_meta_data?.banned"
+                        @click="confirmBanUser(user)"
+                        prepend-icon="mdi-account-cancel"
+                        density="compact"
+                      >
+                        <v-list-item-title class="text-caption">Ban</v-list-item-title>
+                      </v-list-item>
+
+                      <v-list-item
+                        v-else
+                        @click="confirmUnbanUser(user)"
+                        prepend-icon="mdi-account-check"
+                        class="text-success"
+                        density="compact"
+                      >
+                        <v-list-item-title class="text-caption">Unban</v-list-item-title>
+                      </v-list-item>
+
+                      <v-divider class="my-1"></v-divider>
+
+                      <!-- Delete Action -->
+                      <v-list-item
+                        @click="deleteUser(user)"
+                        prepend-icon="mdi-delete"
+                        class="text-error"
+                        density="compact"
+                        :disabled="deletingUser"
+                      >
+                        <v-list-item-title class="text-caption">Delete</v-list-item-title>
+                      </v-list-item>
+                    </v-list>
+                  </v-menu>
                 </div>
               </v-card-text>
             </v-card>
@@ -438,6 +578,27 @@ onMounted(() => {
     <UserDetailsDialog
       v-model="userDialog"
       :selected-user="selectedUser"
+    />
+
+    <!-- Edit User Dialog Component -->
+    <EditUserDialog
+      v-model="showEditDialog"
+      :user="editingSelectedUser"
+      :edit-form="editForm"
+      :loading="editingUser"
+      @update:edit-form="editForm = $event"
+      @save="handleUserUpdate"
+      @cancel="closeEditDialog"
+    />
+
+    <!-- Confirmation Dialog Component -->
+    <ConfirmationDialog
+      v-model="showConfirmationDialog.show"
+      :title="showConfirmationDialog.title"
+      :message="showConfirmationDialog.message"
+      :loading="deletingUser"
+      @confirm="handleUserDeletion"
+      @cancel="closeConfirmationDialog"
     />
 
   </div>

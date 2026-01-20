@@ -358,6 +358,26 @@ export const useAuthUserStore = defineStore("authUser", () => {
     return await updateUserAppMetadata(userId, unbanData);
   }
 
+  // Delete user function (admin only)
+  async function deleteUser(userId: string) {
+    loading.value = true;
+    try {
+      // Delete the user using admin client
+      const { data, error } = await supabaseAdmin.auth.admin.deleteUser(userId);
+
+      if (error) {
+        return { error };
+      }
+
+      return { data };
+    } catch (error) {
+      console.error("Error deleting user:", error);
+      return { error };
+    } finally {
+      loading.value = false;
+    }
+  }
+
   // Helper function to parse duration strings
   function parseDuration(duration: string): number {
     const units: { [key: string]: number } = {
@@ -379,28 +399,24 @@ export const useAuthUserStore = defineStore("authUser", () => {
   // Get role title by role ID (for any user)
   async function getRoleTitleById(roleId: number) {
     try {
-      console.log('getRoleTitleById - Fetching role title for ID:', roleId);
+      console.log('getRoleTitleById - Getting role title for ID:', roleId);
 
       if (!roleId) {
         console.log('getRoleTitleById - No role ID provided, returning null');
         return { title: null, error: null };
       }
 
-      // Fetch the role title from the roles table
-      const { data, error } = await supabase
-        .from('roles')
-        .select('title')
-        .eq('id', roleId)
-        .single();
+      // Use hardcoded role mappings instead of database query
+      const roleMapping: { [key: number]: string } = {
+        1: 'Admin',
+        2: 'User',
+        3: 'Student',
+        4: 'Faculty'
+      };
 
-      if (error) {
-        console.error('getRoleTitleById - Error fetching role title:', error);
-        return { title: null, error };
-      }
-
-      console.log('getRoleTitleById - Successfully fetched role data:', data);
-      console.log('getRoleTitleById - Role title:', data.title);
-      return { title: data.title, error: null };
+      const title = roleMapping[roleId] || 'Unknown Role';
+      console.log('getRoleTitleById - Role title:', title);
+      return { title, error: null };
     } catch (error) {
       console.error('getRoleTitleById - Unexpected error:', error);
       return { title: null, error };
@@ -418,21 +434,17 @@ export const useAuthUserStore = defineStore("authUser", () => {
         return { title: null, error: null };
       }
 
-      // Fetch the role title from the roles table
-      const { data, error } = await supabase
-        .from('roles')
-        .select('title')
-        .eq('id', roleId)
-        .single();
+      // Use hardcoded role mappings instead of database query
+      const roleMapping: { [key: number]: string } = {
+        1: 'Admin',
+        2: 'User',
+        3: 'Student',
+        4: 'Faculty'
+      };
 
-      if (error) {
-        console.error('getCurrentUserRoleTitle - Error fetching role title:', error);
-        return { title: null, error };
-      }
-
-      console.log('getCurrentUserRoleTitle - Successfully fetched role data:', data);
-      console.log('getCurrentUserRoleTitle - Role title:', data.title);
-      return { title: data.title, error: null };
+      const title = roleMapping[roleId] || 'Unknown Role';
+      console.log('getCurrentUserRoleTitle - Role title:', title);
+      return { title, error: null };
     } catch (error) {
       console.error('getCurrentUserRoleTitle - Unexpected error:', error);
       return { title: null, error };
@@ -464,6 +476,7 @@ export const useAuthUserStore = defineStore("authUser", () => {
     getAllUsers,
     updateUserMetadata,
     updateUserAppMetadata,
+    deleteUser,
     banUser,
     unbanUser,
     getRoleTitleById,
