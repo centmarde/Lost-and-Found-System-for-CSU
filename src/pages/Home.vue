@@ -532,7 +532,7 @@ onMounted(async () => {
         />
 
         <!-- Student Admin Support Chat (Floating) -->
-        <FloatingAdminChat
+        <!-- <FloatingAdminChat
           v-if="!isCurrentUserAdmin && currentUser"
           v-model:show="showSupportChat"
           :messages="supportMessages"
@@ -541,7 +541,7 @@ onMounted(async () => {
           :initializing-chat="initializingChat"
           @send-message="sendSupportMessage"
           @open-chat="openSupportChat"
-        />
+        /> -->
       </v-container>
     </template>
   </InnerLayoutWrapper>
