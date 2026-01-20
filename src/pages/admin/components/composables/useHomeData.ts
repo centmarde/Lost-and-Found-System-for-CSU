@@ -57,7 +57,8 @@ export default function useHomeData() {
       if (error) return false
 
       const currentUserData = users?.find(u => u.id === user.id)
-      const roleId = currentUserData?.raw_user_meta_data?.role
+      const roleId = currentUserData?.raw_user_meta_data?.role ||
+                     currentUserData?.raw_app_meta_data?.role
 
       return roleId === 1
     } catch (error) {
@@ -103,7 +104,9 @@ export default function useHomeData() {
           return
         }
 
-        const adminUsers = users?.filter(user => user.raw_user_meta_data?.role === 1) || []
+        const adminUsers = users?.filter(user =>
+          user.raw_user_meta_data?.role === 1 || user.raw_app_meta_data?.role === 1
+        ) || []
 
         if (adminUsers.length === 0) {
           items.value = []

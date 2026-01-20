@@ -29,7 +29,8 @@ const myAccountGroupExpanded = ref(true);
 
 // Computed property to check if user is admin
 const isAdmin = computed(() => {
-  const roleId = authStore.userData?.user_metadata?.role;
+  const roleId = authStore.userData?.user_metadata?.role ||
+                 authStore.userData?.app_metadata?.role;
   return roleId === 1; // Assuming role ID 1 is admin
 });
 

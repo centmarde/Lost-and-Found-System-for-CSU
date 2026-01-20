@@ -1,7 +1,8 @@
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useProfilesWidget } from './composables/profilesWidget'
+import { useUserRolesStore } from '@/stores/roles'
 import { getEmailInitials } from '@/utils/helpers'
 
 // Emits for parent component interactions
@@ -11,7 +12,7 @@ const emit = defineEmits<{
   'profile-updated': [data: Record<string, any>]
 }>()
 
-// Use the composable
+// Use the composables
 const {
   currentUser,
   loading,
@@ -26,9 +27,23 @@ const {
   updateUserMetadata
 } = useProfilesWidget()
 
+const rolesStore = useUserRolesStore()
+
+// Computed property to get role description
+const roleDescription = computed(() => {
+  if (!userRole.value) return null
+  const role = rolesStore.roles.find(r => r.id === userRole.value)
+  return role?.title || `Role ID: ${userRole.value}`
+})
+
 // Computed property for email initials
 const userInitials = computed(() => {
   return getEmailInitials(userEmail.value)
+})
+
+// Load roles on component mount
+onMounted(async () => {
+  await rolesStore.fetchRoles()
 })
 
 // Form state
@@ -161,10 +176,10 @@ const handleUpdateProfile = async () => {
         <!-- Profile Details -->
         <v-list class="bg-transparent">
           <v-list-item
-            v-if="userRole"
+            v-if="roleDescription"
             prepend-icon="mdi-account-key"
-            :title="`Role ID: ${userRole}`"
-            subtitle="User Role Identifier"
+            :title="`Role: ${roleDescription}`"
+            subtitle="User Role"
           ></v-list-item>
 
           <v-list-item
