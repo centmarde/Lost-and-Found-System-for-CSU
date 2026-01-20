@@ -30,7 +30,11 @@ export const useAuthUserStore = defineStore("authUser", () => {
   const isAuthenticated = computed(() => userData.value !== null);
   const userEmail = computed(() => userData.value?.email || null);
   const userName = computed(() => userData.value?.user_metadata?.full_name || userData.value?.email || null);
-  const userRoleId = computed(() => userData.value?.app_metadata?.role || null);
+  const userRoleId = computed(() =>
+    userData.value?.user_metadata?.role ||
+    userData.value?.app_metadata?.role ||
+    null
+  );
 
 
   async function registerUser(
@@ -41,13 +45,14 @@ export const useAuthUserStore = defineStore("authUser", () => {
   ) {
     loading.value = true;
     try {
-      // First, create the user with only profile data in user_metadata
+      // Create the user with profile data and role in user_metadata
       const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
         email,
         password,
         options: {
           data: {
             full_name: username,
+            role: roleId,
           }
         }
       });
@@ -60,9 +65,7 @@ export const useAuthUserStore = defineStore("authUser", () => {
         return { error: new Error("Signup failed") };
       }
 
-      // After user creation, update app_metadata with role information (admin only)
-      // This should be done by an admin endpoint or server function
-      // For now, we'll store role in user_metadata, but it should be moved to app_metadata
+      // Optionally, also set app_metadata for admin-level role management
       const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(
         signUpData.user.id,
         {
@@ -199,11 +202,13 @@ export const useAuthUserStore = defineStore("authUser", () => {
         app_metadata: user.app_metadata,
       };
 
-      // Log user role ID from app_metadata (proper location for roles)
-      const roleId = user.app_metadata?.role;
-      console.log('getCurrentUser - User Role ID from app_metadata:', roleId);
-      console.log('getCurrentUser - Full app_metadata:', user.app_metadata);
+      // Log user role ID from both locations for debugging
+      const roleIdFromUserMeta = user.user_metadata?.role;
+      const roleIdFromAppMeta = user.app_metadata?.role;
+      console.log('getCurrentUser - User Role ID from user_metadata:', roleIdFromUserMeta);
+      console.log('getCurrentUser - User Role ID from app_metadata:', roleIdFromAppMeta);
       console.log('getCurrentUser - Full user_metadata:', user.user_metadata);
+      console.log('getCurrentUser - Full app_metadata:', user.app_metadata);
 
       return { user: userData };
     } catch (error) {

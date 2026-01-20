@@ -70,7 +70,8 @@ export async function getOrCreateAdminSupportConversation(
 /**
  * Gets all admin support conversations (for admin inbox) with pagination
  * Returns conversations where item_id is null and conversations with items
- * Excludes conversations where the current user is the sender
+ * For admins: Excludes conversations where they are the sender
+ * For students (role 2): Shows conversations where they are sender or receiver
  */
 export async function getAllAdminSupportConversations(
   page: number = 1,
@@ -89,11 +90,23 @@ export async function getAllAdminSupportConversations(
       throw new Error("No authenticated user found");
     }
 
-    // First, get the total count of conversations
-    const { count: totalCount, error: countError } = await supabase
+    // Check user role
+    const userRole = currentUser.app_metadata?.role || currentUser.user_metadata?.role;
+
+    // Build query based on user role
+    let countQuery = supabase
       .from("conversations")
-      .select("*", { count: "exact", head: true })
-      .neq("sender_id", currentUser.id);
+      .select("*", { count: "exact", head: true });
+
+    // For role 2 (students), show conversations where they are involved
+    // For admins, exclude conversations where they are the sender
+    if (userRole === 2) {
+      countQuery = countQuery.or(`sender_id.eq.${currentUser.id},receiver_id.eq.${currentUser.id}`);
+    } else {
+      countQuery = countQuery.neq("sender_id", currentUser.id);
+    }
+
+    const { count: totalCount, error: countError } = await countQuery;
 
     if (countError) throw countError;
 
@@ -102,8 +115,8 @@ export async function getAllAdminSupportConversations(
     // Calculate offset for pagination
     const offset = (page - 1) * pageSize;
 
-    // Get conversations with messages and item details, excluding current user as sender
-    const { data: conversations, error } = await supabase
+    // Build conversations query
+    let conversationsQuery = supabase
       .from("conversations")
       .select(
         `
@@ -119,8 +132,17 @@ export async function getAllAdminSupportConversations(
           status
         )
       `
-      )
-      .neq("sender_id", currentUser.id) // Exclude conversations where current user is sender
+      );
+
+    // Apply same filter based on user role
+    if (userRole === 2) {
+      conversationsQuery = conversationsQuery.or(`sender_id.eq.${currentUser.id},receiver_id.eq.${currentUser.id}`);
+    } else {
+      conversationsQuery = conversationsQuery.neq("sender_id", currentUser.id);
+    }
+
+    // Get conversations with messages and item details
+    const { data: conversations, error } = await conversationsQuery
       .order("created_at", { ascending: false })
       .range(offset, offset + pageSize - 1);
 
@@ -208,23 +230,36 @@ export async function getAdminUserId(): Promise<string> {
 }
 
 /**
- * Setup real-time subscription for admin support conversations
+ * Setup real-time subscription for admin support conversations using broadcast
  */
 export function setupAdminSupportConversationsSubscription(
   onNewConversation: (conversation: Conversation) => void
 ) {
-  return supabase
-    .channel("admin_support_conversations")
+  const channel = supabase.channel("admin_support_conversations")
+  
+  return channel
+    .on(
+      "broadcast",
+      { event: "new_conversation" },
+      async (payload: any) => {
+        try {
+          const conversation = payload.payload as Conversation
+          onNewConversation(conversation)
+        } catch (error) {
+          console.error("Error processing broadcast conversation:", error)
+        }
+      }
+    )
     .on(
       "postgres_changes",
       {
         event: "INSERT",
         schema: "public",
         table: "conversations",
-        filter: "item_id=is.null",
       },
       async (payload: any) => {
         try {
+          // Fallback to postgres_changes
           // Fetch the conversation
           const { data: conversation } = await supabase
             .from("conversations")
@@ -249,6 +284,24 @@ export function setupAdminSupportConversationsSubscription(
       }
     )
     .subscribe();
+}
+
+/**
+ * Broadcasts a new conversation to all admin subscribers
+ */
+export async function broadcastNewConversation(
+  conversation: Conversation
+): Promise<void> {
+  try {
+    const channel = supabase.channel("admin_support_conversations")
+    await channel.send({
+      type: "broadcast",
+      event: "new_conversation",
+      payload: conversation
+    })
+  } catch (error) {
+    console.error("Error broadcasting new conversation:", error)
+  }
 }
 
 /**

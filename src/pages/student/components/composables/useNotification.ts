@@ -37,7 +37,8 @@ export function useNotifications(currentUserRef: Ref<any>, isCurrentUserAdminRef
       }
 
       const userData = users?.find(u => u.id === userId)
-      const roleId = userData?.raw_user_meta_data?.role
+      const roleId = userData?.raw_user_meta_data?.role ||
+                     userData?.raw_app_meta_data?.role
 
       return roleId === 1
     } catch (error) {

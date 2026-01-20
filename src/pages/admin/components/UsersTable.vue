@@ -91,7 +91,7 @@ const fetchUsers = async () => {
       // Preload role titles from database for all unique role IDs
       const roleIds = new Set<number>()
       result.users.forEach(user => {
-        const roleId = user.raw_user_meta_data?.role
+        const roleId = user.raw_user_meta_data?.role || user.raw_app_meta_data?.role
         if (roleId && typeof roleId === 'number') {
           roleIds.add(roleId)
         }
@@ -254,11 +254,11 @@ onMounted(() => {
             <!-- Role column -->
             <template v-slot:item.role="{ item }">
               <v-chip
-                :color="getRoleColor(item.raw_user_meta_data?.role)"
+                :color="getRoleColor(item.raw_user_meta_data?.role || item.raw_app_meta_data?.role)"
                 size="small"
                 variant="tonal"
               >
-                {{ getRoleTitleSync(item.raw_user_meta_data?.role) }}
+                {{ getRoleTitleSync(item.raw_user_meta_data?.role || item.raw_app_meta_data?.role) }}
               </v-chip>
             </template>
 

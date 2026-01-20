@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { useAuthUserStore } from '@/stores/authUser'
 
 const authStore = useAuthUserStore()
@@ -13,6 +13,13 @@ const profileForm = ref({
   bio: '',
   organization: '',
   studentNumber: ''
+})
+
+// Check if current user is admin (role 1)
+const isAdmin = computed(() => {
+  const roleId = authStore.userData?.user_metadata?.role ||
+                 authStore.userData?.app_metadata?.role;
+  return roleId === 1;
 })
 
 // Form state
@@ -173,8 +180,8 @@ const loadCurrentUserData = async () => {
             ></v-text-field>
           </v-col>
 
-          <!-- Student Number -->
-          <v-col cols="12" md="6">
+          <!-- Student Number (only show for non-admin users) -->
+          <v-col v-if="!isAdmin" cols="12" md="6">
             <v-text-field
               v-model="profileForm.studentNumber"
               label="Student Number"
