@@ -71,7 +71,7 @@ const formatDate = (dateString: string) => {
               <v-col cols="12" md="6">
                 <v-text-field
                   label="Role"
-                  :model-value="getRoleName(props.selectedUser.user_metadata?.role)"
+                  :model-value="getRoleName(props.selectedUser.user_metadata?.role || props.selectedUser.app_metadata?.role)"
                   readonly
                   variant="outlined"
                   density="comfortable"

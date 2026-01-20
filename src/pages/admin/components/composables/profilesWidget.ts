@@ -30,8 +30,10 @@ export function useProfilesWidget() {
 
   const userRole = computed(() => {
     if (!currentUser.value) return null
-    // Role should be in app_metadata, not user_metadata
-    return currentUser.value.app_metadata?.role || null
+    // Check both user_metadata and app_metadata for role
+    return currentUser.value.user_metadata?.role ||
+           currentUser.value.app_metadata?.role ||
+           null
   })
 
   const userStatus = computed(() => {

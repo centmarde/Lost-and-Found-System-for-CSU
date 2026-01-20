@@ -28,7 +28,8 @@ export const authGuard = async (to: RouteLocationNormalized, from: RouteLocation
       const currentUserResult = await authStore.getCurrentUser();
 
       if (currentUserResult.user) {
-        const userRoleId = currentUserResult.user.user_metadata?.role;
+        const userRoleId = currentUserResult.user.user_metadata?.role ||
+                           currentUserResult.user.app_metadata?.role;
 
         if (userRoleId) {
           // Fetch pages accessible by this role
@@ -65,7 +66,8 @@ export const authGuard = async (to: RouteLocationNormalized, from: RouteLocation
       const currentUserResult = await authStore.getCurrentUser();
 
       if (currentUserResult.user) {
-        const userRoleId = currentUserResult.user.user_metadata?.role;
+        const userRoleId = currentUserResult.user.user_metadata?.role ||
+                           currentUserResult.user.app_metadata?.role;
 
         if (userRoleId) {
           console.log('Checking page access for role ID:', userRoleId);
