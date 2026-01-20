@@ -3,6 +3,7 @@ import { onMounted, onBeforeUnmount, computed, ref } from "vue";
 import InnerLayoutWrapper from "@/layouts/InnerLayoutWrapper.vue";
 import AdminSupportInbox from "@/pages/admin/components/AdminSupportInbox.vue";
 import { supabase } from "@/lib/supabase";
+import { loadItems as loadItemsFromStore } from "@/stores/messages";
 
 // Composables
 import { useAuth } from "@/pages/admin/components/composables/useAuth";
@@ -82,13 +83,7 @@ const pageDescription = computed(() => "Manage student support conversations and
 const loadItems = async () => {
   loadingItems.value = true;
   try {
-    const { data, error } = await supabase
-      .from('items')
-      .select('*')
-      .order('created_at', { ascending: false });
-    
-    if (error) throw error;
-    items.value = data || [];
+    items.value = await loadItemsFromStore();
   } catch (error) {
     console.error('Error loading items:', error);
   } finally {
