@@ -2,7 +2,6 @@
 interface NewItemForm {
   title: string;
   description: string;
-  status: "lost" | "found";
 }
 
 interface Props {
@@ -13,12 +12,15 @@ interface Props {
 const props = defineProps<Props>();
 const model = defineModel<boolean>();
 const emit = defineEmits<{
-  submit: [];
+  submit: [item: NewItemForm & { status: 'lost' }];
 }>();
 
 const handleSubmit = () => {
   if (props.form.title && props.form.description) {
-    emit("submit");
+    emit("submit", {
+      ...props.form,
+      status: 'lost'
+    });
   }
 };
 </script>
@@ -28,23 +30,11 @@ const handleSubmit = () => {
     <v-card>
       <v-card-title class="text-h5 font-weight-bold">
         <v-icon class="me-2">mdi-plus-circle</v-icon>
-        Post Missing Item
+        Post Lost Item
       </v-card-title>
 
       <v-card-text>
         <v-form @submit.prevent="handleSubmit">
-          <v-select
-            v-model="form.status"
-            :items="[
-              { title: 'Lost Item', value: 'lost' },
-              { title: 'Found Item', value: 'found' },
-            ]"
-            label="Item Type"
-            prepend-inner-icon="mdi-tag"
-            variant="outlined"
-            class="mb-3"
-          />
-
           <v-text-field
             v-model="form.title"
             label="Item Title"
@@ -59,7 +49,7 @@ const handleSubmit = () => {
             label="Location"
             prepend-inner-icon="mdi-text-long"
             variant="outlined"
-            placeholder="Location where the item was lost or found"
+            placeholder="Location where the item was lost"
             rows="4"
           />
 

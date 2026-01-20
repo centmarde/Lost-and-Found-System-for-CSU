@@ -5,8 +5,6 @@ import AdminDashboardItemCard from '@/pages/admin/components/DashboardItemCards.
 import ClaimItemDialog from '@/pages/admin/components/ClaimItemDialog.vue'
 import StatsCards from '@/pages/admin/components/StatsCards.vue'
 import SearchBar from '@/pages/admin/components/SearchBar.vue'
-import SystemStats from '@/pages/admin/components/SystemStats.vue'
-import QuickSummary from '@/pages/admin/components/Summary.vue'
 import RecentActivity from '@/pages/admin/components/RecentActivity.vue'
 import PostItemDialog from '@/pages/admin/components/PostItemDialog.vue'
 import ConfirmationDialog from '@/components/common/ConfirmationDialog.vue'
@@ -156,7 +154,7 @@ onMounted(async () => {
           <StatsCards :stats="stats" />
 
           <v-row>
-            <v-col cols="12" lg="8">
+            <v-col cols="12" lg="12">
               <SearchBar v-model="searchQuery" />
 
               <div class="items-container">
@@ -191,10 +189,7 @@ onMounted(async () => {
               </div>
             </v-col>
 
-            <v-col cols="12" lg="4">
-              <QuickSummary :stats="stats" />
-              <SystemStats :stats="stats" />
-            </v-col>
+
           </v-row>
 
           <RecentActivity :stats="stats" />
