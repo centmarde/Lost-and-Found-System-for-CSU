@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, computed, ref } from "vue";
+import { onMounted, onBeforeUnmount, computed, ref } from "vue";
 import InnerLayoutWrapper from "@/layouts/InnerLayoutWrapper.vue";
 import AdminSupportInbox from "@/pages/admin/components/AdminSupportInbox.vue";
 
@@ -12,6 +12,25 @@ const { currentUser, isCurrentUserAdmin, getCurrentUser } = useAuth();
 
 // New message variable
 const newMessage = ref('');
+
+// Computed property to get current user role
+const currentUserRole = computed(() => {
+  console.log("Current User:", currentUser.value?.app_metadata);
+  return currentUser.value?.app_metadata?.role || currentUser.value?.user_metadata?.role || null;
+});
+
+// Computed property to filter conversations based on user role
+const filteredConversations = computed(() => {
+  // If user role is 2, only show conversations where admins have messaged them
+  if (currentUserRole.value === 2) {
+    return supportConversations.value.filter(conversation => {
+      // Check if the current user is the sender (student) and receiver is admin
+      return conversation.sender_id === currentUser.value?.id;
+    });
+  }
+  // For admins or other roles, show all conversations
+  return supportConversations.value;
+});
 
 // Admin Support Inbox composable
 const {
@@ -54,8 +73,15 @@ const handleSendMessage = async () => {
 
 onMounted(async () => {
   await getCurrentUser();
-  // Automatically open the inbox when the view loads
+  // Automatically open the inbox and set up broadcast subscriptions
   openInbox();
+  console.log('SupportInboxView mounted - broadcast subscriptions initialized');
+});
+
+onBeforeUnmount(() => {
+  // Cleanup subscriptions when component unmounts
+  closeInbox();
+  console.log('SupportInboxView unmounted - broadcast subscriptions cleaned up');
 });
 </script>
 
@@ -91,8 +117,8 @@ onMounted(async () => {
                   variant="tonal"
                   :size="$vuetify.display.xs ? 'x-small' : 'small'"
                 >
-                  {{ supportConversations.length }}
-                  {{ supportConversations.length === 1 ? 'Conversation' : 'Conversations' }}
+                  {{ filteredConversations.length }}
+                  {{ filteredConversations.length === 1 ? 'Conversation' : 'Conversations' }}
                 </v-chip>
               </v-card-title>
 
@@ -104,7 +130,7 @@ onMounted(async () => {
 
               <!-- Empty State -->
               <div
-                v-else-if="!loadingSupportConversations && supportConversations.length === 0"
+                v-else-if="!loadingSupportConversations && filteredConversations.length === 0"
                 class="text-center py-12"
               >
                 <v-icon size="80" color="grey-lighten-1" class="mb-4">
@@ -147,14 +173,6 @@ onMounted(async () => {
                               @click="loadSupportConversations(currentPage)"
                             />
                           </div>
-                          <v-chip
-                            v-if="!loadingSupportConversations"
-                            color="info"
-                            variant="tonal"
-                            size="small"
-                          >
-                            {{ totalCount }} Total
-                          </v-chip>
                         </v-card-title>
 
                         <div v-if="loadingSupportConversations" class="pa-4 text-center">
@@ -164,7 +182,7 @@ onMounted(async () => {
 
                         <v-list v-else class="pa-0">
                           <v-list-item
-                            v-for="conversation in supportConversations"
+                            v-for="conversation in filteredConversations"
                             :key="conversation.id"
                             @click="selectSupportConversation(conversation)"
                             :class="{ 'v-list-item--active': selectedSupportConversation?.id === conversation.id }"
@@ -222,11 +240,6 @@ onMounted(async () => {
                                   GENERAL SUPPORT
                                 </v-chip>
                               </div>
-
-                              <!-- User Email -->
-                              <v-list-item-subtitle class="text-caption">
-                                {{ conversation.sender_profile?.email }}
-                              </v-list-item-subtitle>
                             </div>
 
                             <template v-slot:append>
@@ -347,9 +360,10 @@ onMounted(async () => {
                           Select a conversation to view messages
                         </v-card-title>
 
-                        <!-- Messages Display -->
-                        <div v-if="selectedSupportConversation" class="messages-container">
-                          <div v-if="loadingSupportMessages" class="pa-4 text-center">
+                        <!-- Content when conversation is selected -->
+                        <template v-if="selectedSupportConversation">
+                          <!-- Messages Display Container -->
+                          <div v-if="loadingSupportMessages" class="pa-4 text-center" style="height: 400px;">
                             <v-progress-circular indeterminate color="primary" size="24" />
                             <p class="text-caption mt-2">Loading messages...</p>
                           </div>
@@ -385,7 +399,7 @@ onMounted(async () => {
                             </div>
                           </div>
 
-                          <!-- Message Input -->
+                          <!-- Message Input - Always visible when conversation is selected -->
                           <v-divider />
                           <div class="pa-4">
                             <v-form @submit.prevent="handleSendMessage">
@@ -401,7 +415,7 @@ onMounted(async () => {
                               />
                             </v-form>
                           </div>
-                        </div>
+                        </template>
 
                         <!-- No conversation selected state -->
                         <div v-else class="pa-8 text-center">
