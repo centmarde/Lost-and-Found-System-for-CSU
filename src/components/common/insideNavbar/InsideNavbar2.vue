@@ -5,6 +5,7 @@
   import { useTheme } from '@/composables/useTheme'
   import { useDisplay } from 'vuetify'
   import { useAuthUserStore } from '@/stores/authUser'
+  import { useUserRolesStore } from '@/stores/roles'
   import { getEmailInitials } from '@/utils/helpers'
   import { navigationConfig, individualNavItems } from '@/utils/navigation'
 
@@ -15,6 +16,7 @@
   const props = defineProps<Props>()
   const router = useRouter()
   const authStore = useAuthUserStore()
+  const rolesStore = useUserRolesStore()
 
   // Responsive breakpoints
   const { mobile } = useDisplay()
@@ -60,6 +62,8 @@
   onMounted(() => {
     window.addEventListener('scroll', handleScroll, { passive: true })
     lastScrollY.value = window.scrollY
+    // Fetch roles for role description
+    rolesStore.fetchRoles()
   })
 
   onUnmounted(() => {
@@ -113,6 +117,15 @@
   // Computed property for panel title
   const panelTitle = computed(() => {
     return isAdmin.value ? 'Admin Panel' : 'Student Panel';
+  });
+
+  // Get user role description
+  const userRoleDescription = computed(() => {
+    const roleId = authStore.userData?.user_metadata?.role ||
+                   authStore.userData?.app_metadata?.role;
+    if (!roleId) return null;
+    const role = rolesStore.roles.find(r => r.id === roleId);
+    return role?.title || `Role ID: ${roleId}`;
   });
 
   // Get navigation groups from shared config, filtered by user role
@@ -289,6 +302,16 @@
                     <v-list-item-subtitle class="text-caption">
                       {{ authStore.userEmail }}
                     </v-list-item-subtitle>
+                    <v-list-item-subtitle v-if="userRoleDescription" class="text-caption mt-1">
+                      <v-chip
+                        size="x-small"
+                        :color="isAdmin ? 'error' : 'primary'"
+                        variant="tonal"
+                        class="text-caption"
+                      >
+                        {{ userRoleDescription }}
+                      </v-chip>
+                    </v-list-item-subtitle>
                   </v-list-item>
 
                   <v-divider />
@@ -444,6 +467,16 @@
           </v-list-item-title>
           <v-list-item-subtitle class="text-caption">
             {{ authStore.userEmail }}
+          </v-list-item-subtitle>
+          <v-list-item-subtitle v-if="userRoleDescription" class="text-caption mt-1">
+            <v-chip
+              size="x-small"
+              :color="isAdmin ? 'error' : 'primary'"
+              variant="tonal"
+              class="text-caption"
+            >
+              {{ userRoleDescription }}
+            </v-chip>
           </v-list-item-subtitle>
         </v-list-item>
 
