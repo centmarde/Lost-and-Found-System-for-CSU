@@ -79,7 +79,9 @@ const loadExistingConv = async () => {
     if (existingConversation) {
       conversation.value = existingConversation;
       await loadMessages();
+      // Setup broadcast-enabled subscription
       setupMessageSubscription();
+      console.log('Loaded existing conversation with broadcast enabled');
     }
   } catch (error) {
     console.error("Error loading existing conversation:", error);
@@ -140,17 +142,21 @@ const sendMessage = async () => {
       throw new Error("Failed to create or get conversation");
     }
 
-    // Send the message using the messages.ts function
+    // Send the message using the broadcast-enabled messages.ts function
     const sentMessage = await sendMessageToConversation(
       currentConversation.id,
       messageText,
       currentUser.value.id
     );
 
-    // Add the message to the local array immediately
-    messages.value.push(sentMessage);
+    // Add the message to the local array immediately if not already present
+    const exists = messages.value.some(msg => msg.id === sentMessage.id);
+    if (!exists) {
+      messages.value.push(sentMessage);
+    }
     await nextTick();
     scrollToBottom();
+    console.log('Message sent and broadcast to conversation');
   } catch (error) {
     console.error("Error sending message:", error);
     toast.error("Failed to send message");
@@ -160,15 +166,22 @@ const sendMessage = async () => {
   }
 };
 
-// Setup real-time message subscription using messages.ts function
+// Setup real-time message subscription using broadcast-enabled messages.ts function
 const setupMessageSubscription = () => {
   if (!conversation.value || messageSubscription || !currentUser.value) return;
+
+  console.log('Setting up broadcast subscription for conversation:', conversation.value.id);
 
   messageSubscription = setupRealtimeSubscription(
     conversation.value.id,
     (newMessage: Message) => {
-      messages.value.push(newMessage);
-      nextTick(() => scrollToBottom());
+      // Prevent duplicates
+      const exists = messages.value.some(msg => msg.id === newMessage.id);
+      if (!exists) {
+        messages.value.push(newMessage);
+        nextTick(() => scrollToBottom());
+        console.log('Received real-time message via broadcast');
+      }
     },
     currentUser.value.id
   );
@@ -194,9 +207,11 @@ const closeChatDialog = () => {
   messages.value = [];
   newMessage.value = "";
 
+  // Cleanup broadcast subscription
   if (messageSubscription) {
     messageSubscription.unsubscribe();
     messageSubscription = null;
+    console.log('Broadcast subscription cleaned up');
   }
 };
 
@@ -226,10 +241,12 @@ onMounted(async () => {
   await getCurrentUser();
 });
 
-// Cleanup
+// Cleanup broadcast subscriptions on unmount
 onUnmounted(() => {
   if (messageSubscription) {
     messageSubscription.unsubscribe();
+    messageSubscription = null;
+    console.log('ItemCard unmounted - broadcast subscription cleaned up');
   }
 });
 </script>
@@ -338,26 +355,17 @@ onUnmounted(() => {
         </div>
 
         <v-card-actions class="pa-4 bg-grey-lighten-5">
-          <div class="d-flex align-center w-100">
-            <v-text-field
-              v-model="newMessage"
-              placeholder="Type your message..."
-              variant="outlined"
-              density="compact"
-              hide-details
-              @keypress="handleKeyPress"
-              :disabled="sendingMessage"
-              class="flex-grow-1"
-            />
-            <v-btn
-              color="primary"
-              icon="mdi-send"
-              :loading="sendingMessage"
-              :disabled="!newMessage.trim()"
-              @click="sendMessage"
-              class="ml-2"
-            />
-          </div>
+          <v-text-field
+            v-model="newMessage"
+            placeholder="Type your message..."
+            variant="outlined"
+            density="comfortable"
+            hide-details
+            @keypress="handleKeyPress"
+            :disabled="sendingMessage"
+            append-inner-icon="mdi-send"
+            @click:append-inner="sendMessage"
+          />
         </v-card-actions>
       </v-card>
     </v-dialog>

@@ -149,7 +149,7 @@ export function useAdminSupportInbox(currentUser: any) {
 
   // Setup message subscription for a conversation
   const setupMessageSubscriptionForConversation = (conversationId: string) => {
-    console.log('Setting up subscription for support conversation:', conversationId)
+    console.log('Setting up broadcast subscription for support conversation:', conversationId)
 
     messageSubscription = setupMessageSubscription(
       conversationId,
@@ -161,7 +161,7 @@ export function useAdminSupportInbox(currentUser: any) {
           if (!exists) {
             messages.value.push(newMessage)
             scrollToBottom()
-            console.log('Added real-time message')
+            console.log('Added real-time message via broadcast')
           }
         }
       },
@@ -171,7 +171,7 @@ export function useAdminSupportInbox(currentUser: any) {
 
   // Setup subscription for new conversations
   const setupConversationsSubscription = () => {
-    console.log('Setting up conversations subscription')
+    console.log('Setting up broadcast subscription for conversations')
 
     conversationsSubscription = setupAdminSupportConversationsSubscription(
       (newConversation: Conversation) => {
@@ -182,7 +182,9 @@ export function useAdminSupportInbox(currentUser: any) {
         if (!exists) {
           supportConversations.value.unshift(newConversation)
           toast.info('New support conversation started')
-          console.log('New support conversation added')
+          console.log('New support conversation added via broadcast')
+          // Increment total count
+          totalCount.value++
         }
       }
     )
