@@ -2,6 +2,8 @@
 import { onMounted, onBeforeUnmount, computed, ref } from "vue";
 import InnerLayoutWrapper from "@/layouts/InnerLayoutWrapper.vue";
 import AdminSupportInbox from "@/pages/admin/components/AdminSupportInbox.vue";
+import { supabase } from "@/lib/supabase";
+import { loadItems as loadItemsFromStore } from "@/stores/messages";
 
 // Composables
 import { useAuth } from "@/pages/admin/components/composables/useAuth";
@@ -9,6 +11,11 @@ import { useAdminSupportInbox } from "@/pages/admin/components/composables/useAd
 
 // Auth composable
 const { currentUser, isCurrentUserAdmin, getCurrentUser } = useAuth();
+
+// Items state
+const items = ref<any[]>([]);
+const loadingItems = ref(false);
+const selectedItem = ref<any>(null);
 
 // New message variable
 const newMessage = ref('');
@@ -19,17 +26,26 @@ const currentUserRole = computed(() => {
   return currentUser.value?.app_metadata?.role || currentUser.value?.user_metadata?.role || null;
 });
 
-// Computed property to filter conversations based on user role
+// Computed property to filter conversations based on selected item
 const filteredConversations = computed(() => {
-  // If user role is 2, only show conversations where admins have messaged them
-  if (currentUserRole.value === 2) {
-    return supportConversations.value.filter(conversation => {
-      // Check if the current user is the sender (student) and receiver is admin
-      return conversation.sender_id === currentUser.value?.id;
-    });
-  }
-  // For admins or other roles, show all conversations
-  return supportConversations.value;
+  if (!selectedItem.value) return [];
+  
+  // Filter conversations by selected item
+  return supportConversations.value.filter(conversation => {
+    return conversation.item_id === selectedItem.value.id;
+  });
+});
+
+// Computed property to count conversations per item
+const getItemConversationCount = (itemId: number) => {
+  return supportConversations.value.filter(conv => conv.item_id === itemId).length;
+};
+
+// Computed property to filter items that have conversations
+const itemsWithConversations = computed(() => {
+  return items.value.filter(item => {
+    return supportConversations.value.some(conv => conv.item_id === item.id);
+  });
 });
 
 // Admin Support Inbox composable
@@ -63,6 +79,30 @@ const {
 const pageTitle = computed(() => "Support Inbox");
 const pageDescription = computed(() => "Manage student support conversations and provide assistance");
 
+// Load all items
+const loadItems = async () => {
+  loadingItems.value = true;
+  try {
+    items.value = await loadItemsFromStore();
+  } catch (error) {
+    console.error('Error loading items:', error);
+  } finally {
+    loadingItems.value = false;
+  }
+};
+
+// Select an item to view its support conversations
+const selectItem = async (item: any) => {
+  selectedItem.value = item;
+  await loadSupportConversations(1);
+};
+
+// Go back to items list
+const backToItems = () => {
+  selectedItem.value = null;
+  selectedSupportConversation.value = null;
+};
+
 // Message sending handlers
 const handleSendMessage = async () => {
   if (newMessage.value.trim()) {
@@ -73,7 +113,8 @@ const handleSendMessage = async () => {
 
 onMounted(async () => {
   await getCurrentUser();
-  // Automatically open the inbox and set up broadcast subscriptions
+  // Load items and conversations
+  await loadItems();
   openInbox();
   console.log('SupportInboxView mounted - broadcast subscriptions initialized');
 });
@@ -106,10 +147,142 @@ onBeforeUnmount(() => {
         <!-- Support Inbox Content -->
         <v-row>
           <v-col cols="12">
-            <v-card elevation="2" class="pa-4">
-              <v-card-title class="text-h5 font-weight-bold mb-4 d-flex align-center">
+            <!-- Show Items Grid when no item is selected -->
+            <div v-if="!selectedItem">
+              <v-card elevation="2" class="pa-4 mb-4">
+                <v-card-title class="text-h5 font-weight-bold mb-4 d-flex align-center">
+                  <v-icon class="me-2" color="primary">mdi-package-variant</v-icon>
+                  Items with Support Requests
+                  <v-spacer />
+                  <v-chip
+                    v-if="!loadingItems"
+                    color="info"
+                    variant="tonal"
+                    :size="$vuetify.display.xs ? 'x-small' : 'small'"
+                  >
+                    {{ itemsWithConversations.length }} {{ itemsWithConversations.length === 1 ? 'Item' : 'Items' }}
+                  </v-chip>
+                </v-card-title>
+
+                <!-- Loading State -->
+                <div v-if="loadingItems" class="text-center py-12">
+                  <v-progress-circular indeterminate color="primary" size="48" />
+                  <p class="text-body-1 mt-4">Loading items...</p>
+                </div>
+
+                <!-- Empty State -->
+                <div v-else-if="itemsWithConversations.length === 0" class="text-center py-12">
+                  <v-icon size="80" color="grey-lighten-1" class="mb-4">
+                    mdi-package-variant-closed
+                  </v-icon>
+                  <h3 class="text-h5 text-grey-darken-1 mb-2">
+                    No Items with Support Requests
+                  </h3>
+                  <p class="text-body-1 text-grey-darken-2 mb-4">
+                    There are currently no items with student support conversations.
+                  </p>
+                </div>
+
+                <!-- Items Grid -->
+                <v-row v-else>
+                  <v-col
+                    v-for="item in itemsWithConversations"
+                    :key="item.id"
+                    cols="12"
+                    sm="6"
+                    md="4"
+                    lg="3"
+                  >
+                    <v-card
+                      class="item-card h-100"
+                      elevation="2"
+                      hover
+                      @click="selectItem(item)"
+                    >
+                      <v-card-title class="d-flex justify-space-between align-start pb-2">
+                        <div class="text-subtitle-1 font-weight-bold">{{ item.title }}</div>
+                        <v-chip
+                          :color="item.status === 'lost' ? 'error' : 'success'"
+                          size="x-small"
+                          variant="flat"
+                        >
+                          {{ item.status.toUpperCase() }}
+                        </v-chip>
+                      </v-card-title>
+
+                      <v-card-text>
+                        <p class="text-body-2 text-grey-darken-1 mb-3" style="min-height: 60px;">
+                          {{ item.description.substring(0, 80) }}{{ item.description.length > 80 ? '...' : '' }}
+                        </p>
+
+                        <v-divider class="my-3" />
+
+                        <!-- Conversation Count -->
+                        <div class="d-flex align-center justify-space-between">
+                          <div class="d-flex align-center text-caption text-grey-darken-1">
+                            <v-icon size="16" class="me-1">mdi-message-text</v-icon>
+                            {{ getItemConversationCount(item.id) }} 
+                            {{ getItemConversationCount(item.id) === 1 ? 'conversation' : 'conversations' }}
+                          </div>
+                          <v-btn
+                            color="primary"
+                            variant="text"
+                            size="small"
+                            append-icon="mdi-chevron-right"
+                          >
+                            View
+                          </v-btn>
+                        </div>
+
+                        <!-- Created Date -->
+                        <div class="d-flex align-center text-caption text-grey mt-2">
+                          <v-icon size="14" class="me-1">mdi-clock-outline</v-icon>
+                          {{ new Date(item.created_at).toLocaleDateString() }}
+                        </div>
+                      </v-card-text>
+                    </v-card>
+                  </v-col>
+                </v-row>
+              </v-card>
+            </div>
+
+            <!-- Show Support Inbox when item is selected -->
+            <v-card v-else elevation="2" class="pa-4">
+              <!-- Back Button and Item Info Header -->
+              <div class="d-flex align-center mb-4">
+                <v-btn
+                  icon="mdi-arrow-left"
+                  variant="text"
+                  @click="backToItems"
+                  class="me-3"
+                />
+                <div class="flex-grow-1">
+                  <div class="d-flex align-center">
+                    <v-icon class="me-2" color="primary">mdi-package-variant</v-icon>
+                    <h2 class="text-h5 font-weight-bold">{{ selectedItem.title }}</h2>
+                    <v-chip
+                      :color="selectedItem.status === 'lost' ? 'error' : 'success'"
+                      size="small"
+                      variant="flat"
+                      class="ml-3"
+                    >
+                      <v-icon start>
+                        {{ selectedItem.status === 'lost' ? 'mdi-help' : 'mdi-check-circle' }}
+                      </v-icon>
+                      {{ selectedItem.status.toUpperCase() }} ITEM
+                    </v-chip>
+                  </div>
+                  <p class="text-body-2 text-grey-darken-1 mt-2 mb-0">
+                    {{ selectedItem.description }}
+                  </p>
+                </div>
+              </div>
+
+              <v-divider class="mb-4" />
+
+              <v-card-title class="text-h6 font-weight-bold mb-4 d-flex align-center px-0">
                 <v-icon class="me-2" color="primary">mdi-inbox</v-icon>
-                Student Support Messages
+                Support Conversations for this Item
                 <v-spacer />
                 <v-chip
                   v-if="!loadingSupportConversations"
@@ -137,18 +310,18 @@ onBeforeUnmount(() => {
                   mdi-inbox-outline
                 </v-icon>
                 <h3 class="text-h5 text-grey-darken-1 mb-2">
-                  No Support Messages
+                  No Support Messages for this Item
                 </h3>
                 <p class="text-body-1 text-grey-darken-2 mb-4">
-                  There are currently no student support conversations to display.
+                  No students have contacted support about this item yet.
                 </p>
                 <v-btn
                   color="primary"
                   variant="outlined"
-                  prepend-icon="mdi-refresh"
-                  @click="openInbox"
+                  prepend-icon="mdi-arrow-left"
+                  @click="backToItems"
                 >
-                  Refresh
+                  Back to Items
                 </v-btn>
               </div>
 
@@ -195,9 +368,9 @@ onBeforeUnmount(() => {
                                 size="45"
                                 class="me-3"
                               >
-                                <v-icon color="white">
-                                  {{ conversation.item ? (conversation.item.status === 'lost' ? 'mdi-help-circle' : 'mdi-check-circle') : 'mdi-account' }}
-                                </v-icon>
+                                <span class="text-white font-weight-bold">
+                                  {{ (conversation.sender_profile?.full_name || 'U').split(' ').map((n: string) => n[0]).join('').toUpperCase().substring(0, 2) }}
+                                </span>
                               </v-avatar>
                             </template>
 
@@ -217,7 +390,7 @@ onBeforeUnmount(() => {
                                   class="me-2 font-weight-bold"
                                 >
                                   <v-icon start>
-                                    {{ conversation.item.status === 'lost' ? 'mdi-help-circle' : 'mdi-check-circle' }}
+                                    {{ conversation.item.status === 'lost' ? 'mdi-help' : 'mdi-check-circle' }}
                                   </v-icon>
                                   {{ conversation.item.status.toUpperCase() }} ITEM
                                 </v-chip>
@@ -304,9 +477,9 @@ onBeforeUnmount(() => {
                                 size="40"
                                 class="me-3"
                               >
-                                <v-icon color="white">
-                                  {{ selectedSupportConversation.item ? (selectedSupportConversation.item.status === 'lost' ? 'mdi-help-circle' : 'mdi-check-circle') : 'mdi-account' }}
-                                </v-icon>
+                                <span class="text-white font-weight-bold">
+                                  {{ (selectedSupportConversation.sender_profile?.full_name || 'U').split(' ').map((n: string) => n[0]).join('').toUpperCase().substring(0, 2) }}
+                                </span>
                               </v-avatar>
                               <div>
                                 <div class="text-h6 font-weight-bold">
@@ -327,7 +500,7 @@ onBeforeUnmount(() => {
                                   class="me-3 font-weight-bold"
                                 >
                                   <v-icon start>
-                                    {{ selectedSupportConversation.item.status === 'lost' ? 'mdi-help-circle' : 'mdi-check-circle' }}
+                                    {{ selectedSupportConversation.item.status === 'lost' ? 'mdi-help' : 'mdi-check-circle' }}
                                   </v-icon>
                                   {{ selectedSupportConversation.item.status.toUpperCase() }} ITEM
                                 </v-chip>
@@ -436,6 +609,16 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
+.item-card {
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.item-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.15) !important;
+}
+
 .support-inbox-container {
   min-height: 600px;
 }

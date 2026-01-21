@@ -6,6 +6,7 @@ import {
   getItemStatusText,
 } from "@/utils/helpers";
 import { supabase } from "@/lib/supabase";
+import { useAuthUserStore } from "@/stores/authUser";
 import { useToast } from "vue-toastification";
 import {
   loadExistingConversation,
@@ -43,6 +44,12 @@ defineEmits<{
 
 const toast = useToast();
 
+// Admin selection state
+const showAdminSelectionDialog = ref(false);
+const adminUsers = ref<any[]>([]);
+const loadingAdmins = ref(false);
+const selectedAdmin = ref<any>(null);
+
 // Chat state
 const showChatDialog = ref(false);
 const conversation = ref<Conversation | null>(null);
@@ -63,9 +70,39 @@ const getCurrentUser = async () => {
   currentUser.value = user;
 };
 
+// Load admin users
+const loadAdminUsers = async () => {
+  loadingAdmins.value = true;
+  try {
+    const authStore = useAuthUserStore();
+    const { users, error } = await authStore.getAllUsers();
+
+    if (error) throw error;
+    
+    // Filter users with role 1 (admin role)
+    adminUsers.value = (users || [])
+      .filter(user => {
+        const role = user.raw_app_meta_data?.role || user.raw_user_meta_data?.role;
+        return role === 1;
+      })
+      .map(user => ({
+        id: user.id,
+        full_name: user.raw_user_meta_data?.full_name || user.email?.split('@')[0] || 'Admin User',
+        email: user.email
+      }));
+
+    console.log('Loaded admin users:', adminUsers.value);
+  } catch (error) {
+    console.error('Error loading admin users:', error);
+    toast.error('Failed to load admin users');
+  } finally {
+    loadingAdmins.value = false;
+  }
+};
+
 // Load existing conversation and messages
 const loadExistingConv = async () => {
-  if (!currentUser.value) return;
+  if (!currentUser.value || !selectedAdmin.value) return;
 
   messagesLoading.value = true;
 
@@ -73,7 +110,7 @@ const loadExistingConv = async () => {
     const existingConversation = await loadExistingConversation(
       props.item.id,
       currentUser.value.id,
-      props.item.user_id
+      selectedAdmin.value.id
     );
 
     if (existingConversation) {
@@ -127,10 +164,14 @@ const sendMessage = async () => {
 
     // Create conversation if it doesn't exist
     if (!currentConversation) {
+      if (!selectedAdmin.value) {
+        toast.error('Please select an admin first');
+        return;
+      }
       currentConversation = await createConversation(
         props.item.id,
         currentUser.value.id,
-        props.item.user_id
+        selectedAdmin.value.id
       );
       conversation.value = currentConversation;
       setupMessageSubscription();
@@ -187,17 +228,31 @@ const setupMessageSubscription = () => {
   );
 };
 
-// Handle contact button click - opens dialog
+// Handle contact button click - opens admin selection dialog
 const handleContact = async () => {
   if (!currentUser.value) {
     toast.error("Please log in to contact the admin");
     return;
   }
 
+  showAdminSelectionDialog.value = true;
+  await loadAdminUsers();
+};
+
+// Handle admin selection and open chat
+const selectAdminAndOpenChat = async (admin: any) => {
+  selectedAdmin.value = admin;
+  showAdminSelectionDialog.value = false;
   showChatDialog.value = true;
 
   // Load existing conversation if it exists
   await loadExistingConv();
+};
+
+// Close admin selection dialog
+const closeAdminSelection = () => {
+  showAdminSelectionDialog.value = false;
+  selectedAdmin.value = null;
 };
 
 // Close chat dialog
@@ -206,6 +261,7 @@ const closeChatDialog = () => {
   conversation.value = null;
   messages.value = [];
   newMessage.value = "";
+  selectedAdmin.value = null;
 
   // Cleanup broadcast subscription
   if (messageSubscription) {
@@ -293,15 +349,88 @@ onUnmounted(() => {
       </v-btn>
     </v-card-actions>
 
+    <!-- Admin Selection Dialog -->
+    <v-dialog v-model="showAdminSelectionDialog" max-width="500px" persistent>
+      <v-card>
+        <v-card-title class="d-flex align-center pa-4 bg-primary">
+          <v-icon class="me-2 text-white">mdi-account-multiple</v-icon>
+          <div class="text-white">
+            <div class="text-h6">Select Admin to Chat</div>
+            <div class="text-caption opacity-80">
+              Choose an admin to discuss this {{ item.status }} item
+            </div>
+          </div>
+          <v-spacer />
+          <v-btn
+            icon="mdi-close"
+            variant="text"
+            color="white"
+            @click="closeAdminSelection"
+          />
+        </v-card-title>
+
+        <v-card-text class="pa-4">
+          <!-- Loading state -->
+          <div v-if="loadingAdmins" class="text-center py-8">
+            <v-progress-circular indeterminate color="primary" />
+            <p class="text-body-2 mt-3">Loading available admins...</p>
+          </div>
+
+          <!-- Empty state -->
+          <div v-else-if="adminUsers.length === 0" class="text-center py-8">
+            <v-icon size="60" color="grey-lighten-1">mdi-account-alert</v-icon>
+            <p class="text-h6 text-grey-darken-1 mt-3">No Admins Available</p>
+            <p class="text-body-2 text-grey">
+              There are currently no admin users available to chat with.
+            </p>
+          </div>
+
+          <!-- Admin list -->
+          <v-list v-else class="pa-0">
+            <v-list-item
+              v-for="admin in adminUsers"
+              :key="admin.id"
+              @click="selectAdminAndOpenChat(admin)"
+              class="admin-list-item rounded mb-2"
+              lines="two"
+            >
+              <template v-slot:prepend>
+                <v-avatar color="primary" size="48">
+                  <span class="text-white font-weight-bold">
+                    {{ admin.full_name ? admin.full_name.split(' ').map((n: string) => n[0]).join('').toUpperCase().substring(0, 2) : 'A' }}
+                  </span>
+                </v-avatar>
+              </template>
+
+              <v-list-item-title class="font-weight-bold">
+                {{ admin.full_name || 'Admin User' }}
+              </v-list-item-title>
+              <v-list-item-subtitle>
+                {{ admin.email }}
+              </v-list-item-subtitle>
+
+              <template v-slot:append>
+                <v-icon color="primary">mdi-chevron-right</v-icon>
+              </template>
+            </v-list-item>
+          </v-list>
+        </v-card-text>
+      </v-card>
+    </v-dialog>
+
     <!-- Chat Dialog -->
     <v-dialog v-model="showChatDialog" max-width="600px" persistent>
       <v-card class="chat-dialog">
         <v-card-title class="d-flex align-center pa-4 bg-primary">
-          <v-icon class="me-2 text-white">mdi-message-text</v-icon>
+          <v-avatar color="white" size="40" class="me-3">
+            <span class="text-primary font-weight-bold">
+              {{ selectedAdmin ? (selectedAdmin.full_name ? selectedAdmin.full_name.split(' ').map((n: string) => n[0]).join('').toUpperCase().substring(0, 2) : 'A') : 'A' }}
+            </span>
+          </v-avatar>
           <div class="text-white">
-            <div class="text-h6">{{ item.title }}</div>
+            <div class="text-h6">{{ selectedAdmin?.full_name || 'Admin' }}</div>
             <div class="text-caption opacity-80">
-              Chat with admin about this {{ item.status }} item
+              Chat about: {{ item.title }} ({{ item.status }})
             </div>
           </div>
           <v-spacer />
@@ -379,6 +508,18 @@ onUnmounted(() => {
 
 .item-card:hover {
  transform: translateY(-2px);
+}
+
+.admin-list-item {
+ border: 1px solid rgba(0, 0, 0, 0.12);
+ cursor: pointer;
+ transition: all 0.2s ease-in-out;
+}
+
+.admin-list-item:hover {
+ background-color: rgba(var(--v-theme-primary), 0.05);
+ border-color: rgb(var(--v-theme-primary));
+ transform: translateX(4px);
 }
 
 .chat-dialog {

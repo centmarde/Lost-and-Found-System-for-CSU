@@ -115,3 +115,21 @@ export async function broadcastMessage(
     console.error('Error broadcasting message:', error)
   }
 }
+
+/**
+ * Loads all items from the database
+ */
+export async function loadItems(): Promise<any[]> {
+  try {
+    const { data, error } = await supabase
+      .from('items')
+      .select('*')
+      .order('created_at', { ascending: false })
+
+    if (error) throw error
+    return data || []
+  } catch (error) {
+    console.error('Error loading items:', error)
+    throw new Error('Failed to load items')
+  }
+}
