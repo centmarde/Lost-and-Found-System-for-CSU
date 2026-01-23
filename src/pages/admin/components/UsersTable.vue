@@ -318,8 +318,8 @@ onMounted(() => {
                 <v-btn
                   icon="mdi-eye"
                   size="small"
-                  variant="text"
-                  color="primary"
+
+
                   @click="viewUser(item)"
                 >
                   <v-icon>mdi-eye</v-icon>

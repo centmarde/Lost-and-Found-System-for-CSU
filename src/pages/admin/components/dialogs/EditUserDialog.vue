@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { computed, watch } from 'vue'
+import { computed, watch, onMounted } from 'vue'
+import { useUserRolesStore } from '@/stores/roles'
 
 interface User {
   id: string
@@ -32,6 +33,16 @@ interface Emits {
 const props = defineProps<Props>()
 const emit = defineEmits<Emits>()
 
+// Initialize roles store
+const rolesStore = useUserRolesStore()
+
+// Fetch roles on component mount
+onMounted(async () => {
+  if (rolesStore.roles.length === 0) {
+    await rolesStore.fetchRoles()
+  }
+})
+
 // Computed properties for v-model
 const dialog = computed({
   get: () => props.modelValue,
@@ -43,44 +54,44 @@ const form = computed({
   set: (value: EditUserData) => emit('update:editForm', value)
 })
 
-// Role options - matching the system's role mapping
-const roleOptions = [
-  { title: 'Admin', value: 1 },
-  { title: 'User', value: 2 },
-  { title: 'Student', value: 3 },
-  { title: 'Faculty', value: 4 }
-]
+// Role options from store
+const roleOptions = computed(() => {
+  return rolesStore.roles.map(role => ({
+    title: role.title,
+    value: role.id
+  }))
+})
 
 // Helper functions for role display
 const getRoleIcon = (roleValue: number) => {
-  switch (roleValue) {
-    case 1: return 'mdi-shield-crown'      // Admin
-    case 2: return 'mdi-account'           // User
-    case 3: return 'mdi-school'            // Student
-    case 4: return 'mdi-account-tie'       // Faculty
-    default: return 'mdi-account-question' // Unknown
-  }
+  // Get role from store to determine appropriate icon
+  const role = rolesStore.roles.find(r => r.id === roleValue)
+  if (!role) return 'mdi-account-question'
+
+  // Basic mapping based on common role titles
+  const title = role.title.toLowerCase()
+  if (title.includes('admin')) return 'mdi-shield-crown'
+  if (title.includes('student')) return 'mdi-school'
+  if (title.includes('faculty') || title.includes('teacher')) return 'mdi-account-tie'
+  return 'mdi-account' // Default for other roles
 }
 
 const getRoleDescription = (roleValue: number) => {
-  switch (roleValue) {
-    case 1: return 'Full administrator access'
-    case 2: return 'General user access'
-    case 3: return 'Student access'
-    case 4: return 'Faculty access'
-    default: return 'Unknown role'
-  }
+  const role = rolesStore.roles.find(r => r.id === roleValue)
+  if (!role) return 'Unknown role'
+
+  // You can customize descriptions based on role titles
+  const title = role.title.toLowerCase()
+  if (title.includes('admin')) return 'Full administrator access'
+  if (title.includes('student')) return 'Student access'
+  if (title.includes('faculty') || title.includes('teacher')) return 'Faculty access'
+  return `${role.title} access` // Default description
 }
 
 const getCurrentRoleName = (roleValue: number | undefined) => {
   if (!roleValue) return 'No Role'
-  switch (roleValue) {
-    case 1: return 'Admin'
-    case 2: return 'User'
-    case 3: return 'Student'
-    case 4: return 'Faculty'
-    default: return 'Unknown Role'
-  }
+  const role = rolesStore.roles.find(r => r.id === roleValue)
+  return role ? role.title : 'Unknown Role'
 }
 
 // Form validation
@@ -88,7 +99,7 @@ const isFormValid = computed(() => {
   return form.value.full_name &&
          form.value.full_name.trim().length > 0 &&
          form.value.role &&
-         [1, 2, 3, 4].includes(form.value.role)
+         rolesStore.roles.some(role => role.id === form.value.role)
 })
 
 // Handle save
@@ -169,6 +180,8 @@ watch(dialog, (newValue) => {
             variant="outlined"
             density="comfortable"
             :rules="[v => !!v || 'Role is required']"
+            :loading="rolesStore.loading"
+            :disabled="rolesStore.loading || roleOptions.length === 0"
             class="mb-3"
             prepend-inner-icon="mdi-shield-account"
           >
@@ -183,6 +196,11 @@ watch(dialog, (newValue) => {
                 </v-list-item-subtitle>
               </v-list-item>
             </template>
+            <template v-slot:no-data>
+              <div class="pa-4 text-center text-medium-emphasis">
+                {{ rolesStore.loading ? 'Loading roles...' : 'No roles available' }}
+              </div>
+            </template>
           </v-select>
 
           <!-- Current Role Display -->
@@ -196,11 +214,7 @@ watch(dialog, (newValue) => {
             <template v-slot:prepend>
               <v-icon>mdi-information</v-icon>
             </template>
-            Current role: {{
-              (props.user.raw_user_meta_data?.role || props.user.raw_app_meta_data?.role) === 1
-                ? 'Admin'
-                : 'Student'
-            }}
+            Current role: {{ getCurrentRoleName(props.user.raw_user_meta_data?.role || props.user.raw_app_meta_data?.role) }}
           </v-alert>
         </v-form>
       </v-card-text>
