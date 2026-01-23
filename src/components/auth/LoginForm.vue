@@ -28,11 +28,13 @@
               :type="showPassword ? 'text' : 'password'"
               variant="outlined"
               density="comfortable"
-              :rules="[requiredValidator]"
+              :rules="passwordTouched ? [requiredValidator] : []"
               :error-messages="errors.password"
               prepend-inner-icon="mdi-lock"
               :append-inner-icon="showPassword ? 'mdi-eye' : 'mdi-eye-off'"
               @click:append-inner="showPassword = !showPassword"
+              @focus="passwordTouched = true"
+              @blur="passwordTouched = true"
               class="mb-6"
             />
           </v-col>
@@ -76,7 +78,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive } from "vue";
+import { ref, reactive, computed } from "vue";
 import {
   requiredValidator,
   emailValidator,
@@ -101,6 +103,7 @@ const formRef = ref();
 const formValid = ref(false);
 const loading = ref(false);
 const showPassword = ref(false);
+const passwordTouched = ref(false);
 
 // Form data
 const loginForm = reactive({
@@ -165,6 +168,7 @@ const handleLogin = async () => {
 const resetForm = () => {
   loginForm.email = "";
   loginForm.password = "";
+  passwordTouched.value = false;
   clearErrors();
   formRef.value?.resetValidation();
 };
@@ -176,6 +180,6 @@ defineExpose({
 </script>
 <style scoped>
 .white-text {
-  color: white !important; 
+  color: white !important;
 }
 </style>

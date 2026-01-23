@@ -8,6 +8,8 @@
   import { useUserRolesStore } from '@/stores/roles'
   import { getEmailInitials } from '@/utils/helpers'
   import { navigationConfig, individualNavItems } from '@/utils/navigation'
+  import { useNotifications } from '@/composables/useNotifications'
+  import NotificationDialog from '@/pages/student/components/NotifDialog.vue'
 
   interface Props {
     config?: UIConfig
@@ -37,6 +39,34 @@
   // Theme management
   const { toggleTheme: handleToggleTheme, getCurrentTheme, isLoadingTheme } = useTheme()
 
+  // Notifications management
+  const {
+    unreadCount,
+    hasUnreadNotifications,
+    loadMyNotifications,
+    setupRealtimeNotifications,
+    teardownRealtimeNotifications,
+    userNotificationsStore
+  } = useNotifications()
+
+  // Notification dialog state
+  const showNotificationDialog = ref(false)
+
+  const toggleNotifications = () => {
+    showNotificationDialog.value = true
+  }
+
+  const handleMarkGlobalAsRead = (id: number) => {
+    userNotificationsStore.markAsRead(id)
+  }
+
+  const handleClearAllNotifications = () => {
+    // Mark all notifications as read for current user
+    if (authStore.userData?.id) {
+      userNotificationsStore.markAllAsRead(authStore.userData.id)
+    }
+  }
+
   // Scroll detection for mobile drawer auto-close
   let lastScrollY = ref(0)
   let ticking = ref(false)
@@ -64,11 +94,32 @@
     lastScrollY.value = window.scrollY
     // Fetch roles for role description
     rolesStore.fetchRoles()
+
+    // Setup notifications if user is authenticated
+    if (authStore.userData && !isAdmin.value) {
+      loadMyNotifications()
+      setupRealtimeNotifications()
+    }
   })
 
   onUnmounted(() => {
     window.removeEventListener('scroll', handleScroll)
+    teardownRealtimeNotifications()
   })
+
+  // Watch for auth changes to setup/cleanup notifications
+  watch(
+    () => authStore.userData,
+    async (userData) => {
+      if (userData && !isAdmin.value) {
+        await loadMyNotifications()
+        setupRealtimeNotifications()
+      } else {
+        teardownRealtimeNotifications()
+      }
+    },
+    { immediate: true }
+  )
 
   // Watch for route changes and keep admin group expanded if we're on an admin route
   watch(
@@ -264,6 +315,31 @@
               </v-btn>
             </v-badge>
 
+            <!-- Notification Bell for Students - beside theme toggle -->
+            <v-btn
+              v-if="!isAdmin"
+              icon
+              @click="toggleNotifications"
+              :color="hasUnreadNotifications ? 'warning' : 'white'"
+              size="large"
+              variant="text"
+              rounded="xl"
+              class="text-white ml-1"
+              aria-label="Notifications"
+            >
+              <v-badge
+                :content="unreadCount"
+                :model-value="hasUnreadNotifications"
+                color="error"
+                overlap
+              >
+                <v-icon color="white">mdi-bell</v-icon>
+              </v-badge>
+              <v-tooltip activator="parent" location="bottom">
+                {{ hasUnreadNotifications ? `${unreadCount} new notifications` : 'No new notifications' }}
+              </v-tooltip>
+            </v-btn>
+
             <!-- User Avatar with Dropdown Menu -->
             <v-menu
               v-model="userMenu"
@@ -438,6 +514,27 @@
 
         <!-- Theme Toggle List Item -->
         <v-divider class="mx-2 my-3"></v-divider>
+
+        <!-- Notification Bell for Students (Mobile) -->
+        <v-list-item
+          v-if="!isAdmin"
+          @click="toggleNotifications; drawer = false"
+          class="ma-2 rounded-lg"
+          prepend-icon="mdi-bell"
+        >
+          <v-list-item-title class="d-flex align-center">
+            <span>Notifications</span>
+            <v-badge
+              v-if="hasUnreadNotifications"
+              :content="unreadCount"
+              color="error"
+              class="ml-2"
+            >
+              <span></span>
+            </v-badge>
+          </v-list-item-title>
+        </v-list-item>
+
         <v-list-item
           :title="themeTooltip"
           :prepend-icon="themeIcon"
@@ -503,6 +600,16 @@
         </v-list-item>
       </template>
     </v-navigation-drawer>
+
+    <!-- Notification Dialog -->
+    <NotificationDialog
+      v-if="!isAdmin"
+      v-model="showNotificationDialog"
+      :notifications="[]"
+      :global-notifications="userNotificationsStore.userNotifications.filter(n => n.id != null).map(n => ({ ...n, type: 'global' }))"
+      @mark-global-as-read="handleMarkGlobalAsRead"
+      @clear-all="handleClearAllNotifications"
+    />
   </div>
 </template>
 
@@ -536,6 +643,23 @@
 .v-app-bar .v-btn .v-btn__content,
 .v-app-bar .v-icon {
   color: white !important;
+}
+
+/* Notification bell animation */
+.v-app-bar .v-btn:has(.mdi-bell) {
+  animation: bell-shake 3s infinite;
+}
+
+@keyframes bell-shake {
+  0%, 90%, 100% {
+    transform: rotate(0deg);
+  }
+  2%, 6% {
+    transform: rotate(-15deg);
+  }
+  4%, 8% {
+    transform: rotate(15deg);
+  }
 }
 
 /* Ensure navigation drawer has proper styling */
