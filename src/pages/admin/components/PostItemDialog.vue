@@ -1,10 +1,10 @@
 <script lang="ts" setup>
-interface NewItemForm {
+type NewItemForm = {
   title: string;
   description: string;
 }
 
-interface Props {
+type Props = {
   posting: boolean;
   form: NewItemForm;
 }
