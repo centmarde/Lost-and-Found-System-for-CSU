@@ -1,8 +1,10 @@
 <script setup lang="ts">
-import { ref, computed, watch } from "vue";
+import { ref, computed, watch, onMounted } from "vue";
 import { useDisplay } from "vuetify";
 import { useRouter, useRoute } from "vue-router";
 import { useAuthUserStore } from "@/stores/authUser";
+import { useUserRolesStore } from "@/stores/roles";
+import { useUserPagesStore } from "@/stores/pages";
 import { navigationConfig, individualNavItems } from "@/utils/navigation";
 
 // Vuetify display composable for responsive design
@@ -12,8 +14,10 @@ const { smAndDown } = useDisplay();
 const router = useRouter();
 const route = useRoute();
 
-// Auth store
+// Stores
 const authStore = useAuthUserStore();
+const rolesStore = useUserRolesStore();
+const pagesStore = useUserPagesStore();
 
 // Reactive state for sidebar
 const isExpanded = ref(true);
@@ -27,16 +31,75 @@ const organizationGroupExpanded = ref(true);
 // Control my account group expansion - make it persistent
 const myAccountGroupExpanded = ref(true);
 
-// Computed property to check if user is admin
+// User role and pages data
+const userRolePages = ref<string[]>([]);
+const currentUserRole = ref<any>(null);
+
+// Load user role and pages on mount
+onMounted(async () => {
+  // Load roles if not already loaded
+  if (rolesStore.roles.length === 0) {
+    await rolesStore.fetchRoles();
+  }
+
+  // Get user role and allowed pages
+  await loadUserRoleAndPages();
+});
+
+// Function to load user role and pages
+const loadUserRoleAndPages = async () => {
+  try {
+    const roleId = authStore.userData?.user_metadata?.role ||
+                   authStore.userData?.app_metadata?.role;
+
+    console.log('Loading sidebar - User Role ID:', roleId);
+
+    if (roleId) {
+      // Find the role details from the store
+      currentUserRole.value = rolesStore.roles.find(role => role.id === roleId);
+      console.log('Found user role:', currentUserRole.value);
+
+      // Get pages accessible by this role
+      const rolePages = await pagesStore.fetchRolePagesByRoleId(roleId);
+      console.log('Role pages from DB:', rolePages);
+
+      if (rolePages && rolePages.length > 0) {
+        userRolePages.value = rolePages
+          .map(rolePage => rolePage.pages)
+          .filter(Boolean);
+        console.log('User accessible pages:', userRolePages.value);
+      }
+    }
+  } catch (error) {
+    console.error('Error loading user role and pages:', error);
+  }
+};
+
+// Computed property to check if user has access to admin features
+const hasAdminAccess = computed(() => {
+  // Check if user has access to any admin routes
+  return userRolePages.value.some(page =>
+    page.startsWith('/admin/')
+  );
+});
+
+// Computed property to check if user is admin (for backward compatibility)
 const isAdmin = computed(() => {
-  const roleId = authStore.userData?.user_metadata?.role ||
-                 authStore.userData?.app_metadata?.role;
-  return roleId === 1; // Assuming role ID 1 is admin
+  // Check if the user's role title contains "admin" (case insensitive)
+  if (currentUserRole.value) {
+    return currentUserRole.value.title.toLowerCase().includes('admin');
+  }
+
+  // Fallback to checking if they have admin access
+  return hasAdminAccess.value;
 });
 
 // Computed property for panel title
 const panelTitle = computed(() => {
-  return isAdmin.value ? 'Admin Panel' : 'Student Panel';
+  if (currentUserRole.value) {
+    return `${currentUserRole.value.title} Panel`;
+  }
+  return isAdmin.value ? 'Admin Panel' : 'User Panel';
 });
 
 // Watch for route changes and keep admin group expanded if we're on an admin route
@@ -61,16 +124,84 @@ watch(
   { immediate: true }
 );
 
+// Watch for user data changes and reload role/pages
+watch(
+  () => authStore.userData,
+  async (newUserData) => {
+    if (newUserData) {
+      await loadUserRoleAndPages();
+    }
+  },
+  { immediate: false }
+);
+
+// Watch for roles changes and reload user role info
+watch(
+  () => rolesStore.roles,
+  async (newRoles) => {
+    if (newRoles.length > 0 && authStore.userData) {
+      await loadUserRoleAndPages();
+    }
+  },
+  { immediate: false }
+);
+
 // Hide sidebar on small screens
 const showSidebar = computed(() => !smAndDown.value);
 
-// Get navigation groups from shared config, filtered by user role
+// Helper function to check if user has access to a specific page/route
+const hasPageAccess = (route: string) => {
+  const hasAccess = userRolePages.value.includes(route);
+  console.log(`Checking access for route "${route}":`, hasAccess);
+  return hasAccess;
+};
+
+// Filter individual navigation items based on user access
+const filteredIndividualNavItems = computed(() => {
+  const filtered = individualNavItems.filter(item => {
+    // If no permission specified, allow access
+    if (!item.permission) return true;
+
+    // Check if user has access to this specific route
+    return hasPageAccess(item.route);
+  });
+
+  console.log('Filtered individual nav items:', filtered);
+  return filtered;
+});
+
+// Filter navigation groups based on user access
+const filteredNavigationGroups = computed(() => {
+  const filtered = navigationConfig
+    .map(group => {
+      // Filter children based on user access
+      const filteredChildren = group.children.filter(child => {
+        // If no permission specified, allow access
+        if (!child.permission) return true;
+
+        // Check if user has access to this specific route
+        return hasPageAccess(child.route);
+      });
+
+      // Only include the group if it has accessible children
+      if (filteredChildren.length > 0) {
+        return {
+          ...group,
+          children: filteredChildren
+        };
+      }
+
+      return null;
+    })
+    .filter((group): group is NonNullable<typeof group> => group !== null); // Remove null groups with type guard
+
+  console.log('Filtered navigation groups:', filtered);
+  return filtered;
+});
+
+// Get navigation groups from shared config, filtered by user role and access
 const navigationGroups = computed(() => {
-  if (isAdmin.value) {
-    return navigationConfig;
-  }
-  // Filter out admin-only groups for non-admin users
-  return navigationConfig.filter(group => group.title !== 'Admin');
+  return filteredNavigationGroups.value;
 });
 
 // Helper function to get group expansion state
@@ -118,6 +249,10 @@ const handleLogout = async () => {
         <v-list-item-subtitle class="text-caption grey--text">
           Management System
         </v-list-item-subtitle>
+        <!-- Debug Info (remove this in production) -->
+        <v-list-item-subtitle class="text-caption grey--text mt-1" v-if="currentUserRole">
+          Role: {{ currentUserRole.title }} (ID: {{ currentUserRole.id }})
+        </v-list-item-subtitle>
       </v-list-item-content>
     </v-list-item>
 
@@ -127,11 +262,11 @@ const handleLogout = async () => {
     <v-list nav class="pa-2">
       <!-- Individual Navigation Items (non-grouped) -->
       <div
-        v-if="individualNavItems.length > 0"
+        v-if="filteredIndividualNavItems.length > 0"
         class="individual-nav-section mb-3"
       >
         <v-list-item
-          v-for="item in individualNavItems"
+          v-for="item in filteredIndividualNavItems"
           :key="item.title"
           @click="navigateTo(item.route)"
           class="mb-1 rounded-lg"
@@ -144,7 +279,10 @@ const handleLogout = async () => {
         </v-list-item>
 
         <!-- Divider after individual items -->
-        <v-divider class="mx-2 my-3"></v-divider>
+        <v-divider
+          v-if="navigationGroups.length > 0"
+          class="mx-2 my-3"
+        ></v-divider>
       </div>
 
       <!-- Dynamic Navigation Groups -->

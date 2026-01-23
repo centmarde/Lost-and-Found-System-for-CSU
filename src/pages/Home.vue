@@ -1,6 +1,6 @@
 //Home.vue
 <script setup lang="ts">
-import { ref, onMounted, computed, watch } from "vue";
+import { ref, onMounted, computed, watch, onUnmounted } from "vue";
 import InnerLayoutWrapper from "@/layouts/InnerLayoutWrapper.vue";
 import AdminItemCard from "@/pages/admin/components/AdminCard.vue";
 import UserItemCard from "@/pages/student/components/ItemCard.vue";
@@ -17,13 +17,19 @@ import { useUserChat } from "@/pages/student/components/composables/useUserChat"
 import { useAdminChat } from "@/pages/admin/components/composables/useAdminChat";
 import { useAdminItemActions } from "@/pages/admin/components/composables/useAdminItems";
 import { useNotifications } from "@/pages/student/components/composables/useNotification";
+import { useNotifications as useGlobalNotifications } from "@/composables/useNotifications";
 import { useAdminSupport } from "@/pages/student/components/composables/useAdminSupport";
 import { useFilterSortPagination } from "@/utils/helpers";
+import { useAuthUserStore } from "@/stores/authUser";
 
 import "@/styles/home.css";
 
-// Auth composable
-const { currentUser, isCurrentUserAdmin, getCurrentUser } = useAuth();
+// Auth store and composable
+const authStore = useAuthUserStore();
+const { currentUser, getCurrentUser } = useAuth();
+
+// Computed property to check if current user is admin (role ID 1)
+const isCurrentUserAdmin = computed(() => authStore.userRoleId === 1);
 
 // Items composable
 const { items, itemsLoading, fetchItems } = useItems(
@@ -99,7 +105,7 @@ const {
 // Admin actions composable
 const { updatingItems, markAsClaimed } = useAdminItemActions(fetchItems);
 
-// Notifications composable
+// Notifications composable (local item notifications)
 const showNotificationBell = ref(false);
 const showNotificationDialog = ref(false);
 
@@ -111,8 +117,39 @@ const {
   cleanup,
 } = useNotifications(currentUser, isCurrentUserAdmin);
 
+// Global notifications composable (for admin broadcasts)
+const {
+  unreadCount: globalUnreadCount,
+  loadMyNotifications,
+  markAllMyNotificationsAsRead,
+  userNotificationsStore,
+  setupRealtimeNotifications,
+  teardownRealtimeNotifications
+} = useGlobalNotifications();
+
+// Combined unread count from both local and global notifications
 const unreadCount = computed(() => {
-  return notifications.value.filter((n) => !n.read).length;
+  const localUnread = notifications.value.filter((n) => !n.read).length;
+  const globalUnread = globalUnreadCount.value || 0;
+  return localUnread + globalUnread;
+});
+
+// Transform global notifications to match expected format
+const transformedGlobalNotifications = computed(() => {
+  return userNotificationsStore.userNotifications
+    .filter(n => n.id != null) // Filter out any notifications without valid IDs
+    .map(n => ({
+      ...n,
+      type: 'global' as const
+    }));
+});
+
+// Transform local notifications to match expected format
+const transformedLocalNotifications = computed(() => {
+  return notifications.value.map(n => ({
+    ...n,
+    type: 'local' as const
+  }));
 });
 
 const toggleNotifications = () => {
@@ -125,6 +162,7 @@ const handleMarkAsRead = (notificationId: number) => {
 
 const handleClearAllNotifications = () => {
   clearNotifications();
+  markAllMyNotificationsAsRead();
 };
 
 // Student Admin Support Chat
@@ -145,17 +183,29 @@ watch(
   async ([user, isAdmin]) => {
     if (user && !isAdmin) {
       await setupItemNotifications();
+      // Load global notifications for students
+      await loadMyNotifications();
+      // Setup real-time notifications
+      setupRealtimeNotifications();
       showNotificationBell.value = true;
     } else {
+      // Cleanup real-time notifications when user is admin or not authenticated
+      teardownRealtimeNotifications();
       showNotificationBell.value = false;
     }
   },
-  { immediate: false }
+  { immediate: true }
 );
 
 onMounted(async () => {
   await getCurrentUser();
   await fetchItems();
+});
+
+// Cleanup on component unmount
+onUnmounted(() => {
+  teardownRealtimeNotifications();
+  cleanup(); // Cleanup local notifications
 });
 </script>
 
@@ -166,23 +216,25 @@ onMounted(async () => {
         <v-row class="mb-6">
           <v-col cols="12">
             <div class="pa-6 pa-sm-8 pa-md-12 position-relative">
-              <!-- Perfectly Centered Header Content -->
-              <div class="text-center mb-4 mb-md-6">
-                <h1 class="text-h2 text-sm-h1 font-weight-bold text-green-darken-4 mb-2">
+              <!-- Compact Header Content -->
+              <div class="text-center mb-3 mb-md-4">
+                <h1 class="text-h4 text-sm-h3 font-weight-bold text-green-darken-4 mb-1">
                   {{ pageTitle }}
                 </h1>
-                <p class="text-h6 text-sm-h5 text-grey-darken-1 mb-0">
+                <p class="text-body-1 text-sm-h6 text-grey-darken-1 mb-0">
                   {{ pageSubtitle }}
                 </p>
               </div>
 
               <!-- Centered Notification Bell for Students -->
-              <div v-if="showNotificationBell" class="text-center mt-3 mt-md-4">
+              <div v-if="showNotificationBell" class="text-center mb-2">
                 <v-btn
                   icon
                   @click="toggleNotifications"
-                  :color="unreadCount > 0 ? 'primary' : 'default'"
-                  :size="$vuetify.display.xs ? 'small' : $vuetify.display.sm ? 'default' : 'large'"
+                  :color="unreadCount > 0 ? 'primary' : 'grey-lighten-1'"
+                  :size="$vuetify.display.xs ? 'default' : 'large'"
+                  elevation="2"
+                  class="notification-bell-btn"
                 >
                   <v-badge
                     :content="unreadCount"
@@ -190,9 +242,23 @@ onMounted(async () => {
                     color="error"
                     overlap
                   >
-                    <v-icon :size="$vuetify.display.xs ? 'small' : 'default'">mdi-bell</v-icon>
+                    <v-icon :size="$vuetify.display.xs ? 'default' : 'large'">mdi-bell</v-icon>
                   </v-badge>
                 </v-btn>
+                <div class="text-caption text-grey-darken-1 mt-1">
+                  Notifications
+                </div>
+              </div>
+
+              <!-- Welcome Admin Text -->
+              <div v-else-if="isCurrentUserAdmin" class="text-center mb-2">
+                <div class="d-flex align-center justify-center mb-2">
+                  <v-icon color="primary" size="large" class="me-2">mdi-shield-crown</v-icon>
+                  <h2 class="text-h5 font-weight-bold text-primary mb-0">Welcome Admin</h2>
+                </div>
+                <p class="text-body-2 text-grey-darken-1 mb-0">
+                  Manage lost & found items and oversee the system
+                </p>
               </div>
             </div>
           </v-col>
@@ -526,8 +592,10 @@ onMounted(async () => {
 
         <NotificationDialog
           v-model="showNotificationDialog"
-          :notifications="notifications"
+          :notifications="transformedLocalNotifications"
+          :global-notifications="transformedGlobalNotifications"
           @mark-as-read="handleMarkAsRead"
+          @mark-global-as-read="(id) => userNotificationsStore.markAsRead(id)"
           @clear-all="handleClearAllNotifications"
         />
 
@@ -548,5 +616,24 @@ onMounted(async () => {
 </template>
 
 <style scoped>
-/* Only keeping non-header related styles if any exist */
+.notification-bell-btn {
+  animation: pulse 2s infinite;
+}
+
+.notification-bell-btn:hover {
+  transform: scale(1.1);
+  transition: transform 0.2s ease-in-out;
+}
+
+@keyframes pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(var(--v-theme-primary), 0.7);
+  }
+  70% {
+    box-shadow: 0 0 0 10px rgba(var(--v-theme-primary), 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(var(--v-theme-primary), 0);
+  }
+}
 </style>
