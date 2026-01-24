@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
 import { useAuthUserStore } from '@/stores/authUser'
+import { useUserRolesStore } from '@/stores/roles'
 
 const authStore = useAuthUserStore()
+const rolesStore = useUserRolesStore()
 
 // Form data
 const profileForm = ref({
@@ -15,11 +17,31 @@ const profileForm = ref({
   studentNumber: ''
 })
 
-// Check if current user is admin (role 1)
-const isAdmin = computed(() => {
+// Get current user role
+const currentUserRole = computed(() => {
   const roleId = authStore.userData?.user_metadata?.role ||
                  authStore.userData?.app_metadata?.role;
-  return roleId === 1;
+
+  if (roleId) {
+    return rolesStore.roles.find(role => role.id === roleId);
+  }
+  return null;
+})
+
+// Check if current user is a student (should show student number field)
+const isStudent = computed(() => {
+  if (!currentUserRole.value) return false;
+
+  // Check if the role title contains "student" (case insensitive)
+  return currentUserRole.value.title.toLowerCase().includes('student');
+})
+
+// Check if current user is admin (for backward compatibility)
+const isAdmin = computed(() => {
+  if (!currentUserRole.value) return false;
+
+  // Check if the role title contains "admin" (case insensitive)
+  return currentUserRole.value.title.toLowerCase().includes('admin');
 })
 
 // Form state
@@ -29,6 +51,11 @@ const successMessage = ref('')
 
 // Load current user data into form
 onMounted(async () => {
+  // Load roles if not already loaded
+  if (rolesStore.roles.length === 0) {
+    await rolesStore.fetchRoles()
+  }
+
   await loadCurrentUserData()
 })
 
@@ -55,13 +82,17 @@ const updateProfile = async () => {
     const userId = currentUserResult.user.id
 
     // Prepare the metadata update object with trimmed values
-    const metadataUpdate = {
+    const metadataUpdate: Record<string, string> = {
       full_name: profileForm.value.fullName.trim(),
       phone_number: profileForm.value.phoneNumber.trim(),
       address: profileForm.value.address.trim(),
       bio: profileForm.value.bio.trim(),
-      organization: profileForm.value.organization.trim(),
-      student_number: profileForm.value.studentNumber.trim()
+      organization: profileForm.value.organization.trim()
+    }
+
+    // Only include student number if the user is a student
+    if (isStudent.value) {
+      metadataUpdate.student_number = profileForm.value.studentNumber.trim()
     }
 
     // Call the updateUserMetadata function from authUser store
@@ -100,7 +131,8 @@ const loadCurrentUserData = async () => {
       address: result.user.user_metadata?.address || '',
       bio: result.user.user_metadata?.bio || '',
       organization: result.user.user_metadata?.organization || '',
-      studentNumber: result.user.user_metadata?.student_number || ''
+      // Only load student number if the user is a student
+      studentNumber: isStudent.value ? (result.user.user_metadata?.student_number || '') : ''
     }
   }
 }
@@ -180,14 +212,16 @@ const loadCurrentUserData = async () => {
             ></v-text-field>
           </v-col>
 
-          <!-- Student Number (only show for non-admin users) -->
-          <v-col v-if="!isAdmin" cols="12" md="6">
+          <!-- Student Number (only show for student roles) -->
+          <v-col v-if="isStudent" cols="12" md="6">
             <v-text-field
               v-model="profileForm.studentNumber"
               label="Student Number"
               prepend-inner-icon="mdi-school"
               variant="outlined"
               :disabled="isUpdating"
+              hint="Only visible to users with Student role"
+              persistent-hint
             ></v-text-field>
           </v-col>
 
