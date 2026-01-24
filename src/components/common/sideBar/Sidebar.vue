@@ -1,11 +1,13 @@
 <script setup lang="ts">
-import { ref, computed, watch, onMounted } from "vue";
+import { ref, computed, watch, onMounted, onBeforeUnmount } from "vue";
 import { useDisplay } from "vuetify";
 import { useRouter, useRoute } from "vue-router";
 import { useAuthUserStore } from "@/stores/authUser";
 import { useUserRolesStore } from "@/stores/roles";
 import { useUserPagesStore } from "@/stores/pages";
+import { useSidebarStore } from "@/stores/sidebar";
 import { navigationConfig, individualNavItems } from "@/utils/navigation";
+import { supabase } from "@/lib/supabase";
 
 // Vuetify display composable for responsive design
 const { smAndDown } = useDisplay();
@@ -18,6 +20,7 @@ const route = useRoute();
 const authStore = useAuthUserStore();
 const rolesStore = useUserRolesStore();
 const pagesStore = useUserPagesStore();
+const sidebarStore = useSidebarStore();
 
 // Reactive state for sidebar
 const isExpanded = ref(true);
@@ -35,6 +38,9 @@ const myAccountGroupExpanded = ref(true);
 const userRolePages = ref<string[]>([]);
 const currentUserRole = ref<any>(null);
 
+// Real-time subscription for messages
+let messagesSubscription: any = null;
+
 // Load user role and pages on mount
 onMounted(async () => {
   // Load roles if not already loaded
@@ -44,6 +50,12 @@ onMounted(async () => {
 
   // Get user role and allowed pages
   await loadUserRoleAndPages();
+
+  // Initialize unread message count for sidebar
+  if (authStore.userData?.id) {
+    await sidebarStore.updateUnreadMessageCount(authStore.userData.id);
+    setupMessagesRealtimeSubscription();
+  }
 });
 
 // Function to load user role and pages
@@ -74,6 +86,65 @@ const loadUserRoleAndPages = async () => {
     console.error('Error loading user role and pages:', error);
   }
 };
+
+// Setup real-time subscription for messages to update sidebar badge
+const setupMessagesRealtimeSubscription = () => {
+  if (!authStore.userData?.id) return;
+
+  console.log('Setting up sidebar real-time subscription for messages');
+
+  messagesSubscription = supabase
+    .channel('sidebar-messages-changes')
+    .on(
+      'postgres_changes',
+      {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'messages',
+      },
+      async (payload) => {
+        console.log('New message inserted - updating sidebar badge:', payload.new);
+        const message = payload.new as any;
+
+        // Only count messages not sent by current user
+        if (message.user_id !== authStore.userData?.id) {
+          sidebarStore.incrementUnreadCount();
+        }
+      }
+    )
+    .on(
+      'postgres_changes',
+      {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'messages',
+      },
+      async (payload) => {
+        console.log('Message updated - checking sidebar badge:', payload.new);
+        // If a message was marked as read, update the count
+        if (authStore.userData?.id) {
+          await sidebarStore.updateUnreadMessageCount(authStore.userData.id);
+        }
+      }
+    )
+    .subscribe((status) => {
+      console.log('Sidebar messages real-time subscription status:', status);
+    });
+};
+
+// Cleanup real-time subscription
+const cleanupMessagesSubscription = () => {
+  if (messagesSubscription) {
+    supabase.removeChannel(messagesSubscription);
+    messagesSubscription = null;
+    console.log('Sidebar messages real-time subscription cleaned up');
+  }
+};
+
+// Add onBeforeUnmount to cleanup subscription
+onBeforeUnmount(() => {
+  cleanupMessagesSubscription();
+});
 
 // Computed property to check if user has access to admin features
 const hasAdminAccess = computed(() => {
@@ -127,9 +198,21 @@ watch(
 // Watch for user data changes and reload role/pages
 watch(
   () => authStore.userData,
-  async (newUserData) => {
+  async (newUserData, oldUserData) => {
     if (newUserData) {
       await loadUserRoleAndPages();
+
+      // Update sidebar unread count when user changes
+      if (newUserData.id && newUserData.id !== oldUserData?.id) {
+        await sidebarStore.updateUnreadMessageCount(newUserData.id);
+        // Setup real-time subscription for new user
+        cleanupMessagesSubscription();
+        setupMessagesRealtimeSubscription();
+      }
+    } else {
+      // User logged out, reset unread count
+      sidebarStore.resetUnreadCount();
+      cleanupMessagesSubscription();
     }
   },
   { immediate: false }
@@ -273,8 +356,17 @@ const handleLogout = async () => {
           :class="{ 'v-list-item--active': isRouteActive(item.route) }"
           :prepend-icon="item.icon"
         >
-          <v-list-item-title class="font-weight-medium">
-            {{ item.title }}
+          <v-list-item-title class="font-weight-medium d-flex align-center justify-space-between">
+            <span>{{ item.title }}</span>
+            <!-- Badge for Support Inbox when there are unread messages -->
+            <v-badge
+              v-if="item.route === '/admin/support-inbox' && sidebarStore.hasUnreadMessages"
+              :content="sidebarStore.totalUnreadMessages"
+              color="error"
+              inline
+            >
+              <v-icon size="0" />
+            </v-badge>
           </v-list-item-title>
         </v-list-item>
 

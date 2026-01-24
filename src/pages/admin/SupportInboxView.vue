@@ -4,6 +4,7 @@ import InnerLayoutWrapper from "@/layouts/InnerLayoutWrapper.vue";
 import AdminSupportInbox from "@/pages/admin/components/AdminSupportInbox.vue";
 import { supabase } from "@/lib/supabase";
 import { loadItems as loadItemsFromStore, getUnreadMessageCountsForItems, updateUnreadCountForConversation as updateUnreadCountForConversationStore } from "@/stores/messages";
+import { useSidebarStore } from "@/stores/sidebar";
 
 // Composables
 import { useAuth } from "@/pages/admin/components/composables/useAuth";
@@ -11,6 +12,9 @@ import { useAdminSupportInbox } from "@/pages/admin/components/composables/useAd
 
 // Auth composable
 const { currentUser, isCurrentUserAdmin, getCurrentUser } = useAuth();
+
+// Sidebar store for updating badge
+const sidebarStore = useSidebarStore();
 
 // Items state
 const items = ref<any[]>([]);
@@ -33,7 +37,7 @@ const currentUserRole = computed(() => {
 // Computed property to filter conversations based on selected item
 const filteredConversations = computed(() => {
   if (!selectedItem.value) return [];
-  
+
   // Filter conversations by selected item
   return supportConversations.value.filter(conversation => {
     return conversation.item_id === selectedItem.value.id;
@@ -98,11 +102,14 @@ const loadItems = async () => {
   loadingItems.value = true;
   try {
     items.value = await loadItemsFromStore();
-    
+
     // Load unread message counts for all items
     const itemIds = items.value.map(item => item.id);
     if (itemIds.length > 0 && currentUser.value) {
       unreadMessageCounts.value = await getUnreadMessageCountsForItems(itemIds, currentUser.value.id);
+
+      // Update sidebar store with fresh total unread count
+      await sidebarStore.updateUnreadMessageCount(currentUser.value.id);
     }
   } catch (error) {
     console.error('Error loading items:', error);
@@ -135,7 +142,7 @@ const handleSendMessage = async () => {
 const updateUnreadCountForConversation = async (conversationId: string) => {
   try {
     if (!currentUser.value) return;
-    
+
     // Find the conversation to get its item_id
     const conversation = supportConversations.value.find(conv => conv.id === conversationId);
     if (!conversation || !conversation.item_id) return;
@@ -157,6 +164,11 @@ const updateUnreadCountForConversation = async (conversationId: string) => {
 
     unreadMessageCounts.value[itemId] = totalUnread;
     console.log('Updated unread counts - Conversation:', conversationId, 'Count:', count, 'Item:', itemId, 'Total:', totalUnread);
+
+    // Update sidebar store with fresh total unread count
+    if (currentUser.value?.id) {
+      await sidebarStore.updateUnreadMessageCount(currentUser.value.id);
+    }
   } catch (error) {
     console.error('Error updating unread count:', error);
   }
@@ -178,7 +190,7 @@ const setupMessagesRealtimeSubscription = () => {
       async (payload) => {
         console.log('New message inserted:', payload.new);
         const message = payload.new as any;
-        
+
         // Update unread counts for the conversation
         await updateUnreadCountForConversation(message.conversation_id);
       }
@@ -193,7 +205,7 @@ const setupMessagesRealtimeSubscription = () => {
       async (payload) => {
         console.log('Message updated:', payload.new);
         const message = payload.new as any;
-        
+
         // Update unread counts for the conversation (e.g., when isread changes)
         await updateUnreadCountForConversation(message.conversation_id);
       }
@@ -217,10 +229,10 @@ onMounted(async () => {
   // Load items and conversations
   await loadItems();
   openInbox();
-  
+
   // Setup real-time subscription for messages
   setupMessagesRealtimeSubscription();
-  
+
   console.log('SupportInboxView mounted - broadcast subscriptions initialized');
 });
 
@@ -340,7 +352,7 @@ onBeforeUnmount(() => {
                           <div class="d-flex flex-column">
                             <div class="d-flex align-center text-caption text-grey-darken-1 mb-1">
                               <v-icon size="16" class="me-1">mdi-message-text</v-icon>
-                              {{ getItemConversationCount(item.id) }} 
+                              {{ getItemConversationCount(item.id) }}
                               {{ getItemConversationCount(item.id) === 1 ? 'conversation' : 'conversations' }}
                             </div>
                           </div>
