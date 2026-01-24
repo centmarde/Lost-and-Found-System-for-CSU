@@ -17,6 +17,7 @@ export async function sendMessage(
         conversation_id: conversationId,
         message: messageText,
         user_id: userId,
+        isread: false, // Explicitly set isread to false for new messages
       })
       .select()
       .single()
@@ -137,8 +138,9 @@ export async function loadItems(): Promise<any[]> {
 /**
  * Counts unread messages for a specific item
  * Returns the total count of messages where isread is false for all conversations related to the item
+ * Only counts messages received by the current user (excludes messages sent by currentUserId)
  */
-export async function countUnreadMessagesForItem(itemId: number): Promise<number> {
+export async function countUnreadMessagesForItem(itemId: number, currentUserId: string): Promise<number> {
   try {
     // First get all conversations for this item
     const { data: conversations, error: convError } = await supabase
@@ -152,12 +154,13 @@ export async function countUnreadMessagesForItem(itemId: number): Promise<number
     // Get conversation IDs
     const conversationIds = conversations.map(conv => conv.id)
 
-    // Count unread messages in these conversations
+    // Count unread messages in these conversations (excluding messages sent by current user)
     const { count, error } = await supabase
       .from('messages')
       .select('*', { count: 'exact', head: true })
       .in('conversation_id', conversationIds)
       .eq('isread', false)
+      .neq('user_id', currentUserId) // Only count messages NOT sent by current user
 
     if (error) throw error
     return count || 0
@@ -170,8 +173,9 @@ export async function countUnreadMessagesForItem(itemId: number): Promise<number
 /**
  * Gets unread message counts for multiple items
  * Returns a map of item_id -> unread_count
+ * Only counts messages received by the current user (excludes messages sent by currentUserId)
  */
-export async function getUnreadMessageCountsForItems(itemIds: number[]): Promise<Record<number, number>> {
+export async function getUnreadMessageCountsForItems(itemIds: number[], currentUserId: string): Promise<Record<number, number>> {
   try {
     if (itemIds.length === 0) return {}
 
@@ -187,12 +191,13 @@ export async function getUnreadMessageCountsForItems(itemIds: number[]): Promise
     // Get conversation IDs
     const conversationIds = conversations.map(conv => conv.id)
 
-    // Get all unread messages for these conversations
+    // Get all unread messages for these conversations (excluding messages sent by current user)
     const { data: unreadMessages, error: msgError } = await supabase
       .from('messages')
       .select('conversation_id')
       .in('conversation_id', conversationIds)
       .eq('isread', false)
+      .neq('user_id', currentUserId) // Only count messages NOT sent by current user
 
     if (msgError) throw msgError
 
@@ -224,4 +229,187 @@ export async function getUnreadMessageCountsForItems(itemIds: number[]): Promise
     console.error('Error getting unread message counts:', error)
     return {}
   }
+}
+
+/**
+ * Counts unread messages for a specific conversation
+ * Returns the total count of messages where isread is false for a conversation
+ * Only counts messages received by the current user (excludes messages sent by currentUserId)
+ */
+export async function countUnreadMessagesForConversation(conversationId: string, currentUserId: string): Promise<number> {
+  try {
+    const { count, error } = await supabase
+      .from('messages')
+      .select('*', { count: 'exact', head: true })
+      .eq('conversation_id', conversationId)
+      .eq('isread', false)
+      .neq('user_id', currentUserId) // Only count messages NOT sent by current user
+
+    if (error) throw error
+    return count || 0
+  } catch (error) {
+    console.error('Error counting unread messages for conversation:', error)
+    return 0
+  }
+}
+
+/**
+ * Gets unread message counts for multiple conversations
+ * Returns a map of conversation_id -> unread_count
+ * Only counts messages received by the current user (excludes messages sent by currentUserId)
+ */
+export async function getUnreadMessageCountsForConversations(conversationIds: string[], currentUserId: string): Promise<Record<string, number>> {
+  try {
+    if (conversationIds.length === 0) return {}
+
+    // Get all unread messages for these conversations (excluding messages sent by current user)
+    const { data: unreadMessages, error } = await supabase
+      .from('messages')
+      .select('conversation_id')
+      .in('conversation_id', conversationIds)
+      .eq('isread', false)
+      .neq('user_id', currentUserId) // Only count messages NOT sent by current user
+
+    if (error) throw error
+
+    // Count unread messages per conversation
+    const unreadCounts: Record<string, number> = {}
+    conversationIds.forEach(id => {
+      unreadCounts[id] = 0
+    })
+
+    if (unreadMessages) {
+      unreadMessages.forEach(msg => {
+        unreadCounts[msg.conversation_id] = (unreadCounts[msg.conversation_id] || 0) + 1
+      })
+    }
+
+    return unreadCounts
+  } catch (error) {
+    console.error('Error getting unread message counts for conversations:', error)
+    return {}
+  }
+}
+
+/**
+ * Marks all messages in a conversation as read
+ * Updates isread to true for all messages where the user is NOT the sender
+ */
+export async function markConversationMessagesAsRead(
+  conversationId: string,
+  currentUserId: string
+): Promise<number> {
+  try {
+    console.log('Attempting to mark messages as read for conversation:', conversationId, 'User:', currentUserId)
+    
+    // First, let's check how many unread messages exist
+    const { data: unreadMessages, error: checkError } = await supabase
+      .from('messages')
+      .select('id, user_id, isread')
+      .eq('conversation_id', conversationId)
+      .neq('user_id', currentUserId)
+      .eq('isread', false)
+    
+    if (checkError) {
+      console.error('Error checking unread messages:', checkError)
+      throw checkError
+    }
+    
+    console.log('Found unread messages to mark as read:', unreadMessages?.length || 0, unreadMessages)
+    
+    if (!unreadMessages || unreadMessages.length === 0) {
+      console.log('No unread messages to update')
+      return 0
+    }
+
+    // Update the messages
+    const { data, error, count } = await supabase
+      .from('messages')
+      .update({ isread: true })
+      .eq('conversation_id', conversationId)
+      .neq('user_id', currentUserId)
+      .eq('isread', false)
+      .select()
+
+    if (error) {
+      console.error('Error updating messages:', error)
+      throw error
+    }
+    
+    console.log('Successfully marked messages as read. Updated count:', data?.length || 0, 'Data:', data)
+    return data?.length || 0
+  } catch (error) {
+    console.error('Error marking messages as read:', error)
+    throw new Error('Failed to mark messages as read: ' + (error as any).message)
+  }
+}
+
+/**
+ * Verifies if messages were successfully marked as read
+ * Diagnostic function to check database state
+ */
+export async function verifyMessagesMarkedAsRead(
+  conversationId: string,
+  currentUserId: string
+): Promise<{ total: number; unread: number; read: number }> {
+  try {
+    // Get all messages in the conversation (excluding current user's messages)
+    const { data: allMessages, error: allError } = await supabase
+      .from('messages')
+      .select('id, user_id, isread')
+      .eq('conversation_id', conversationId)
+      .neq('user_id', currentUserId)
+
+    if (allError) throw allError
+
+    const total = allMessages?.length || 0
+    const unread = allMessages?.filter(m => !m.isread).length || 0
+    const read = allMessages?.filter(m => m.isread).length || 0
+
+    console.log('Message verification for conversation:', conversationId)
+    console.log('Total messages (from others):', total)
+    console.log('Unread messages:', unread)
+    console.log('Read messages:', read)
+
+    return { total, unread, read }
+  } catch (error) {
+    console.error('Error verifying messages:', error)
+    return { total: 0, unread: 0, read: 0 }
+  }
+}
+
+/**
+ * Sets up a real-time subscription for all messages in the database
+ * Useful for monitoring message changes across all conversations
+ */
+export function setupMessagesRealtimeSubscription(
+  onMessageInserted: (message: Message) => void,
+  onMessageUpdated: (message: Message) => void
+) {
+  const channel = supabase.channel('all-messages-changes')
+  
+  return channel
+    .on(
+      'postgres_changes',
+      {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'messages',
+      },
+      (payload) => {
+        onMessageInserted(payload.new as Message)
+      }
+    )
+    .on(
+      'postgres_changes',
+      {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'messages',
+      },
+      (payload) => {
+        onMessageUpdated(payload.new as Message)
+      }
+    )
+    .subscribe()
 }

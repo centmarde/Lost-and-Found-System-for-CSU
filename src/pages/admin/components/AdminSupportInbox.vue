@@ -41,6 +41,7 @@ const props = defineProps({
   loadingConversations: { type: Boolean, required: true },
   loadingMessages: { type: Boolean, required: true },
   sendingMessage: { type: Boolean, required: true },
+  unreadCounts: { type: Object as () => Record<string, number>, default: () => ({}) },
 })
 
 const emit = defineEmits(['update:show', 'select-conversation', 'send-message'])
@@ -152,7 +153,24 @@ const getLatestMessagePreview = (conversation: Conversation) => {
               lines="three"
             >
               <template #prepend>
+                <v-badge
+                  v-if="unreadCounts[conversation.id] > 0"
+                  :content="unreadCounts[conversation.id]"
+                  color="error"
+                  overlap
+                >
+                  <v-avatar
+                    :color="conversation.item ? (conversation.item.status === 'lost' ? 'error' : 'success') : 'primary'"
+                    size="45"
+                    class="me-3"
+                  >
+                    <v-icon color="white">
+                      {{ conversation.item ? (conversation.item.status === 'lost' ? 'mdi-help-circle' : 'mdi-check-circle') : 'mdi-account' }}
+                    </v-icon>
+                  </v-avatar>
+                </v-badge>
                 <v-avatar
+                  v-else
                   :color="conversation.item ? (conversation.item.status === 'lost' ? 'error' : 'success') : 'primary'"
                   size="45"
                   class="me-3"
@@ -165,10 +183,22 @@ const getLatestMessagePreview = (conversation: Conversation) => {
 
               <!-- Main Content -->
               <div class="d-flex flex-column">
-                <!-- User Name -->
-                <v-list-item-title class="text-subtitle-2 font-weight-bold mb-1">
-                  {{ getStudentName(conversation) }}
-                </v-list-item-title>
+                <!-- User Name with unread indicator -->
+                <div class="d-flex align-center justify-space-between mb-1">
+                  <v-list-item-title class="text-subtitle-2 font-weight-bold">
+                    {{ getStudentName(conversation) }}
+                  </v-list-item-title>
+                  <div class="d-flex align-center">
+                    <v-icon
+                      v-if="unreadCounts[conversation.id] > 0"
+                      color="error"
+                      size="20"
+                      class="ml-2"
+                    >
+                      mdi-email-alert
+                    </v-icon>
+                  </div>
+                </div>
 
                 <!-- Item Information - Made More Prominent -->
                 <div v-if="conversation.item" class="mb-2">

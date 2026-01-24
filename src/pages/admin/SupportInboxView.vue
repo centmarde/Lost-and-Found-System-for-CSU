@@ -18,6 +18,9 @@ const loadingItems = ref(false);
 const selectedItem = ref<any>(null);
 const unreadMessageCounts = ref<Record<number, number>>({});
 
+// Real-time subscription
+let messagesSubscription: any = null;
+
 // New message variable
 const newMessage = ref('');
 
@@ -63,6 +66,7 @@ const {
   loadingConversations: loadingSupportConversations,
   loadingMessages: loadingSupportMessages,
   sendingMessage: sendingSupportInboxMessage,
+  unreadCounts: conversationUnreadCounts,
   // Pagination state
   currentPage,
   pageSize,
@@ -93,8 +97,8 @@ const loadItems = async () => {
     
     // Load unread message counts for all items
     const itemIds = items.value.map(item => item.id);
-    if (itemIds.length > 0) {
-      unreadMessageCounts.value = await getUnreadMessageCountsForItems(itemIds);
+    if (itemIds.length > 0 && currentUser.value) {
+      unreadMessageCounts.value = await getUnreadMessageCountsForItems(itemIds, currentUser.value.id);
     }
   } catch (error) {
     console.error('Error loading items:', error);
@@ -123,17 +127,110 @@ const handleSendMessage = async () => {
   }
 };
 
+// Update unread count for a conversation and its item
+const updateUnreadCountForConversation = async (conversationId: string) => {
+  try {
+    if (!currentUser.value) return;
+    
+    // Find the conversation to get its item_id
+    const conversation = supportConversations.value.find(conv => conv.id === conversationId);
+    if (!conversation || !conversation.item_id) return;
+
+    // Count unread messages for this conversation (excluding current user's messages)
+    const { count, error } = await supabase
+      .from('messages')
+      .select('*', { count: 'exact', head: true })
+      .eq('conversation_id', conversationId)
+      .eq('isread', false)
+      .neq('user_id', currentUser.value.id); // Only count messages NOT sent by current user
+
+    if (!error) {
+      // Update conversation unread count
+      conversationUnreadCounts.value[conversationId] = count || 0;
+
+      // Recalculate item unread count
+      const itemId = conversation.item_id;
+      const itemConversations = supportConversations.value.filter(conv => conv.item_id === itemId);
+      let totalUnread = 0;
+
+      for (const conv of itemConversations) {
+        totalUnread += conversationUnreadCounts.value[conv.id] || 0;
+      }
+
+      unreadMessageCounts.value[itemId] = totalUnread;
+      console.log('Updated unread counts - Conversation:', conversationId, 'Count:', count, 'Item:', itemId, 'Total:', totalUnread);
+    }
+  } catch (error) {
+    console.error('Error updating unread count:', error);
+  }
+};
+
+// Setup real-time subscription for messages
+const setupMessagesRealtimeSubscription = () => {
+  console.log('Setting up real-time subscription for messages table');
+
+  messagesSubscription = supabase
+    .channel('messages-changes')
+    .on(
+      'postgres_changes',
+      {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'messages',
+      },
+      async (payload) => {
+        console.log('New message inserted:', payload.new);
+        const message = payload.new as any;
+        
+        // Update unread counts for the conversation
+        await updateUnreadCountForConversation(message.conversation_id);
+      }
+    )
+    .on(
+      'postgres_changes',
+      {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'messages',
+      },
+      async (payload) => {
+        console.log('Message updated:', payload.new);
+        const message = payload.new as any;
+        
+        // Update unread counts for the conversation (e.g., when isread changes)
+        await updateUnreadCountForConversation(message.conversation_id);
+      }
+    )
+    .subscribe((status) => {
+      console.log('Messages real-time subscription status:', status);
+    });
+};
+
+// Cleanup real-time subscription
+const cleanupMessagesSubscription = () => {
+  if (messagesSubscription) {
+    supabase.removeChannel(messagesSubscription);
+    messagesSubscription = null;
+    console.log('Messages real-time subscription cleaned up');
+  }
+};
+
 onMounted(async () => {
   await getCurrentUser();
   // Load items and conversations
   await loadItems();
   openInbox();
+  
+  // Setup real-time subscription for messages
+  setupMessagesRealtimeSubscription();
+  
   console.log('SupportInboxView mounted - broadcast subscriptions initialized');
 });
 
 onBeforeUnmount(() => {
   // Cleanup subscriptions when component unmounts
   closeInbox();
+  cleanupMessagesSubscription();
   console.log('SupportInboxView unmounted - broadcast subscriptions cleaned up');
 });
 </script>
@@ -248,15 +345,6 @@ onBeforeUnmount(() => {
                               <v-icon size="16" class="me-1">mdi-message-text</v-icon>
                               {{ getItemConversationCount(item.id) }} 
                               {{ getItemConversationCount(item.id) === 1 ? 'conversation' : 'conversations' }}
-                            </div>
-                            <!-- Unread Messages Count -->
-                            <div
-                              v-if="getUnreadMessageCount(item.id) > 0"
-                              class="d-flex align-center text-caption font-weight-bold"
-                              style="color: #d32f2f;"
-                            >
-                              <v-icon size="16" class="me-1" color="error">mdi-circle</v-icon>
-                              {{ getUnreadMessageCount(item.id) }} unread
                             </div>
                           </div>
                           <v-btn
@@ -398,7 +486,24 @@ onBeforeUnmount(() => {
                             lines="three"
                           >
                             <template v-slot:prepend>
+                              <v-badge
+                                v-if="conversationUnreadCounts[conversation.id] > 0"
+                                :content="conversationUnreadCounts[conversation.id]"
+                                color="error"
+                                overlap
+                              >
+                                <v-avatar
+                                  :color="conversation.item ? (conversation.item.status === 'lost' ? 'error' : 'success') : 'primary'"
+                                  size="45"
+                                  class="me-3"
+                                >
+                                  <span class="text-white font-weight-bold">
+                                    {{ (conversation.sender_profile?.full_name || 'U').split(' ').map((n: string) => n[0]).join('').toUpperCase().substring(0, 2) }}
+                                  </span>
+                                </v-avatar>
+                              </v-badge>
                               <v-avatar
+                                v-else
                                 :color="conversation.item ? (conversation.item.status === 'lost' ? 'error' : 'success') : 'primary'"
                                 size="45"
                                 class="me-3"
@@ -411,10 +516,20 @@ onBeforeUnmount(() => {
 
                             <!-- Main Content -->
                             <div class="d-flex flex-column">
-                              <!-- User Info -->
-                              <v-list-item-title class="font-weight-bold mb-1">
-                                {{ conversation.sender_profile?.full_name || 'Student User' }}
-                              </v-list-item-title>
+                              <!-- User Info with unread indicator -->
+                              <div class="d-flex align-center justify-space-between mb-1">
+                                <v-list-item-title class="font-weight-bold">
+                                  {{ conversation.sender_profile?.full_name || 'Student User' }}
+                                </v-list-item-title>
+                                <v-icon
+                                  v-if="conversationUnreadCounts[conversation.id] > 0"
+                                  color="error"
+                                  size="20"
+                                  class="ml-2"
+                                >
+                                  mdi-email-alert
+                                </v-icon>
+                              </div>
 
                               <!-- Item Information - Made More Prominent -->
                               <div v-if="conversation.item" class="mb-2">

@@ -9,7 +9,10 @@ import {
 import {
   loadMessages,
   sendMessage,
-  setupMessageSubscription
+  setupMessageSubscription,
+  getUnreadMessageCountsForConversations,
+  markConversationMessagesAsRead,
+  verifyMessagesMarkedAsRead
 } from '@/stores/messages'
 
 export function useAdminSupportInbox(currentUser: any) {
@@ -24,6 +27,7 @@ export function useAdminSupportInbox(currentUser: any) {
   const loadingConversations = ref(false)
   const loadingMessages = ref(false)
   const sendingMessage = ref(false)
+  const unreadCounts = ref<Record<string, number>>({})
 
   // Pagination state
   const currentPage = ref(1)
@@ -55,6 +59,12 @@ export function useAdminSupportInbox(currentUser: any) {
       totalPages.value = result.totalPages
       currentPage.value = result.currentPage
       console.log('Loaded support conversations:', result.conversations.length, 'Total:', result.totalCount)
+      
+      // Load unread counts for all conversations (only if user is logged in)
+      const conversationIds = result.conversations.map(conv => conv.id)
+      if (conversationIds.length > 0 && currentUser.value) {
+        unreadCounts.value = await getUnreadMessageCountsForConversations(conversationIds, currentUser.value.id)
+      }
     } catch (error) {
       console.error('Error loading support conversations:', error)
       toast.error('Failed to load support conversations')
@@ -79,8 +89,32 @@ export function useAdminSupportInbox(currentUser: any) {
     selectedConversation.value = conversation
     currentConversationId = conversation.id
 
-    // Load messages
+    // Load messages first
     await loadConversationMessages(conversation.id)
+
+    // Mark messages as read (only messages from other users) after messages are loaded
+    if (currentUser.value) {
+      try {
+        console.log('Marking messages as read for conversation:', conversation.id, 'Current user:', currentUser.value.id)
+        const updatedCount = await markConversationMessagesAsRead(conversation.id, currentUser.value.id)
+        console.log('Marked', updatedCount, 'messages as read')
+        
+        // Verify the update
+        const verification = await verifyMessagesMarkedAsRead(conversation.id, currentUser.value.id)
+        console.log('Verification result:', verification)
+        
+        // Update unread count for this conversation to 0
+        if (updatedCount > 0 || verification.unread === 0) {
+          unreadCounts.value[conversation.id] = 0
+          console.log('Updated unread count to 0 for conversation:', conversation.id)
+        }
+      } catch (error) {
+        console.error('Error marking messages as read:', error)
+        toast.error('Failed to mark messages as read')
+      }
+    } else {
+      console.warn('Cannot mark messages as read - no current user')
+    }
 
     // Setup subscription
     setupMessageSubscriptionForConversation(conversation.id)
@@ -163,6 +197,12 @@ export function useAdminSupportInbox(currentUser: any) {
             scrollToBottom()
             console.log('Added real-time message via broadcast')
           }
+        }
+        
+        // Update unread count for this conversation if message is from another user
+        if (newMessage.user_id !== currentUser.value?.id) {
+          // Increment unread count
+          unreadCounts.value[conversationId] = (unreadCounts.value[conversationId] || 0) + 1
         }
       },
       currentUser.value.id
@@ -262,6 +302,7 @@ export function useAdminSupportInbox(currentUser: any) {
     loadingConversations,
     loadingMessages,
     sendingMessage,
+    unreadCounts,
     // Pagination state
     currentPage,
     pageSize,
