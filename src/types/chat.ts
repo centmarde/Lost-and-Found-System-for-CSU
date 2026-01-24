@@ -40,6 +40,7 @@ export interface Message {
   user_id: string
   created_at: string
   sender_id?: string
+  isread?: boolean
 }
 
 export interface SendMessagePayload {

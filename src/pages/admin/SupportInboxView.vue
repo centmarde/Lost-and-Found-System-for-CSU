@@ -3,7 +3,7 @@ import { onMounted, onBeforeUnmount, computed, ref } from "vue";
 import InnerLayoutWrapper from "@/layouts/InnerLayoutWrapper.vue";
 import AdminSupportInbox from "@/pages/admin/components/AdminSupportInbox.vue";
 import { supabase } from "@/lib/supabase";
-import { loadItems as loadItemsFromStore } from "@/stores/messages";
+import { loadItems as loadItemsFromStore, getUnreadMessageCountsForItems } from "@/stores/messages";
 
 // Composables
 import { useAuth } from "@/pages/admin/components/composables/useAuth";
@@ -16,6 +16,7 @@ const { currentUser, isCurrentUserAdmin, getCurrentUser } = useAuth();
 const items = ref<any[]>([]);
 const loadingItems = ref(false);
 const selectedItem = ref<any>(null);
+const unreadMessageCounts = ref<Record<number, number>>({});
 
 // New message variable
 const newMessage = ref('');
@@ -39,6 +40,11 @@ const filteredConversations = computed(() => {
 // Computed property to count conversations per item
 const getItemConversationCount = (itemId: number) => {
   return supportConversations.value.filter(conv => conv.item_id === itemId).length;
+};
+
+// Get unread message count for an item
+const getUnreadMessageCount = (itemId: number) => {
+  return unreadMessageCounts.value[itemId] || 0;
 };
 
 // Computed property to filter items that have conversations
@@ -84,6 +90,12 @@ const loadItems = async () => {
   loadingItems.value = true;
   try {
     items.value = await loadItemsFromStore();
+    
+    // Load unread message counts for all items
+    const itemIds = items.value.map(item => item.id);
+    if (itemIds.length > 0) {
+      unreadMessageCounts.value = await getUnreadMessageCountsForItems(itemIds);
+    }
   } catch (error) {
     console.error('Error loading items:', error);
   } finally {
@@ -201,13 +213,25 @@ onBeforeUnmount(() => {
                     >
                       <v-card-title class="d-flex justify-space-between align-start pb-2">
                         <div class="text-subtitle-1 font-weight-bold">{{ item.title }}</div>
-                        <v-chip
-                          :color="item.status === 'lost' ? 'error' : 'success'"
-                          size="x-small"
-                          variant="flat"
-                        >
-                          {{ item.status.toUpperCase() }}
-                        </v-chip>
+                        <div class="d-flex align-center gap-1">
+                          <!-- Unread Messages Badge -->
+                          <v-badge
+                            v-if="getUnreadMessageCount(item.id) > 0"
+                            :content="getUnreadMessageCount(item.id)"
+                            color="error"
+                            inline
+                            class="me-2"
+                          >
+                            <v-icon color="error" size="20">mdi-email-alert</v-icon>
+                          </v-badge>
+                          <v-chip
+                            :color="item.status === 'lost' ? 'error' : 'success'"
+                            size="x-small"
+                            variant="flat"
+                          >
+                            {{ item.status.toUpperCase() }}
+                          </v-chip>
+                        </div>
                       </v-card-title>
 
                       <v-card-text>
@@ -217,12 +241,23 @@ onBeforeUnmount(() => {
 
                         <v-divider class="my-3" />
 
-                        <!-- Conversation Count -->
+                        <!-- Conversation Count and Unread Messages -->
                         <div class="d-flex align-center justify-space-between">
-                          <div class="d-flex align-center text-caption text-grey-darken-1">
-                            <v-icon size="16" class="me-1">mdi-message-text</v-icon>
-                            {{ getItemConversationCount(item.id) }} 
-                            {{ getItemConversationCount(item.id) === 1 ? 'conversation' : 'conversations' }}
+                          <div class="d-flex flex-column">
+                            <div class="d-flex align-center text-caption text-grey-darken-1 mb-1">
+                              <v-icon size="16" class="me-1">mdi-message-text</v-icon>
+                              {{ getItemConversationCount(item.id) }} 
+                              {{ getItemConversationCount(item.id) === 1 ? 'conversation' : 'conversations' }}
+                            </div>
+                            <!-- Unread Messages Count -->
+                            <div
+                              v-if="getUnreadMessageCount(item.id) > 0"
+                              class="d-flex align-center text-caption font-weight-bold"
+                              style="color: #d32f2f;"
+                            >
+                              <v-icon size="16" class="me-1" color="error">mdi-circle</v-icon>
+                              {{ getUnreadMessageCount(item.id) }} unread
+                            </div>
                           </div>
                           <v-btn
                             color="primary"

@@ -133,3 +133,95 @@ export async function loadItems(): Promise<any[]> {
     throw new Error('Failed to load items')
   }
 }
+
+/**
+ * Counts unread messages for a specific item
+ * Returns the total count of messages where isread is false for all conversations related to the item
+ */
+export async function countUnreadMessagesForItem(itemId: number): Promise<number> {
+  try {
+    // First get all conversations for this item
+    const { data: conversations, error: convError } = await supabase
+      .from('conversations')
+      .select('id')
+      .eq('item_id', itemId)
+
+    if (convError) throw convError
+    if (!conversations || conversations.length === 0) return 0
+
+    // Get conversation IDs
+    const conversationIds = conversations.map(conv => conv.id)
+
+    // Count unread messages in these conversations
+    const { count, error } = await supabase
+      .from('messages')
+      .select('*', { count: 'exact', head: true })
+      .in('conversation_id', conversationIds)
+      .eq('isread', false)
+
+    if (error) throw error
+    return count || 0
+  } catch (error) {
+    console.error('Error counting unread messages for item:', error)
+    return 0
+  }
+}
+
+/**
+ * Gets unread message counts for multiple items
+ * Returns a map of item_id -> unread_count
+ */
+export async function getUnreadMessageCountsForItems(itemIds: number[]): Promise<Record<number, number>> {
+  try {
+    if (itemIds.length === 0) return {}
+
+    // Get all conversations for these items
+    const { data: conversations, error: convError } = await supabase
+      .from('conversations')
+      .select('id, item_id')
+      .in('item_id', itemIds)
+
+    if (convError) throw convError
+    if (!conversations || conversations.length === 0) return {}
+
+    // Get conversation IDs
+    const conversationIds = conversations.map(conv => conv.id)
+
+    // Get all unread messages for these conversations
+    const { data: unreadMessages, error: msgError } = await supabase
+      .from('messages')
+      .select('conversation_id')
+      .in('conversation_id', conversationIds)
+      .eq('isread', false)
+
+    if (msgError) throw msgError
+
+    // Create a map of conversation_id -> item_id
+    const convToItemMap: Record<string, number> = {}
+    conversations.forEach(conv => {
+      if (conv.item_id) {
+        convToItemMap[conv.id] = conv.item_id
+      }
+    })
+
+    // Count unread messages per item
+    const unreadCounts: Record<number, number> = {}
+    itemIds.forEach(id => {
+      unreadCounts[id] = 0
+    })
+
+    if (unreadMessages) {
+      unreadMessages.forEach(msg => {
+        const itemId = convToItemMap[msg.conversation_id]
+        if (itemId) {
+          unreadCounts[itemId] = (unreadCounts[itemId] || 0) + 1
+        }
+      })
+    }
+
+    return unreadCounts
+  } catch (error) {
+    console.error('Error getting unread message counts:', error)
+    return {}
+  }
+}
