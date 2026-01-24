@@ -9,7 +9,12 @@ import {
 import {
   loadMessages,
   sendMessage,
-  setupMessageSubscription
+  setupMessageSubscription,
+  getUnreadMessageCountsForConversations,
+  markConversationMessagesAsRead,
+  verifyMessagesMarkedAsRead,
+  broadcastTyping,
+  setupTypingSubscription
 } from '@/stores/messages'
 
 export function useAdminSupportInbox(currentUser: any) {
@@ -24,6 +29,15 @@ export function useAdminSupportInbox(currentUser: any) {
   const loadingConversations = ref(false)
   const loadingMessages = ref(false)
   const sendingMessage = ref(false)
+  const unreadCounts = ref<Record<string, number>>({})
+  
+  // Typing indicator state
+  const isOtherUserTyping = ref(false)
+  const otherUserTypingName = ref('')
+  const typingTimeout = ref<NodeJS.Timeout | null>(null)
+  // Track typing status for each conversation
+  const conversationTypingStatus = ref<Record<string, { isTyping: boolean; userName: string }>>({})
+  const conversationTypingTimeouts = ref<Record<string, NodeJS.Timeout>>({})
 
   // Pagination state
   const currentPage = ref(1)
@@ -33,6 +47,9 @@ export function useAdminSupportInbox(currentUser: any) {
 
   let messageSubscription: any = null
   let conversationsSubscription: any = null
+  let typingSubscription: any = null
+  // Track typing subscriptions for all conversations
+  let typingSubscriptions: Map<string, any> = new Map()
   let currentConversationId: string | null = null
 
   // Helper to scroll messages to bottom
@@ -45,6 +62,90 @@ export function useAdminSupportInbox(currentUser: any) {
     })
   }
 
+  // Handle typing indicator
+  const handleTyping = async () => {
+    if (!selectedConversation.value || !currentUser.value) return
+
+    const userName = currentUser.value.user_metadata?.full_name || 
+                     currentUser.value.email || 
+                     'Admin'
+
+    // Broadcast that user is typing
+    await broadcastTyping(
+      selectedConversation.value.id,
+      currentUser.value.id,
+      userName,
+      true
+    )
+
+    // Clear existing timeout
+    if (typingTimeout.value) {
+      clearTimeout(typingTimeout.value)
+    }
+
+    // Set timeout to stop typing indicator after 3 seconds
+    typingTimeout.value = setTimeout(async () => {
+      if (selectedConversation.value && currentUser.value) {
+        await broadcastTyping(
+          selectedConversation.value.id,
+          currentUser.value.id,
+          userName,
+          false
+        )
+      }
+    }, 3000)
+  }
+
+  // Setup typing subscription
+  const setupTypingSubscriptionForConversation = (conversationId: string) => {
+    if (!currentUser.value) return
+
+    console.log('Setting up typing subscription for conversation:', conversationId)
+
+    const subscription = setupTypingSubscription(
+      conversationId,
+      (payload) => {
+        console.log('Typing event received:', payload)
+        
+        // Update typing status for this specific conversation
+        conversationTypingStatus.value[conversationId] = {
+          isTyping: payload.is_typing,
+          userName: payload.user_name
+        }
+        
+        // If this is the selected conversation, also update the main typing state
+        if (selectedConversation.value?.id === conversationId) {
+          isOtherUserTyping.value = payload.is_typing
+          otherUserTypingName.value = payload.user_name
+        }
+
+        // Clear existing timeout for this conversation
+        if (conversationTypingTimeouts.value[conversationId]) {
+          clearTimeout(conversationTypingTimeouts.value[conversationId])
+        }
+
+        // Auto-hide typing indicator after 5 seconds
+        if (payload.is_typing) {
+          conversationTypingTimeouts.value[conversationId] = setTimeout(() => {
+            conversationTypingStatus.value[conversationId] = {
+              isTyping: false,
+              userName: ''
+            }
+            // Also clear main typing state if this is the selected conversation
+            if (selectedConversation.value?.id === conversationId) {
+              isOtherUserTyping.value = false
+              otherUserTypingName.value = ''
+            }
+          }, 5000)
+        }
+      },
+      currentUser.value.id
+    )
+
+    // Store subscription for later cleanup
+    typingSubscriptions.set(conversationId, subscription)
+  }
+
   // Load all admin support conversations with pagination
   const loadSupportConversations = async (page: number = currentPage.value) => {
     loadingConversations.value = true
@@ -55,6 +156,20 @@ export function useAdminSupportInbox(currentUser: any) {
       totalPages.value = result.totalPages
       currentPage.value = result.currentPage
       console.log('Loaded support conversations:', result.conversations.length, 'Total:', result.totalCount)
+      
+      // Load unread counts for all conversations (only if user is logged in)
+      const conversationIds = result.conversations.map(conv => conv.id)
+      if (conversationIds.length > 0 && currentUser.value) {
+        unreadCounts.value = await getUnreadMessageCountsForConversations(conversationIds, currentUser.value.id)
+        
+        // Setup typing subscriptions for all conversations
+        conversationIds.forEach(convId => {
+          // Only setup if not already subscribed
+          if (!typingSubscriptions.has(convId)) {
+            setupTypingSubscriptionForConversation(convId)
+          }
+        })
+      }
     } catch (error) {
       console.error('Error loading support conversations:', error)
       toast.error('Failed to load support conversations')
@@ -68,10 +183,20 @@ export function useAdminSupportInbox(currentUser: any) {
   const selectConversation = async (conversation: Conversation) => {
     console.log('Selecting support conversation:', conversation.id)
 
-    // Cleanup previous subscription
+    // Cleanup previous message subscription
     if (messageSubscription) {
       messageSubscription.unsubscribe()
       messageSubscription = null
+    }
+
+    // Update typing state for the newly selected conversation
+    const typingStatus = conversationTypingStatus.value[conversation.id]
+    if (typingStatus && typingStatus.isTyping) {
+      isOtherUserTyping.value = true
+      otherUserTypingName.value = typingStatus.userName
+    } else {
+      isOtherUserTyping.value = false
+      otherUserTypingName.value = ''
     }
 
     // Clear and set new conversation
@@ -79,11 +204,36 @@ export function useAdminSupportInbox(currentUser: any) {
     selectedConversation.value = conversation
     currentConversationId = conversation.id
 
-    // Load messages
+    // Load messages first
     await loadConversationMessages(conversation.id)
 
-    // Setup subscription
+    // Mark messages as read (only messages from other users) after messages are loaded
+    if (currentUser.value) {
+      try {
+        console.log('Marking messages as read for conversation:', conversation.id, 'Current user:', currentUser.value.id)
+        const updatedCount = await markConversationMessagesAsRead(conversation.id, currentUser.value.id)
+        console.log('Marked', updatedCount, 'messages as read')
+        
+        // Verify the update
+        const verification = await verifyMessagesMarkedAsRead(conversation.id, currentUser.value.id)
+        console.log('Verification result:', verification)
+        
+        // Update unread count for this conversation to 0
+        if (updatedCount > 0 || verification.unread === 0) {
+          unreadCounts.value[conversation.id] = 0
+          console.log('Updated unread count to 0 for conversation:', conversation.id)
+        }
+      } catch (error) {
+        console.error('Error marking messages as read:', error)
+        toast.error('Failed to mark messages as read')
+      }
+    } else {
+      console.warn('Cannot mark messages as read - no current user')
+    }
+
+    // Setup subscriptions
     setupMessageSubscriptionForConversation(conversation.id)
+    // No need to setup typing subscription again - it's already set up for all conversations
   }
 
   // Load messages for selected conversation
@@ -164,6 +314,12 @@ export function useAdminSupportInbox(currentUser: any) {
             console.log('Added real-time message via broadcast')
           }
         }
+        
+        // Update unread count for this conversation if message is from another user
+        if (newMessage.user_id !== currentUser.value?.id) {
+          // Increment unread count
+          unreadCounts.value[conversationId] = (unreadCounts.value[conversationId] || 0) + 1
+        }
       },
       currentUser.value.id
     )
@@ -238,6 +394,28 @@ export function useAdminSupportInbox(currentUser: any) {
       conversationsSubscription.unsubscribe()
       conversationsSubscription = null
     }
+    
+    // Cleanup all typing subscriptions
+    typingSubscriptions.forEach((subscription) => {
+      subscription.unsubscribe()
+    })
+    typingSubscriptions.clear()
+    
+    // Clear all typing timeouts
+    Object.values(conversationTypingTimeouts.value).forEach(timeout => {
+      clearTimeout(timeout)
+    })
+    conversationTypingTimeouts.value = {}
+    
+    if (typingTimeout.value) {
+      clearTimeout(typingTimeout.value)
+      typingTimeout.value = null
+    }
+
+    // Reset typing state
+    isOtherUserTyping.value = false
+    otherUserTypingName.value = ''
+    conversationTypingStatus.value = {}
 
     currentConversationId = null
     console.log('Inbox closed, subscriptions cleaned up')
@@ -251,6 +429,22 @@ export function useAdminSupportInbox(currentUser: any) {
     if (conversationsSubscription) {
       conversationsSubscription.unsubscribe()
     }
+    
+    // Cleanup all typing subscriptions
+    typingSubscriptions.forEach((subscription) => {
+      subscription.unsubscribe()
+    })
+    typingSubscriptions.clear()
+    
+    // Clear all typing timeouts
+    Object.values(conversationTypingTimeouts.value).forEach(timeout => {
+      clearTimeout(timeout)
+    })
+    conversationTypingTimeouts.value = {}
+    
+    if (typingTimeout.value) {
+      clearTimeout(typingTimeout.value)
+    }
   })
 
   return {
@@ -262,6 +456,10 @@ export function useAdminSupportInbox(currentUser: any) {
     loadingConversations,
     loadingMessages,
     sendingMessage,
+    unreadCounts,
+    isOtherUserTyping,
+    otherUserTypingName,
+    conversationTypingStatus, // For showing typing in conversation list
     // Pagination state
     currentPage,
     pageSize,
@@ -273,6 +471,7 @@ export function useAdminSupportInbox(currentUser: any) {
     selectConversation,
     sendMessageToStudent,
     loadSupportConversations,
+    handleTyping,
     // Pagination functions
     goToPage,
     nextPage,

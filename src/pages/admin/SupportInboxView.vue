@@ -3,7 +3,7 @@ import { onMounted, onBeforeUnmount, computed, ref } from "vue";
 import InnerLayoutWrapper from "@/layouts/InnerLayoutWrapper.vue";
 import AdminSupportInbox from "@/pages/admin/components/AdminSupportInbox.vue";
 import { supabase } from "@/lib/supabase";
-import { loadItems as loadItemsFromStore } from "@/stores/messages";
+import { loadItems as loadItemsFromStore, getUnreadMessageCountsForItems, updateUnreadCountForConversation as updateUnreadCountForConversationStore } from "@/stores/messages";
 
 // Composables
 import { useAuth } from "@/pages/admin/components/composables/useAuth";
@@ -16,6 +16,10 @@ const { currentUser, isCurrentUserAdmin, getCurrentUser } = useAuth();
 const items = ref<any[]>([]);
 const loadingItems = ref(false);
 const selectedItem = ref<any>(null);
+const unreadMessageCounts = ref<Record<number, number>>({});
+
+// Real-time subscription
+let messagesSubscription: any = null;
 
 // New message variable
 const newMessage = ref('');
@@ -41,6 +45,11 @@ const getItemConversationCount = (itemId: number) => {
   return supportConversations.value.filter(conv => conv.item_id === itemId).length;
 };
 
+// Get unread message count for an item
+const getUnreadMessageCount = (itemId: number) => {
+  return unreadMessageCounts.value[itemId] || 0;
+};
+
 // Computed property to filter items that have conversations
 const itemsWithConversations = computed(() => {
   return items.value.filter(item => {
@@ -57,6 +66,10 @@ const {
   loadingConversations: loadingSupportConversations,
   loadingMessages: loadingSupportMessages,
   sendingMessage: sendingSupportInboxMessage,
+  unreadCounts: conversationUnreadCounts,
+  isOtherUserTyping,
+  otherUserTypingName,
+  conversationTypingStatus, // For showing typing in conversation list
   // Pagination state
   currentPage,
   pageSize,
@@ -68,6 +81,7 @@ const {
   selectConversation: selectSupportConversation,
   sendMessageToStudent,
   loadSupportConversations,
+  handleTyping,
   // Pagination functions
   goToPage,
   nextPage,
@@ -84,6 +98,12 @@ const loadItems = async () => {
   loadingItems.value = true;
   try {
     items.value = await loadItemsFromStore();
+    
+    // Load unread message counts for all items
+    const itemIds = items.value.map(item => item.id);
+    if (itemIds.length > 0 && currentUser.value) {
+      unreadMessageCounts.value = await getUnreadMessageCountsForItems(itemIds, currentUser.value.id);
+    }
   } catch (error) {
     console.error('Error loading items:', error);
   } finally {
@@ -111,17 +131,103 @@ const handleSendMessage = async () => {
   }
 };
 
+// Update unread count for a conversation and its item
+const updateUnreadCountForConversation = async (conversationId: string) => {
+  try {
+    if (!currentUser.value) return;
+    
+    // Find the conversation to get its item_id
+    const conversation = supportConversations.value.find(conv => conv.id === conversationId);
+    if (!conversation || !conversation.item_id) return;
+
+    // Get unread count from store
+    const count = await updateUnreadCountForConversationStore(conversationId, currentUser.value.id);
+
+    // Update conversation unread count
+    conversationUnreadCounts.value[conversationId] = count;
+
+    // Recalculate item unread count
+    const itemId = conversation.item_id;
+    const itemConversations = supportConversations.value.filter(conv => conv.item_id === itemId);
+    let totalUnread = 0;
+
+    for (const conv of itemConversations) {
+      totalUnread += conversationUnreadCounts.value[conv.id] || 0;
+    }
+
+    unreadMessageCounts.value[itemId] = totalUnread;
+    console.log('Updated unread counts - Conversation:', conversationId, 'Count:', count, 'Item:', itemId, 'Total:', totalUnread);
+  } catch (error) {
+    console.error('Error updating unread count:', error);
+  }
+};
+
+// Setup real-time subscription for messages
+const setupMessagesRealtimeSubscription = () => {
+  console.log('Setting up real-time subscription for messages table');
+
+  messagesSubscription = supabase
+    .channel('messages-changes')
+    .on(
+      'postgres_changes',
+      {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'messages',
+      },
+      async (payload) => {
+        console.log('New message inserted:', payload.new);
+        const message = payload.new as any;
+        
+        // Update unread counts for the conversation
+        await updateUnreadCountForConversation(message.conversation_id);
+      }
+    )
+    .on(
+      'postgres_changes',
+      {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'messages',
+      },
+      async (payload) => {
+        console.log('Message updated:', payload.new);
+        const message = payload.new as any;
+        
+        // Update unread counts for the conversation (e.g., when isread changes)
+        await updateUnreadCountForConversation(message.conversation_id);
+      }
+    )
+    .subscribe((status) => {
+      console.log('Messages real-time subscription status:', status);
+    });
+};
+
+// Cleanup real-time subscription
+const cleanupMessagesSubscription = () => {
+  if (messagesSubscription) {
+    supabase.removeChannel(messagesSubscription);
+    messagesSubscription = null;
+    console.log('Messages real-time subscription cleaned up');
+  }
+};
+
 onMounted(async () => {
   await getCurrentUser();
   // Load items and conversations
   await loadItems();
   openInbox();
+  
+  // Setup real-time subscription for messages
+  setupMessagesRealtimeSubscription();
+  
   console.log('SupportInboxView mounted - broadcast subscriptions initialized');
 });
 
 onBeforeUnmount(() => {
   // Cleanup subscriptions when component unmounts
   closeInbox();
+  cleanupMessagesSubscription();
   console.log('SupportInboxView unmounted - broadcast subscriptions cleaned up');
 });
 </script>
@@ -201,13 +307,25 @@ onBeforeUnmount(() => {
                     >
                       <v-card-title class="d-flex justify-space-between align-start pb-2">
                         <div class="text-subtitle-1 font-weight-bold">{{ item.title }}</div>
-                        <v-chip
-                          :color="item.status === 'lost' ? 'error' : 'success'"
-                          size="x-small"
-                          variant="flat"
-                        >
-                          {{ item.status.toUpperCase() }}
-                        </v-chip>
+                        <div class="d-flex align-center gap-1">
+                          <!-- Unread Messages Badge -->
+                          <v-badge
+                            v-if="getUnreadMessageCount(item.id) > 0"
+                            :content="getUnreadMessageCount(item.id)"
+                            color="error"
+                            inline
+                            class="me-2"
+                          >
+                            <v-icon color="error" size="20">mdi-email-alert</v-icon>
+                          </v-badge>
+                          <v-chip
+                            :color="item.status === 'lost' ? 'error' : 'success'"
+                            size="x-small"
+                            variant="flat"
+                          >
+                            {{ item.status.toUpperCase() }}
+                          </v-chip>
+                        </div>
                       </v-card-title>
 
                       <v-card-text>
@@ -217,12 +335,14 @@ onBeforeUnmount(() => {
 
                         <v-divider class="my-3" />
 
-                        <!-- Conversation Count -->
+                        <!-- Conversation Count and Unread Messages -->
                         <div class="d-flex align-center justify-space-between">
-                          <div class="d-flex align-center text-caption text-grey-darken-1">
-                            <v-icon size="16" class="me-1">mdi-message-text</v-icon>
-                            {{ getItemConversationCount(item.id) }} 
-                            {{ getItemConversationCount(item.id) === 1 ? 'conversation' : 'conversations' }}
+                          <div class="d-flex flex-column">
+                            <div class="d-flex align-center text-caption text-grey-darken-1 mb-1">
+                              <v-icon size="16" class="me-1">mdi-message-text</v-icon>
+                              {{ getItemConversationCount(item.id) }} 
+                              {{ getItemConversationCount(item.id) === 1 ? 'conversation' : 'conversations' }}
+                            </div>
                           </div>
                           <v-btn
                             color="primary"
@@ -363,7 +483,24 @@ onBeforeUnmount(() => {
                             lines="three"
                           >
                             <template v-slot:prepend>
+                              <v-badge
+                                v-if="conversationUnreadCounts[conversation.id] > 0"
+                                :content="conversationUnreadCounts[conversation.id]"
+                                color="error"
+                                overlap
+                              >
+                                <v-avatar
+                                  :color="conversation.item ? (conversation.item.status === 'lost' ? 'error' : 'success') : 'primary'"
+                                  size="45"
+                                  class="me-3"
+                                >
+                                  <span class="text-white font-weight-bold">
+                                    {{ (conversation.sender_profile?.full_name || 'U').split(' ').map((n: string) => n[0]).join('').toUpperCase().substring(0, 2) }}
+                                  </span>
+                                </v-avatar>
+                              </v-badge>
                               <v-avatar
+                                v-else
                                 :color="conversation.item ? (conversation.item.status === 'lost' ? 'error' : 'success') : 'primary'"
                                 size="45"
                                 class="me-3"
@@ -376,10 +513,29 @@ onBeforeUnmount(() => {
 
                             <!-- Main Content -->
                             <div class="d-flex flex-column">
-                              <!-- User Info -->
-                              <v-list-item-title class="font-weight-bold mb-1">
-                                {{ conversation.sender_profile?.full_name || 'Student User' }}
-                              </v-list-item-title>
+                              <!-- User Info with unread indicator and typing indicator -->
+                              <div class="d-flex align-center justify-space-between mb-1">
+                                <div class="d-flex align-center">
+                                  <v-list-item-title class="font-weight-bold">
+                                    {{ conversation.sender_profile?.full_name || 'Student User' }}
+                                  </v-list-item-title>
+                                  <!-- Typing indicator in conversation list -->
+                                  <span
+                                    v-if="conversationTypingStatus[conversation.id]?.isTyping"
+                                    class="text-caption text-primary ml-2"
+                                  >
+                                    typing...
+                                  </span>
+                                </div>
+                                <v-icon
+                                  v-if="conversationUnreadCounts[conversation.id] > 0"
+                                  color="error"
+                                  size="20"
+                                  class="ml-2"
+                                >
+                                  mdi-email-alert
+                                </v-icon>
+                              </div>
 
                               <!-- Item Information - Made More Prominent -->
                               <div v-if="conversation.item" class="mb-2">
@@ -572,6 +728,25 @@ onBeforeUnmount(() => {
                             </div>
                           </div>
 
+                          <!-- Typing Indicator -->
+                          <div v-if="isOtherUserTyping" class="px-4 pb-2">
+                            <div class="d-flex align-center">
+                              <v-avatar size="24" color="primary" class="me-2">
+                                <v-icon size="14" color="white">mdi-account</v-icon>
+                              </v-avatar>
+                              <div class="typing-indicator">
+                                <span class="text-caption text-grey-darken-1">
+                                  {{ otherUserTypingName }} is typing
+                                </span>
+                                <span class="typing-dots">
+                                  <span class="dot"></span>
+                                  <span class="dot"></span>
+                                  <span class="dot"></span>
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+
                           <!-- Message Input - Always visible when conversation is selected -->
                           <v-divider />
                           <div class="pa-4">
@@ -585,6 +760,7 @@ onBeforeUnmount(() => {
                                 append-inner-icon="mdi-send"
                                 @click:append-inner="handleSendMessage"
                                 @keyup.enter="handleSendMessage"
+                                @input="handleTyping"
                               />
                             </v-form>
                           </div>
@@ -680,5 +856,51 @@ onBeforeUnmount(() => {
 
 .border-b {
   border-bottom: 1px solid rgba(0, 0, 0, 0.12);
+}
+
+/* Typing Indicator Styles */
+.typing-indicator {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.typing-dots {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 8px;
+}
+
+.typing-dots .dot {
+  width: 6px;
+  height: 6px;
+  background-color: #666;
+  border-radius: 50%;
+  display: inline-block;
+  animation: typingDot 1.4s infinite ease-in-out;
+}
+
+.typing-dots .dot:nth-child(1) {
+  animation-delay: 0s;
+}
+
+.typing-dots .dot:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+.typing-dots .dot:nth-child(3) {
+  animation-delay: 0.4s;
+}
+
+@keyframes typingDot {
+  0%, 60%, 100% {
+    transform: translateY(0);
+    opacity: 0.5;
+  }
+  30% {
+    transform: translateY(-10px);
+    opacity: 1;
+  }
 }
 </style>
