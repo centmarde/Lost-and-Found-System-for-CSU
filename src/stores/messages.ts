@@ -67,7 +67,7 @@ export function setupMessageSubscription(
   currentUserId: string
 ) {
   const channel = supabase.channel(`conversation_${conversationId}`)
-  
+
   return channel
     .on(
       'broadcast',
@@ -152,7 +152,7 @@ export function setupTypingSubscription(
   currentUserId: string
 ) {
   const channel = supabase.channel(`conversation_typing_${conversationId}`)
-  
+
   return channel
     .on(
       'broadcast',
@@ -351,7 +351,7 @@ export async function markConversationMessagesAsRead(
 ): Promise<number> {
   try {
     console.log('Attempting to mark messages as read for conversation:', conversationId, 'User:', currentUserId)
-    
+
     // First, let's check how many unread messages exist
     const { data: unreadMessages, error: checkError } = await supabase
       .from('messages')
@@ -359,14 +359,14 @@ export async function markConversationMessagesAsRead(
       .eq('conversation_id', conversationId)
       .neq('user_id', currentUserId)
       .eq('isread', false)
-    
+
     if (checkError) {
       console.error('Error checking unread messages:', checkError)
       throw checkError
     }
-    
+
     console.log('Found unread messages to mark as read:', unreadMessages?.length || 0, unreadMessages)
-    
+
     if (!unreadMessages || unreadMessages.length === 0) {
       console.log('No unread messages to update')
       return 0
@@ -385,7 +385,7 @@ export async function markConversationMessagesAsRead(
       console.error('Error updating messages:', error)
       throw error
     }
-    
+
     console.log('Successfully marked messages as read. Updated count:', data?.length || 0, 'Data:', data)
     return data?.length || 0
   } catch (error) {
@@ -437,7 +437,7 @@ export function setupMessagesRealtimeSubscription(
   onMessageUpdated: (message: Message) => void
 ) {
   const channel = supabase.channel('all-messages-changes')
-  
+
   return channel
     .on(
       'postgres_changes',
@@ -485,6 +485,39 @@ export async function updateUnreadCountForConversation(
     return count || 0
   } catch (error) {
     console.error('Error updating unread count:', error)
+    return 0
+  }
+}
+
+/**
+ * Gets the total unread message count across all items for the current user
+ * Used for showing a badge in the sidebar Support Inbox menu item
+ */
+export async function getTotalUnreadMessageCount(currentUserId: string): Promise<number> {
+  try {
+    // Get all conversations
+    const { data: conversations, error: convError } = await supabase
+      .from('conversations')
+      .select('id')
+
+    if (convError) throw convError
+    if (!conversations || conversations.length === 0) return 0
+
+    // Get conversation IDs
+    const conversationIds = conversations.map(conv => conv.id)
+
+    // Count all unread messages across all conversations (excluding current user's messages)
+    const { count, error: msgError } = await supabase
+      .from('messages')
+      .select('*', { count: 'exact', head: true })
+      .in('conversation_id', conversationIds)
+      .eq('isread', false)
+      .neq('user_id', currentUserId) // Only count messages NOT sent by current user
+
+    if (msgError) throw msgError
+    return count || 0
+  } catch (error) {
+    console.error('Error getting total unread message count:', error)
     return 0
   }
 }
