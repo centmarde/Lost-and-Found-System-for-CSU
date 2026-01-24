@@ -194,7 +194,7 @@ type SortBy = 'newest' | 'oldest';
  * @param items - A reactive reference to the array of items.
  * @returns An object containing reactive state and computed properties.
  */
-export function useFilterSortPagination<T extends { created_at: string; title?: string; description?: string; location?: string; user?: any }>(
+export function useFilterSortPagination<T extends { created_at: string; title?: string; description?: string; location?: string; user?: any; status?: string; claimed_by?: string | null }>(
   items: Ref<T[]>,
   initialItemsPerPage: number = 10
 ) {
@@ -205,6 +205,7 @@ export function useFilterSortPagination<T extends { created_at: string; title?: 
   const page = ref(1);
   const itemsPerPage = ref(initialItemsPerPage);
   const searchQuery = ref('');
+  const statusFilter = ref('active'); // Default to showing only lost/found items (not claimed)
 
   // --- Computed properties for filtering and sorting ---
   const availableMonths = computed(() => {
@@ -253,6 +254,16 @@ export function useFilterSortPagination<T extends { created_at: string; title?: 
 
   const filteredAndSortedItems = computed(() => {
     let filtered = [...items.value]
+
+    // Filter by status
+    if (statusFilter.value === 'active') {
+      // Show only lost/found items (not claimed)
+      filtered = filtered.filter(item => !item.claimed_by)
+    } else if (statusFilter.value === 'claimed') {
+      // Show only claimed items
+      filtered = filtered.filter(item => item.claimed_by)
+    }
+    // If statusFilter is 'all', don't filter by status
 
     // Filter by search query
     if (searchQuery.value.trim()) {
@@ -339,7 +350,7 @@ export function useFilterSortPagination<T extends { created_at: string; title?: 
 
   // --- Watchers for State Reset ---
   // Reset pagination when filters change
-  watch([selectedMonth, selectedDay, sortBy, itemsPerPage, searchQuery], () => {
+  watch([selectedMonth, selectedDay, sortBy, itemsPerPage, searchQuery, statusFilter], () => {
     page.value = 1
   })
 
@@ -356,6 +367,7 @@ export function useFilterSortPagination<T extends { created_at: string; title?: 
     page,
     itemsPerPage,
     searchQuery,
+    statusFilter,
     availableMonths,
     availableDays,
     filteredAndSortedItems,
