@@ -8,6 +8,7 @@ import UserChatDialog from "@/pages/student/components/userChatDialog.vue";
 import AdminChatDialog from "@/pages/admin/components/AdminChatDialog.vue";
 import NotificationDialog from "@/pages/student/components/NotifDialog.vue";
 import FloatingAdminChat from "@/pages/student/components/FloatingAdminChat.vue";
+import ItemFilters from "@/components/common/ItemFilters.vue";
 
 // Composables
 import { useAuth } from "@/pages/admin/components/composables/useAuth";
@@ -49,6 +50,7 @@ const {
   selectedMonth,
   selectedDay,
   searchQuery,
+  statusFilter,
   availableMonths,
   availableDays,
   filteredAndSortedItems,
@@ -57,21 +59,6 @@ const {
   formatMonthLabel,
   formatDayLabel,
 } = useFilterSortPagination(items, 12);
-
-// Current date helpers
-const currentDate = new Date();
-const currentMonthValue = computed(() =>
-  `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}`
-);
-const currentDayValue = computed(() =>
-  `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}-${String(currentDate.getDate()).padStart(2, '0')}`
-);
-const currentMonthLabel = computed(() =>
-  currentDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
-);
-const currentDayLabel = computed(() =>
-  currentDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-);
 
 // User chat composable
 const {
@@ -163,6 +150,14 @@ const handleMarkAsRead = (notificationId: number) => {
 const handleClearAllNotifications = () => {
   clearNotifications();
   markAllMyNotificationsAsRead();
+};
+
+// Clear all filters method
+const clearAllFilters = () => {
+  selectedMonth.value = 'all';
+  selectedDay.value = 'all';
+  searchQuery.value = '';
+  statusFilter.value = 'active'; // Reset to default (lost items only)
 };
 
 // Student Admin Support Chat
@@ -266,168 +261,18 @@ onUnmounted(() => {
 
         <v-row class="mb-4">
           <v-col cols="12">
-            <v-card elevation="1" class="pa-4">
-              <!-- Search Bar - Full width at top -->
-              <v-row class="mb-4">
-                <v-col cols="12">
-                  <v-text-field
-                    v-model="searchQuery"
-                    label="Search items..."
-                    placeholder="Search by title, description, location, or user..."
-                    variant="outlined"
-                    density="comfortable"
-                    prepend-inner-icon="mdi-magnify"
-                    clearable
-                    hide-details
-                  />
-                </v-col>
-              </v-row>
-
-              <!-- Existing filters row -->
-              <v-row align="center">
-                <v-col cols="12" sm="6" md="3">
-                  <v-select
-                    v-model="sortBy"
-                    :items="[
-                      { title: 'Newest First', value: 'newest' },
-                      { title: 'Oldest First', value: 'oldest' },
-                    ]"
-                    label="Sort By"
-                    variant="outlined"
-                    density="comfortable"
-                    prepend-inner-icon="mdi-sort"
-                    hide-details
-                  />
-                </v-col>
-
-                <v-col cols="12" sm="6" md="3">
-                  <v-select
-                    v-model="selectedMonth"
-                    :items="[
-                      { title: 'All Months', value: 'all' },
-                      {
-                        title: `Current Month (${currentMonthLabel})`,
-                        value: currentMonthValue
-                      },
-                      ...availableMonths
-                        .filter(m => m !== currentMonthValue)
-                        .map((m) => ({
-                          title: formatMonthLabel(m),
-                          value: m,
-                        })),
-                    ]"
-                    label="Filter by Month"
-                    variant="outlined"
-                    density="comfortable"
-                    prepend-inner-icon="mdi-calendar-month"
-                    hide-details
-                  />
-                </v-col>
-
-                <v-col cols="12" sm="6" md="3">
-                  <v-select
-                    v-model="selectedDay"
-                    :items="[
-                      { title: 'All Days', value: 'all' },
-                      ...(selectedMonth === currentMonthValue
-                        ? [{
-                            title: `Today (${currentDayLabel})`,
-                            value: currentDayValue
-                          }]
-                        : []),
-                      ...availableDays
-                        .filter(d => selectedMonth !== currentMonthValue || d !== currentDayValue)
-                        .map((d) => ({
-                          title: formatDayLabel(d),
-                          value: d,
-                        })),
-                    ]"
-                    label="Filter by Day"
-                    variant="outlined"
-                    density="comfortable"
-                    prepend-inner-icon="mdi-calendar"
-                    :disabled="
-                      selectedMonth === 'all' || availableDays.length === 0
-                    "
-                    hide-details
-                  />
-                </v-col>
-
-                <v-col cols="12" sm="6" md="3">
-                  <v-select
-                    v-model="itemsPerPage"
-                    :items="[8, 12, 16, 24, 48]"
-                    label="Items per page"
-                    variant="outlined"
-                    density="comfortable"
-                    prepend-inner-icon="mdi-view-grid"
-                    hide-details
-                  />
-                </v-col>
-              </v-row>
-
-              <v-row
-                v-if="selectedMonth !== 'all' || selectedDay !== 'all' || searchQuery.trim()"
-                class="mt-2"
-              >
-                <v-col cols="12">
-                  <div class="d-flex align-center flex-wrap gap-2">
-                    <span class="text-caption text-grey-darken-1"
-                      >Active filters:</span
-                    >
-
-                    <v-chip
-                      v-if="searchQuery.trim()"
-                      closable
-                      size="small"
-                      color="primary"
-                      variant="tonal"
-                      @click:close="searchQuery = ''"
-                    >
-                      <v-icon start size="small">mdi-magnify</v-icon>
-                      "{{ searchQuery.trim() }}"
-                    </v-chip>
-
-                    <v-chip
-                      v-if="selectedMonth !== 'all'"
-                      closable
-                      size="small"
-                      color="primary"
-                      variant="tonal"
-                      @click:close="selectedMonth = 'all'"
-                    >
-                      <v-icon start size="small">mdi-calendar-month</v-icon>
-                      {{ formatMonthLabel(selectedMonth) }}
-                    </v-chip>
-
-                    <v-chip
-                      v-if="selectedDay !== 'all'"
-                      closable
-                      size="small"
-                      color="primary"
-                      variant="tonal"
-                      @click:close="selectedDay = 'all'"
-                    >
-                      <v-icon start size="small">mdi-calendar</v-icon>
-                      {{ formatDayLabel(selectedDay) }}
-                    </v-chip>
-
-                    <v-btn
-                      size="small"
-                      variant="text"
-                      color="error"
-                      @click="
-                        selectedMonth = 'all';
-                        selectedDay = 'all';
-                        searchQuery = '';
-                      "
-                    >
-                      Clear all
-                    </v-btn>
-                  </div>
-                </v-col>
-              </v-row>
-            </v-card>
+            <ItemFilters
+              v-model:search-query="searchQuery"
+              v-model:sort-by="sortBy"
+              v-model:selected-month="selectedMonth"
+              v-model:selected-day="selectedDay"
+              v-model:items-per-page="itemsPerPage"
+              v-model:status-filter="statusFilter"
+              :available-months="availableMonths"
+              :available-days="availableDays"
+              :format-month-label="formatMonthLabel"
+              :format-day-label="formatDayLabel"
+            />
           </v-col>
         </v-row>
 
@@ -499,11 +344,7 @@ onUnmounted(() => {
                   color="primary"
                   variant="outlined"
                   prepend-icon="mdi-filter-remove"
-                  @click="
-                    selectedMonth = 'all';
-                    selectedDay = 'all';
-                    searchQuery = '';
-                  "
+                  @click="clearAllFilters"
                 >
                   Clear Filters
                 </v-btn>

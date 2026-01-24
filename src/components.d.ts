@@ -14,6 +14,7 @@ declare module 'vue' {
     InsideNavbar2: typeof import('./components/common/insideNavbar/InsideNavbar2.vue')['default']
     InsideNavbar3: typeof import('./components/common/insideNavbar/InsideNavbar3.vue')['default']
     InsideNavbar4: typeof import('./components/common/insideNavbar/InsideNavbar4.vue')['default']
+    ItemFilters: typeof import('./components/common/ItemFilters.vue')['default']
     LoginForm: typeof import('./components/auth/LoginForm.vue')['default']
     NotificationBell: typeof import('./components/common/NotificationBell.vue')['default']
     NotificationExample: typeof import('./components/examples/NotificationExample.vue')['default']
