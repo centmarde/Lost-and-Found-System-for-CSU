@@ -118,6 +118,56 @@ export async function broadcastMessage(
 }
 
 /**
+ * Broadcasts a typing indicator to a conversation channel
+ */
+export async function broadcastTyping(
+  conversationId: string,
+  userId: string,
+  userName: string,
+  isTyping: boolean
+): Promise<void> {
+  try {
+    const channel = supabase.channel(`conversation_typing_${conversationId}`)
+    await channel.send({
+      type: 'broadcast',
+      event: 'typing',
+      payload: {
+        user_id: userId,
+        user_name: userName,
+        is_typing: isTyping,
+        timestamp: new Date().toISOString()
+      }
+    })
+  } catch (error) {
+    console.error('Error broadcasting typing status:', error)
+  }
+}
+
+/**
+ * Sets up a subscription to listen for typing indicators
+ */
+export function setupTypingSubscription(
+  conversationId: string,
+  onTypingChange: (payload: { user_id: string; user_name: string; is_typing: boolean }) => void,
+  currentUserId: string
+) {
+  const channel = supabase.channel(`conversation_typing_${conversationId}`)
+  
+  return channel
+    .on(
+      'broadcast',
+      { event: 'typing' },
+      (payload: any) => {
+        // Only trigger callback if typing user is not the current user
+        if (payload.payload.user_id !== currentUserId) {
+          onTypingChange(payload.payload)
+        }
+      }
+    )
+    .subscribe()
+}
+
+/**
  * Loads all items from the database
  */
 export async function loadItems(): Promise<any[]> {
@@ -412,4 +462,29 @@ export function setupMessagesRealtimeSubscription(
       }
     )
     .subscribe()
+}
+
+/**
+ * Updates unread count for a specific conversation
+ * Queries the database to count unread messages and returns the count
+ */
+export async function updateUnreadCountForConversation(
+  conversationId: string,
+  currentUserId: string
+): Promise<number> {
+  try {
+    // Count unread messages for this conversation (excluding current user's messages)
+    const { count, error } = await supabase
+      .from('messages')
+      .select('*', { count: 'exact', head: true })
+      .eq('conversation_id', conversationId)
+      .eq('isread', false)
+      .neq('user_id', currentUserId) // Only count messages NOT sent by current user
+
+    if (error) throw error
+    return count || 0
+  } catch (error) {
+    console.error('Error updating unread count:', error)
+    return 0
+  }
 }

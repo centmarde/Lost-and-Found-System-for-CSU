@@ -3,7 +3,7 @@ import { onMounted, onBeforeUnmount, computed, ref } from "vue";
 import InnerLayoutWrapper from "@/layouts/InnerLayoutWrapper.vue";
 import AdminSupportInbox from "@/pages/admin/components/AdminSupportInbox.vue";
 import { supabase } from "@/lib/supabase";
-import { loadItems as loadItemsFromStore, getUnreadMessageCountsForItems } from "@/stores/messages";
+import { loadItems as loadItemsFromStore, getUnreadMessageCountsForItems, updateUnreadCountForConversation as updateUnreadCountForConversationStore } from "@/stores/messages";
 
 // Composables
 import { useAuth } from "@/pages/admin/components/composables/useAuth";
@@ -67,6 +67,9 @@ const {
   loadingMessages: loadingSupportMessages,
   sendingMessage: sendingSupportInboxMessage,
   unreadCounts: conversationUnreadCounts,
+  isOtherUserTyping,
+  otherUserTypingName,
+  conversationTypingStatus, // For showing typing in conversation list
   // Pagination state
   currentPage,
   pageSize,
@@ -78,6 +81,7 @@ const {
   selectConversation: selectSupportConversation,
   sendMessageToStudent,
   loadSupportConversations,
+  handleTyping,
   // Pagination functions
   goToPage,
   nextPage,
@@ -136,30 +140,23 @@ const updateUnreadCountForConversation = async (conversationId: string) => {
     const conversation = supportConversations.value.find(conv => conv.id === conversationId);
     if (!conversation || !conversation.item_id) return;
 
-    // Count unread messages for this conversation (excluding current user's messages)
-    const { count, error } = await supabase
-      .from('messages')
-      .select('*', { count: 'exact', head: true })
-      .eq('conversation_id', conversationId)
-      .eq('isread', false)
-      .neq('user_id', currentUser.value.id); // Only count messages NOT sent by current user
+    // Get unread count from store
+    const count = await updateUnreadCountForConversationStore(conversationId, currentUser.value.id);
 
-    if (!error) {
-      // Update conversation unread count
-      conversationUnreadCounts.value[conversationId] = count || 0;
+    // Update conversation unread count
+    conversationUnreadCounts.value[conversationId] = count;
 
-      // Recalculate item unread count
-      const itemId = conversation.item_id;
-      const itemConversations = supportConversations.value.filter(conv => conv.item_id === itemId);
-      let totalUnread = 0;
+    // Recalculate item unread count
+    const itemId = conversation.item_id;
+    const itemConversations = supportConversations.value.filter(conv => conv.item_id === itemId);
+    let totalUnread = 0;
 
-      for (const conv of itemConversations) {
-        totalUnread += conversationUnreadCounts.value[conv.id] || 0;
-      }
-
-      unreadMessageCounts.value[itemId] = totalUnread;
-      console.log('Updated unread counts - Conversation:', conversationId, 'Count:', count, 'Item:', itemId, 'Total:', totalUnread);
+    for (const conv of itemConversations) {
+      totalUnread += conversationUnreadCounts.value[conv.id] || 0;
     }
+
+    unreadMessageCounts.value[itemId] = totalUnread;
+    console.log('Updated unread counts - Conversation:', conversationId, 'Count:', count, 'Item:', itemId, 'Total:', totalUnread);
   } catch (error) {
     console.error('Error updating unread count:', error);
   }
@@ -516,11 +513,20 @@ onBeforeUnmount(() => {
 
                             <!-- Main Content -->
                             <div class="d-flex flex-column">
-                              <!-- User Info with unread indicator -->
+                              <!-- User Info with unread indicator and typing indicator -->
                               <div class="d-flex align-center justify-space-between mb-1">
-                                <v-list-item-title class="font-weight-bold">
-                                  {{ conversation.sender_profile?.full_name || 'Student User' }}
-                                </v-list-item-title>
+                                <div class="d-flex align-center">
+                                  <v-list-item-title class="font-weight-bold">
+                                    {{ conversation.sender_profile?.full_name || 'Student User' }}
+                                  </v-list-item-title>
+                                  <!-- Typing indicator in conversation list -->
+                                  <span
+                                    v-if="conversationTypingStatus[conversation.id]?.isTyping"
+                                    class="text-caption text-primary ml-2"
+                                  >
+                                    typing...
+                                  </span>
+                                </div>
                                 <v-icon
                                   v-if="conversationUnreadCounts[conversation.id] > 0"
                                   color="error"
@@ -722,6 +728,25 @@ onBeforeUnmount(() => {
                             </div>
                           </div>
 
+                          <!-- Typing Indicator -->
+                          <div v-if="isOtherUserTyping" class="px-4 pb-2">
+                            <div class="d-flex align-center">
+                              <v-avatar size="24" color="primary" class="me-2">
+                                <v-icon size="14" color="white">mdi-account</v-icon>
+                              </v-avatar>
+                              <div class="typing-indicator">
+                                <span class="text-caption text-grey-darken-1">
+                                  {{ otherUserTypingName }} is typing
+                                </span>
+                                <span class="typing-dots">
+                                  <span class="dot"></span>
+                                  <span class="dot"></span>
+                                  <span class="dot"></span>
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+
                           <!-- Message Input - Always visible when conversation is selected -->
                           <v-divider />
                           <div class="pa-4">
@@ -735,6 +760,7 @@ onBeforeUnmount(() => {
                                 append-inner-icon="mdi-send"
                                 @click:append-inner="handleSendMessage"
                                 @keyup.enter="handleSendMessage"
+                                @input="handleTyping"
                               />
                             </v-form>
                           </div>
@@ -830,5 +856,51 @@ onBeforeUnmount(() => {
 
 .border-b {
   border-bottom: 1px solid rgba(0, 0, 0, 0.12);
+}
+
+/* Typing Indicator Styles */
+.typing-indicator {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.typing-dots {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 8px;
+}
+
+.typing-dots .dot {
+  width: 6px;
+  height: 6px;
+  background-color: #666;
+  border-radius: 50%;
+  display: inline-block;
+  animation: typingDot 1.4s infinite ease-in-out;
+}
+
+.typing-dots .dot:nth-child(1) {
+  animation-delay: 0s;
+}
+
+.typing-dots .dot:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+.typing-dots .dot:nth-child(3) {
+  animation-delay: 0.4s;
+}
+
+@keyframes typingDot {
+  0%, 60%, 100% {
+    transform: translateY(0);
+    opacity: 0.5;
+  }
+  30% {
+    transform: translateY(-10px);
+    opacity: 1;
+  }
 }
 </style>
