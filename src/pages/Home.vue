@@ -9,6 +9,7 @@ import AdminChatDialog from "@/pages/admin/components/AdminChatDialog.vue";
 import NotificationDialog from "@/pages/student/components/NotifDialog.vue";
 import FloatingAdminChat from "@/pages/student/components/FloatingAdminChat.vue";
 import ItemFilters from "@/components/common/ItemFilters.vue";
+import DirectAdminMessageCard from "@/components/common/DirectAdminMessageCard.vue";
 
 // Composables
 import { useAuth } from "@/pages/admin/components/composables/useAuth";
@@ -208,6 +209,7 @@ onUnmounted(() => {
   <InnerLayoutWrapper>
     <template #content>
       <v-container fluid class="pa-6">
+
         <v-row class="mb-6">
           <v-col cols="12">
             <div class="pa-6 pa-sm-8 pa-md-12 position-relative">
@@ -258,7 +260,15 @@ onUnmounted(() => {
             </div>
           </v-col>
         </v-row>
-
+ <!-- Direct Admin Message Card -->
+        <v-row class="mb-4">
+          <v-col cols="12">
+            <DirectAdminMessageCard
+              :current-user="currentUser"
+              :is-current-user-admin="isCurrentUserAdmin"
+            />
+          </v-col>
+        </v-row>
         <v-row class="mb-4">
           <v-col cols="12">
             <ItemFilters
@@ -275,6 +285,8 @@ onUnmounted(() => {
             />
           </v-col>
         </v-row>
+
+
 
         <v-row>
           <v-col cols="12">
