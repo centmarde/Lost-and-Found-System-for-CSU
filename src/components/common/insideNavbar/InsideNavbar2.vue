@@ -20,6 +20,13 @@
   const authStore = useAuthUserStore()
   const rolesStore = useUserRolesStore()
 
+  // Computed property to check if user is admin - must be defined early
+  const isAdmin = computed(() => {
+    const roleId = authStore.userData?.user_metadata?.role ||
+                   authStore.userData?.app_metadata?.role;
+    return roleId === 1; // Assuming role ID 1 is admin
+  });
+
   // Responsive breakpoints
   const { mobile } = useDisplay()
 
@@ -157,13 +164,6 @@
   const userInitials = computed(() => {
     return getEmailInitials(authStore.userEmail)
   })
-
-  // Computed property to check if user is admin
-  const isAdmin = computed(() => {
-    const roleId = authStore.userData?.user_metadata?.role ||
-                   authStore.userData?.app_metadata?.role;
-    return roleId === 1; // Assuming role ID 1 is admin
-  });
 
   // Computed property for panel title
   const panelTitle = computed(() => {
