@@ -20,16 +20,15 @@ export const useSidebarStore = defineStore('sidebar', () => {
    */
   const updateUnreadMessageCount = async (currentUserId: string) => {
     if (!currentUserId) {
-      console.warn('[Sidebar Store] No user ID provided for updating unread count')
       return
     }
 
     try {
       isLoading.value = true
-      const previousCount = totalUnreadMessages.value
       const count = await getTotalUnreadMessageCount(currentUserId)
       totalUnreadMessages.value = count
     } catch (error) {
+      console.error('Error updating unread message count:', error)
     } finally {
       isLoading.value = false
     }
@@ -52,7 +51,6 @@ export const useSidebarStore = defineStore('sidebar', () => {
    * Optimistic decrement can cause drift from actual database state
    */
   const decrementUnreadCount = (amount = 1) => {
-    const previousCount = totalUnreadMessages.value
     totalUnreadMessages.value = Math.max(0, totalUnreadMessages.value - amount)
   }
 

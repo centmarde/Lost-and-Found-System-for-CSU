@@ -8,7 +8,6 @@ import { useUserPagesStore } from "@/stores/pages";
 import { useSidebarStore } from "@/stores/sidebar";
 import { navigationConfig, individualNavItems } from "@/utils/navigation";
 import { supabase } from "@/lib/supabase";
-import { debugUnreadMessages, markAllUnreadMessagesAsRead, getUnreadConversationsDetails } from "@/stores/messages";
 
 // Vuetify display composable for responsive design
 const { smAndDown } = useDisplay();
@@ -55,52 +54,7 @@ onMounted(async () => {
   // Initialize unread message count for sidebar
   if (authStore.userData?.id) {
     await sidebarStore.updateUnreadMessageCount(authStore.userData.id);
-    // Debug: Show all unread messages
-    await debugUnreadMessages(authStore.userData.id);
-    
-    // Show unread conversations details
-    const unreadConvs = await getUnreadConversationsDetails(authStore.userData.id);
-    if (unreadConvs.length > 0) {
-      console.log('\n🔍 UNREAD CONVERSATIONS LOCATIONS:');
-      unreadConvs.forEach((conv, index) => {
-        console.log(`${index + 1}. Conversation ${conv.conversation_id}:`);
-        console.log(`   📍 Location: ${conv.item_title}`);
-        console.log(`   📊 Status: ${conv.item_status || 'N/A'}`);
-        console.log(`   💬 Unread messages: ${conv.unread_count}`);
-        console.log(`   👤 Sender ID: ${conv.sender_id}`);
-      });
-      console.log('\n⚠️ TIP: These conversations may be on different pages due to pagination.');
-      console.log('   Use "Mark all as read" button in Support Inbox or run markAllUnreadMessagesAsRead() here.\n');
-    }
-    
     setupMessagesRealtimeSubscription();
-
-    // Expose helper functions to window for debugging
-    (window as any).markAllUnreadMessagesAsRead = async () => {
-      if (authStore.userData?.id) {
-        const count = await markAllUnreadMessagesAsRead(authStore.userData.id);
-        console.log(`✅ Marked ${count} messages as read`);
-        await sidebarStore.updateUnreadMessageCount(authStore.userData.id);
-        console.log('✅ Sidebar badge updated');
-        return count;
-      }
-      console.error('❌ No user logged in');
-      return 0;
-    };
-
-    (window as any).showUnreadConversations = async () => {
-      if (authStore.userData?.id) {
-        const convs = await getUnreadConversationsDetails(authStore.userData.id);
-        console.table(convs);
-        return convs;
-      }
-      console.error('❌ No user logged in');
-      return [];
-    };
-
-    console.log('\n💡 AVAILABLE DEBUG COMMANDS:');
-    console.log('   markAllUnreadMessagesAsRead() - Mark all unread messages as read');
-    console.log('   showUnreadConversations() - Show table of conversations with unread messages');
   }
 });
 
@@ -110,22 +64,17 @@ const loadUserRoleAndPages = async () => {
     const roleId = authStore.userData?.user_metadata?.role ||
                    authStore.userData?.app_metadata?.role;
 
-    console.log('Loading sidebar - User Role ID:', roleId);
-
     if (roleId) {
       // Find the role details from the store
       currentUserRole.value = rolesStore.roles.find(role => role.id === roleId);
-      console.log('Found user role:', currentUserRole.value);
 
       // Get pages accessible by this role
       const rolePages = await pagesStore.fetchRolePagesByRoleId(roleId);
-      console.log('Role pages from DB:', rolePages);
 
       if (rolePages && rolePages.length > 0) {
         userRolePages.value = rolePages
           .map(rolePage => rolePage.pages)
           .filter(Boolean);
-        console.log('User accessible pages:', userRolePages.value);
       }
     }
   } catch (error) {
@@ -137,8 +86,6 @@ const loadUserRoleAndPages = async () => {
 const setupMessagesRealtimeSubscription = () => {
   if (!authStore.userData?.id) return;
 
-  console.log('Setting up sidebar real-time subscription for messages');
-
   messagesSubscription = supabase
     .channel('sidebar-messages-changes')
     .on(
@@ -149,16 +96,11 @@ const setupMessagesRealtimeSubscription = () => {
         table: 'messages',
       },
       async (payload) => {
-        console.log('[Sidebar] New message inserted - updating sidebar badge:', payload.new);
         const message = payload.new as any;
 
         // Only refresh count for messages not sent by current user
         if (authStore.userData?.id && message.user_id !== authStore.userData.id) {
-          console.log('[Sidebar] Message from another user, refreshing count from database');
-          // Always query database for accurate count instead of optimistic increment
           await sidebarStore.updateUnreadMessageCount(authStore.userData.id);
-        } else {
-          console.log('[Sidebar] Message from current user, not updating count');
         }
       }
     )
@@ -170,21 +112,16 @@ const setupMessagesRealtimeSubscription = () => {
         table: 'messages',
       },
       async (payload) => {
-        console.log('[Sidebar] Message updated - checking sidebar badge:', payload.new);
         const message = payload.new as any;
         
         // If a message was marked as read (isread changed to true), update the count
-        // Also check if the message is not from current user to avoid unnecessary updates
         const userId = authStore.userData?.id;
         if (userId && message.user_id !== userId) {
-          console.log('[Sidebar] Message from another user updated, refreshing count from database');
           await sidebarStore.updateUnreadMessageCount(userId);
         }
       }
     )
-    .subscribe((status) => {
-      console.log('Sidebar messages real-time subscription status:', status);
-    });
+    .subscribe();
 };
 
 // Cleanup real-time subscription
@@ -192,7 +129,6 @@ const cleanupMessagesSubscription = () => {
   if (messagesSubscription) {
     supabase.removeChannel(messagesSubscription);
     messagesSubscription = null;
-    console.log('Sidebar messages real-time subscription cleaned up');
   }
 };
 
@@ -289,23 +225,18 @@ const showSidebar = computed(() => !smAndDown.value);
 
 // Helper function to check if user has access to a specific page/route
 const hasPageAccess = (route: string) => {
-  const hasAccess = userRolePages.value.includes(route);
-  console.log(`Checking access for route "${route}":`, hasAccess);
-  return hasAccess;
+  return userRolePages.value.includes(route);
 };
 
 // Filter individual navigation items based on user access
 const filteredIndividualNavItems = computed(() => {
-  const filtered = individualNavItems.filter(item => {
+  return individualNavItems.filter(item => {
     // If no permission specified, allow access
     if (!item.permission) return true;
 
     // Check if user has access to this specific route
     return hasPageAccess(item.route);
   });
-
-  console.log('Filtered individual nav items:', filtered);
-  return filtered;
 });
 
 // Filter navigation groups based on user access
@@ -331,9 +262,8 @@ const filteredNavigationGroups = computed(() => {
 
       return null;
     })
-    .filter((group): group is NonNullable<typeof group> => group !== null); // Remove null groups with type guard
+    .filter((group): group is NonNullable<typeof group> => group !== null);
 
-  console.log('Filtered navigation groups:', filtered);
   return filtered;
 });
 

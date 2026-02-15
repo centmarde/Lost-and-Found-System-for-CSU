@@ -306,16 +306,9 @@ const updateUnreadCountForConversation = async (conversationId: string) => {
       }
 
       unreadMessageCounts.value[itemId] = totalUnread;
-    } else {
-      console.log('[SupportInbox] Updated direct message unread count:', {
-        conversationId,
-        conversationCount: count,
-        timestamp: new Date().toISOString()
-      });
     }
 
     // Always update sidebar store with fresh total count (includes both item and direct messages)
-    // This uses getTotalUnreadMessageCount from messages store
     await sidebarStore.updateUnreadMessageCount(currentUser.value.id);
   } catch (error) {
     console.error('[SupportInbox] Error updating unread count:', error);
@@ -324,7 +317,6 @@ const updateUnreadCountForConversation = async (conversationId: string) => {
 
 // Setup real-time subscription for messages
 const setupMessagesRealtimeSubscription = () => {
-
   messagesSubscription = supabase
     .channel('messages-changes')
     .on(
@@ -335,15 +327,7 @@ const setupMessagesRealtimeSubscription = () => {
         table: 'messages',
       },
       async (payload) => {
-        console.log('[SupportInbox] New message inserted:', {
-          messageId: payload.new.id,
-          conversationId: payload.new.conversation_id,
-          userId: payload.new.user_id,
-          isCurrentUser: payload.new.user_id === currentUser.value?.id
-        });
         const message = payload.new as any;
-
-        // Update unread counts for the conversation
         await updateUnreadCountForConversation(message.conversation_id);
       }
     )
@@ -355,21 +339,11 @@ const setupMessagesRealtimeSubscription = () => {
         table: 'messages',
       },
       async (payload) => {
-        console.log('[SupportInbox] Message updated:', {
-          messageId: payload.new.id,
-          conversationId: payload.new.conversation_id,
-          isRead: payload.new.isread,
-          userId: payload.new.user_id
-        });
         const message = payload.new as any;
-
-        // Update unread counts for the conversation (e.g., when isread changes)
         await updateUnreadCountForConversation(message.conversation_id);
       }
     )
-    .subscribe((status) => {
-      console.log('[SupportInbox] Messages real-time subscription status:', status);
-    });
+    .subscribe();
 };
 
 // Cleanup real-time subscription
@@ -377,7 +351,6 @@ const cleanupMessagesSubscription = () => {
   if (messagesSubscription) {
     supabase.removeChannel(messagesSubscription);
     messagesSubscription = null;
-    console.log('Messages real-time subscription cleaned up');
   }
 };
 
@@ -389,15 +362,12 @@ onMounted(async () => {
 
   // Setup real-time subscription for messages
   setupMessagesRealtimeSubscription();
-
-  console.log('SupportInboxView mounted - broadcast subscriptions initialized');
 });
 
 onBeforeUnmount(() => {
   // Cleanup subscriptions when component unmounts
   closeInbox();
   cleanupMessagesSubscription();
-  console.log('SupportInboxView unmounted - broadcast subscriptions cleaned up');
 });
 </script>
 
