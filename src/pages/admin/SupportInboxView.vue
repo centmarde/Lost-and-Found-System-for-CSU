@@ -3,8 +3,9 @@ import { onMounted, onBeforeUnmount, computed, ref } from "vue";
 import InnerLayoutWrapper from "@/layouts/InnerLayoutWrapper.vue";
 import AdminSupportInbox from "@/pages/admin/components/AdminSupportInbox.vue";
 import { supabase } from "@/lib/supabase";
-import { loadItems as loadItemsFromStore, getUnreadMessageCountsForItems, updateUnreadCountForConversation as updateUnreadCountForConversationStore } from "@/stores/messages";
+import { loadItems as loadItemsFromStore, getUnreadMessageCountsForItems, updateUnreadCountForConversation as updateUnreadCountForConversationStore, markAllUnreadMessagesAsRead, getUnreadConversationsDetails } from "@/stores/messages";
 import { useSidebarStore } from "@/stores/sidebar";
+import { useToast } from 'vue-toastification';
 
 // Composables
 import { useAuth } from "@/pages/admin/components/composables/useAuth";
@@ -15,6 +16,9 @@ const { currentUser, isCurrentUserAdmin, getCurrentUser } = useAuth();
 
 // Sidebar store for updating badge
 const sidebarStore = useSidebarStore();
+
+// Toast for notifications
+const toast = useToast();
 
 // Items state
 const items = ref<any[]>([]);
@@ -38,7 +42,6 @@ const newMessage = ref('');
 
 // Computed property to get current user role
 const currentUserRole = computed(() => {
-  console.log("Current User:", currentUser.value?.app_metadata);
   return currentUser.value?.app_metadata?.role || currentUser.value?.user_metadata?.role || null;
 });
 
@@ -244,45 +247,83 @@ const handleSendMessage = async () => {
   }
 };
 
+// Mark all unread messages as read
+const handleMarkAllAsRead = async () => {
+  if (!currentUser.value) return;
+  
+  try {
+    toast.info('Marking all messages as read...');
+    const count = await markAllUnreadMessagesAsRead(currentUser.value.id);
+    
+    if (count > 0) {
+      toast.success(`✅ Marked ${count} message${count > 1 ? 's' : ''} as read`);
+      
+      // Refresh all unread counts
+      await sidebarStore.updateUnreadMessageCount(currentUser.value.id);
+      await loadItems();
+      await loadSupportConversations(currentPage.value);
+      
+      // Reset conversation unread counts
+      conversationUnreadCounts.value = {};
+    } else {
+      toast.info('No unread messages to mark');
+    }
+  } catch (error) {
+    toast.error('Failed to mark messages as read');
+  }
+};
+
 // Update unread count for a conversation and its item
 const updateUnreadCountForConversation = async (conversationId: string) => {
   try {
-    if (!currentUser.value) return;
+    if (!currentUser.value) {
+      return;
+    }
 
-    // Find the conversation to get its item_id
+    // Find the conversation
     const conversation = supportConversations.value.find(conv => conv.id === conversationId);
-    if (!conversation || !conversation.item_id) return;
+    if (!conversation) {
+      // Still update sidebar badge even if conversation not found locally
+      await sidebarStore.updateUnreadMessageCount(currentUser.value.id);
+      return;
+    }
 
-    // Get unread count from store
+
+    // Get unread count from store for this specific conversation
     const count = await updateUnreadCountForConversationStore(conversationId, currentUser.value.id);
 
     // Update conversation unread count
     conversationUnreadCounts.value[conversationId] = count;
 
-    // Recalculate item unread count
-    const itemId = conversation.item_id;
-    const itemConversations = supportConversations.value.filter(conv => conv.item_id === itemId);
-    let totalUnread = 0;
+    // If conversation has an item_id, recalculate item unread count
+    if (conversation.item_id) {
+      const itemId = conversation.item_id;
+      const itemConversations = supportConversations.value.filter(conv => conv.item_id === itemId);
+      let totalUnread = 0;
 
-    for (const conv of itemConversations) {
-      totalUnread += conversationUnreadCounts.value[conv.id] || 0;
+      for (const conv of itemConversations) {
+        totalUnread += conversationUnreadCounts.value[conv.id] || 0;
+      }
+
+      unreadMessageCounts.value[itemId] = totalUnread;
+    } else {
+      console.log('[SupportInbox] Updated direct message unread count:', {
+        conversationId,
+        conversationCount: count,
+        timestamp: new Date().toISOString()
+      });
     }
 
-    unreadMessageCounts.value[itemId] = totalUnread;
-    console.log('Updated unread counts - Conversation:', conversationId, 'Count:', count, 'Item:', itemId, 'Total:', totalUnread);
-
-    // Update sidebar store with fresh total unread count
-    if (currentUser.value?.id) {
-      await sidebarStore.updateUnreadMessageCount(currentUser.value.id);
-    }
+    // Always update sidebar store with fresh total count (includes both item and direct messages)
+    // This uses getTotalUnreadMessageCount from messages store
+    await sidebarStore.updateUnreadMessageCount(currentUser.value.id);
   } catch (error) {
-    console.error('Error updating unread count:', error);
+    console.error('[SupportInbox] Error updating unread count:', error);
   }
 };
 
 // Setup real-time subscription for messages
 const setupMessagesRealtimeSubscription = () => {
-  console.log('Setting up real-time subscription for messages table');
 
   messagesSubscription = supabase
     .channel('messages-changes')
@@ -294,7 +335,12 @@ const setupMessagesRealtimeSubscription = () => {
         table: 'messages',
       },
       async (payload) => {
-        console.log('New message inserted:', payload.new);
+        console.log('[SupportInbox] New message inserted:', {
+          messageId: payload.new.id,
+          conversationId: payload.new.conversation_id,
+          userId: payload.new.user_id,
+          isCurrentUser: payload.new.user_id === currentUser.value?.id
+        });
         const message = payload.new as any;
 
         // Update unread counts for the conversation
@@ -309,7 +355,12 @@ const setupMessagesRealtimeSubscription = () => {
         table: 'messages',
       },
       async (payload) => {
-        console.log('Message updated:', payload.new);
+        console.log('[SupportInbox] Message updated:', {
+          messageId: payload.new.id,
+          conversationId: payload.new.conversation_id,
+          isRead: payload.new.isread,
+          userId: payload.new.user_id
+        });
         const message = payload.new as any;
 
         // Update unread counts for the conversation (e.g., when isread changes)
@@ -317,7 +368,7 @@ const setupMessagesRealtimeSubscription = () => {
       }
     )
     .subscribe((status) => {
-      console.log('Messages real-time subscription status:', status);
+      console.log('[SupportInbox] Messages real-time subscription status:', status);
     });
 };
 
@@ -364,6 +415,17 @@ onBeforeUnmount(() => {
               <p class="text-h6 text-sm-h5 text-grey-darken-1 mb-0">
                 {{ pageDescription }}
               </p>
+              <!-- Mark All as Read Button -->
+              <v-btn
+                v-if="sidebarStore.hasUnreadMessages"
+                color="primary"
+                variant="tonal"
+                class="mt-4"
+                prepend-icon="mdi-email-check"
+                @click="handleMarkAllAsRead"
+              >
+                Mark All {{ sidebarStore.totalUnreadMessages }} Message{{ sidebarStore.totalUnreadMessages > 1 ? 's' : '' }} as Read
+              </v-btn>
             </div>
           </v-col>
         </v-row>

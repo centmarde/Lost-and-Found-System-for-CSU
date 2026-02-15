@@ -11,16 +11,25 @@ export const useSidebarStore = defineStore('sidebar', () => {
   const hasUnreadMessages = computed(() => totalUnreadMessages.value > 0)
 
   // Actions
+  /**
+   * Updates the total unread message count for the sidebar badge
+   * Uses getTotalUnreadMessageCount from messages store to count:
+   * - All unread messages across ALL conversations (item-based + direct messages)
+   * - Only messages received by the user (excludes messages sent by the user)
+   * - Messages where isread = false
+   */
   const updateUnreadMessageCount = async (currentUserId: string) => {
-    if (!currentUserId) return
+    if (!currentUserId) {
+      console.warn('[Sidebar Store] No user ID provided for updating unread count')
+      return
+    }
 
     try {
       isLoading.value = true
+      const previousCount = totalUnreadMessages.value
       const count = await getTotalUnreadMessageCount(currentUserId)
       totalUnreadMessages.value = count
-      console.log('Updated sidebar unread message count:', count)
     } catch (error) {
-      console.error('Error updating sidebar unread message count:', error)
     } finally {
       isLoading.value = false
     }
@@ -30,11 +39,20 @@ export const useSidebarStore = defineStore('sidebar', () => {
     totalUnreadMessages.value = 0
   }
 
+  /**
+   * @deprecated Avoid using this for real-time updates - use updateUnreadMessageCount instead
+   * Optimistic increment can cause drift from actual database state
+   */
   const incrementUnreadCount = () => {
     totalUnreadMessages.value++
   }
 
+  /**
+   * @deprecated Avoid using this for real-time updates - use updateUnreadMessageCount instead
+   * Optimistic decrement can cause drift from actual database state
+   */
   const decrementUnreadCount = (amount = 1) => {
+    const previousCount = totalUnreadMessages.value
     totalUnreadMessages.value = Math.max(0, totalUnreadMessages.value - amount)
   }
 

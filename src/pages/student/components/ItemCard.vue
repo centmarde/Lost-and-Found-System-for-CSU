@@ -79,11 +79,12 @@ const loadAdminUsers = async () => {
 
     if (error) throw error;
     
-    // Filter users with role 1 (admin role)
+    // Filter users with role 1 (admin role) and exclude current user
     adminUsers.value = (users || [])
       .filter(user => {
         const role = user.raw_app_meta_data?.role || user.raw_user_meta_data?.role;
-        return role === 1;
+        // Show admin users (role === 1) but exclude the currently logged-in user
+        return role === 1 && user.id !== currentUser.value?.id;
       })
       .map(user => ({
         id: user.id,
@@ -91,7 +92,7 @@ const loadAdminUsers = async () => {
         email: user.email
       }));
 
-    console.log('Loaded admin users:', adminUsers.value);
+    console.log('Loaded admin users (excluding current user):', adminUsers.value);
   } catch (error) {
     console.error('Error loading admin users:', error);
     toast.error('Failed to load admin users');
