@@ -2,6 +2,11 @@
 import { onMounted, onBeforeUnmount, computed, ref } from "vue";
 import InnerLayoutWrapper from "@/layouts/InnerLayoutWrapper.vue";
 import AdminSupportInbox from "@/pages/admin/components/AdminSupportInbox.vue";
+import FilterHeader from "@/pages/admin/components/FilterHeader.vue";
+import ItemsDataTable from "@/pages/admin/components/ItemsDataTable.vue";
+import UsersDataTable from "@/pages/admin/components/UsersDataTable.vue";
+import ItemsCardView from "@/pages/admin/components/ItemsCardView.vue";
+import UsersCardView from "@/pages/admin/components/UsersCardView.vue";
 import { supabase } from "@/lib/supabase";
 import { loadItems as loadItemsFromStore, getUnreadMessageCountsForItems, updateUnreadCountForConversation as updateUnreadCountForConversationStore, markAllUnreadMessagesAsRead, getUnreadConversationsDetails } from "@/stores/messages";
 import { useSidebarStore } from "@/stores/sidebar";
@@ -33,6 +38,12 @@ const selectedUser = ref<any>(null);
 
 // View mode: 'items' | 'direct-messages' | 'user-messages'
 const viewMode = ref<'items' | 'direct-messages' | 'user-messages'>('items');
+
+// Filter and view state
+const searchQuery = ref('');
+const sortBy = ref('name');
+const itemViewMode = ref<'table' | 'cards'>('cards');
+const userViewMode = ref<'table' | 'cards'>('cards');
 
 // Real-time subscription
 let messagesSubscription: any = null;
@@ -99,6 +110,86 @@ const itemsWithConversations = computed(() => {
   return items.value.filter(item => {
     return supportConversations.value.some(conv => conv.item_id === item.id);
   });
+});
+
+// Computed property for filtered and sorted items
+const filteredAndSortedItems = computed(() => {
+  let filtered = itemsWithConversations.value;
+
+  // Apply search filter
+  if (searchQuery.value.trim()) {
+    const query = searchQuery.value.toLowerCase();
+    filtered = filtered.filter(item =>
+      item.title.toLowerCase().includes(query) ||
+      item.description.toLowerCase().includes(query) ||
+      item.status.toLowerCase().includes(query)
+    );
+  }
+
+  // Apply sorting
+  filtered = [...filtered].sort((a, b) => {
+    switch (sortBy.value) {
+      case 'name':
+        return a.title.localeCompare(b.title);
+      case 'name_desc':
+        return b.title.localeCompare(a.title);
+      case 'date':
+        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+      case 'date_asc':
+        return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+      case 'unread':
+        return getUnreadMessageCount(b.id) - getUnreadMessageCount(a.id);
+      case 'conversations':
+        return getItemConversationCount(b.id) - getItemConversationCount(a.id);
+      default:
+        return 0;
+    }
+  });
+
+  return filtered;
+});
+
+// Computed property for filtered and sorted users
+const filteredAndSortedUsers = computed(() => {
+  let filtered = usersWithDirectMessages.value;
+
+  // Apply search filter
+  if (searchQuery.value.trim()) {
+    const query = searchQuery.value.toLowerCase();
+    filtered = filtered.filter(user =>
+      user.full_name.toLowerCase().includes(query) ||
+      user.email.toLowerCase().includes(query)
+    );
+  }
+
+  // Apply sorting
+  filtered = [...filtered].sort((a, b) => {
+    switch (sortBy.value) {
+      case 'name':
+        return a.full_name.localeCompare(b.full_name);
+      case 'name_desc':
+        return b.full_name.localeCompare(a.full_name);
+      case 'date':
+        return new Date(b.latest_message_date).getTime() - new Date(a.latest_message_date).getTime();
+      case 'date_asc':
+        return new Date(a.latest_message_date).getTime() - new Date(b.latest_message_date).getTime();
+      case 'unread':
+        return b.unread_count - a.unread_count;
+      case 'conversations':
+        return b.conversations.length - a.conversations.length;
+      default:
+        return 0;
+    }
+  });
+
+  return filtered;
+});// Computed property for conversation counts per item
+const itemConversationCounts = computed(() => {
+  const counts: Record<number, number> = {};
+  items.value.forEach(item => {
+    counts[item.id] = getItemConversationCount(item.id);
+  });
+  return counts;
 });
 
 // Computed property to get unique users with direct messages
@@ -239,6 +330,93 @@ const backToUsers = () => {
   selectedSupportConversation.value = null;
 };
 
+// Filter handlers
+const handleSearchChange = (query: string) => {
+  searchQuery.value = query;
+};
+
+const handleSortChange = (sort: string) => {
+  sortBy.value = sort;
+};
+
+const handleItemViewModeChange = (mode: 'table' | 'cards') => {
+  itemViewMode.value = mode;
+};
+
+const handleUserViewModeChange = (mode: 'table' | 'cards') => {
+  userViewMode.value = mode;
+};
+
+const handleClearFilters = () => {
+  searchQuery.value = '';
+  sortBy.value = 'name';
+};
+
+// Handle marking item messages as read
+const handleMarkItemAsRead = async (item: any) => {
+  if (!currentUser.value) return;
+
+  try {
+    toast.info('Marking item messages as read...');
+
+    // Find all conversations for this item and mark their messages as read
+    const itemConversations = supportConversations.value.filter(conv => conv.item_id === item.id);
+    let totalMarked = 0;
+
+    for (const conversation of itemConversations) {
+      const count = await updateUnreadCountForConversationStore(conversation.id, currentUser.value.id);
+      totalMarked += (conversationUnreadCounts.value[conversation.id] || 0);
+      conversationUnreadCounts.value[conversation.id] = 0;
+    }
+
+    // Update item unread count
+    unreadMessageCounts.value[item.id] = 0;
+
+    if (totalMarked > 0) {
+      toast.success(`✅ Marked ${totalMarked} message${totalMarked > 1 ? 's' : ''} as read for "${item.title}"`);
+    } else {
+      toast.info('No unread messages for this item');
+    }
+
+    // Update sidebar badge
+    await sidebarStore.updateUnreadMessageCount(currentUser.value.id);
+  } catch (error) {
+    toast.error('Failed to mark messages as read');
+  }
+};
+
+// Handle marking user messages as read
+const handleMarkUserAsRead = async (user: any) => {
+  if (!currentUser.value) return;
+
+  try {
+    toast.info('Marking user messages as read...');
+
+    // Find all conversations for this user and mark their messages as read
+    let totalMarked = 0;
+
+    for (const conversation of user.conversations) {
+      const count = await updateUnreadCountForConversationStore(conversation.id, currentUser.value.id);
+      totalMarked += (conversationUnreadCounts.value[conversation.id] || 0);
+      conversationUnreadCounts.value[conversation.id] = 0;
+    }
+
+    // Update user unread count
+    user.unread_count = 0;
+
+    if (totalMarked > 0) {
+      toast.success(`✅ Marked ${totalMarked} message${totalMarked > 1 ? 's' : ''} as read from "${user.full_name}"`);
+    } else {
+      toast.info('No unread messages from this user');
+    }
+
+    // Update sidebar badge
+    await sidebarStore.updateUnreadMessageCount(currentUser.value.id);
+  } catch (error) {
+    toast.error('Failed to mark messages as read');
+  }
+};
+
 // Message sending handlers
 const handleSendMessage = async () => {
   if (newMessage.value.trim()) {
@@ -250,19 +428,19 @@ const handleSendMessage = async () => {
 // Mark all unread messages as read
 const handleMarkAllAsRead = async () => {
   if (!currentUser.value) return;
-  
+
   try {
     toast.info('Marking all messages as read...');
     const count = await markAllUnreadMessagesAsRead(currentUser.value.id);
-    
+
     if (count > 0) {
       toast.success(`✅ Marked ${count} message${count > 1 ? 's' : ''} as read`);
-      
+
       // Refresh all unread counts
       await sidebarStore.updateUnreadMessageCount(currentUser.value.id);
       await loadItems();
       await loadSupportConversations(currentPage.value);
-      
+
       // Reset conversation unread counts
       conversationUnreadCounts.value = {};
     } else {
@@ -405,6 +583,7 @@ onBeforeUnmount(() => {
           <v-col cols="12">
             <!-- Show Items Grid and Direct Messages when no specific item is selected and not in direct messages view -->
             <div v-if="!selectedItem && viewMode === 'items'">
+              <!-- Items with Support Requests Section -->
               <v-card elevation="2" class="pa-4 mb-4">
                 <v-card-title class="text-h5 font-weight-bold mb-4 d-flex align-center">
                   <v-icon class="me-2" color="primary">mdi-package-variant</v-icon>
@@ -416,12 +595,51 @@ onBeforeUnmount(() => {
                     variant="tonal"
                     :size="$vuetify.display.xs ? 'x-small' : 'small'"
                   >
-                    {{ itemsWithConversations.length }} {{ itemsWithConversations.length === 1 ? 'Item' : 'Items' }}
+                    {{ filteredAndSortedItems.length }} of {{ itemsWithConversations.length }} {{ itemsWithConversations.length === 1 ? 'Item' : 'Items' }}
                   </v-chip>
                 </v-card-title>
 
+                <!-- Filter Header for Items -->
+                <FilterHeader
+                  :search-query="searchQuery"
+                  :sort-by="sortBy"
+                  :view-mode="itemViewMode"
+                  :loading="loadingItems"
+                  :total-items="itemsWithConversations.length"
+                  :filtered-items="filteredAndSortedItems.length"
+                  @update:search-query="handleSearchChange"
+                  @update:sort-by="handleSortChange"
+                  @update:view-mode="handleItemViewModeChange"
+                  @clear-filters="handleClearFilters"
+                />
+
+                <!-- Items Display -->
+                <div v-if="!loadingItems && itemsWithConversations.length > 0">
+                  <!-- Table View -->
+                  <ItemsDataTable
+                    v-if="itemViewMode === 'table'"
+                    :items="filteredAndSortedItems"
+                    :loading="loadingItems"
+                    :search="searchQuery"
+                    :unread-counts="unreadMessageCounts"
+                    :conversation-counts="itemConversationCounts"
+                    @view-item="selectItem"
+                    @mark-as-read="handleMarkItemAsRead"
+                  />
+
+                  <!-- Card View -->
+                  <ItemsCardView
+                    v-else
+                    :items="filteredAndSortedItems"
+                    :unread-counts="unreadMessageCounts"
+                    :conversation-counts="itemConversationCounts"
+                    @item-click="selectItem"
+                    @mark-as-read="handleMarkItemAsRead"
+                  />
+                </div>
+
                 <!-- Loading State -->
-                <div v-if="loadingItems" class="text-center py-12">
+                <div v-else-if="loadingItems" class="text-center py-12">
                   <v-progress-circular indeterminate color="primary" size="48" />
                   <p class="text-body-1 mt-4">Loading items...</p>
                 </div>
@@ -439,80 +657,25 @@ onBeforeUnmount(() => {
                   </p>
                 </div>
 
-                <!-- Items Grid -->
-                <v-row v-else>
-                  <v-col
-                    v-for="item in itemsWithConversations"
-                    :key="item.id"
-                    cols="12"
-                    sm="6"
-                    md="4"
-                    lg="3"
+                <!-- No Filtered Results -->
+                <div v-else-if="filteredAndSortedItems.length === 0" class="text-center py-12">
+                  <v-icon size="80" color="grey-lighten-1" class="mb-4">
+                    mdi-magnify
+                  </v-icon>
+                  <h3 class="text-h5 text-grey-darken-1 mb-2">
+                    No Items Found
+                  </h3>
+                  <p class="text-body-1 text-grey-darken-2 mb-4">
+                    No items match your current filters. Try adjusting your search or filters.
+                  </p>
+                  <v-btn
+                    color="primary"
+                    variant="outlined"
+                    @click="handleClearFilters"
                   >
-                    <v-card
-                      class="item-card h-100"
-                      elevation="2"
-                      hover
-                      @click="selectItem(item)"
-                    >
-                      <v-card-title class="d-flex justify-space-between align-start pb-2">
-                        <div class="text-subtitle-1 font-weight-bold">{{ item.title }}</div>
-                        <div class="d-flex align-center gap-1">
-                          <!-- Unread Messages Badge -->
-                          <v-badge
-                            v-if="getUnreadMessageCount(item.id) > 0"
-                            :content="getUnreadMessageCount(item.id)"
-                            color="error"
-                            inline
-                            class="me-2"
-                          >
-                            <v-icon color="error" size="20">mdi-email-alert</v-icon>
-                          </v-badge>
-                          <v-chip
-                            :color="item.status === 'lost' ? 'error' : 'success'"
-                            size="x-small"
-                            variant="flat"
-                          >
-                            {{ item.status.toUpperCase() }}
-                          </v-chip>
-                        </div>
-                      </v-card-title>
-
-                      <v-card-text>
-                        <p class="text-body-2 text-grey-darken-1 mb-3" style="min-height: 60px;">
-                          {{ item.description.substring(0, 80) }}{{ item.description.length > 80 ? '...' : '' }}
-                        </p>
-
-                        <v-divider class="my-3" />
-
-                        <!-- Conversation Count and Unread Messages -->
-                        <div class="d-flex align-center justify-space-between">
-                          <div class="d-flex flex-column">
-                            <div class="d-flex align-center text-caption text-grey-darken-1 mb-1">
-                              <v-icon size="16" class="me-1">mdi-message-text</v-icon>
-                              {{ getItemConversationCount(item.id) }}
-                              {{ getItemConversationCount(item.id) === 1 ? 'conversation' : 'conversations' }}
-                            </div>
-                          </div>
-                          <v-btn
-                            color="primary"
-                            variant="text"
-                            size="small"
-                            append-icon="mdi-chevron-right"
-                          >
-                            View
-                          </v-btn>
-                        </div>
-
-                        <!-- Created Date -->
-                        <div class="d-flex align-center text-caption text-grey mt-2">
-                          <v-icon size="14" class="me-1">mdi-clock-outline</v-icon>
-                          {{ new Date(item.created_at).toLocaleDateString() }}
-                        </div>
-                      </v-card-text>
-                    </v-card>
-                  </v-col>
-                </v-row>
+                    Clear Filters
+                  </v-btn>
+                </div>
               </v-card>
 
               <!-- Direct Messages Card -->
@@ -527,12 +690,47 @@ onBeforeUnmount(() => {
                     variant="tonal"
                     :size="$vuetify.display.xs ? 'x-small' : 'small'"
                   >
-                    {{ usersWithDirectMessages.length }} {{ usersWithDirectMessages.length === 1 ? 'User' : 'Users' }}
+                    {{ filteredAndSortedUsers.length }} of {{ usersWithDirectMessages.length }} {{ usersWithDirectMessages.length === 1 ? 'User' : 'Users' }}
                   </v-chip>
                 </v-card-title>
 
+                <!-- Filter Header for Users -->
+                <FilterHeader
+                  :search-query="searchQuery"
+                  :sort-by="sortBy"
+                  :view-mode="userViewMode"
+                  :loading="loadingSupportConversations"
+                  :total-items="usersWithDirectMessages.length"
+                  :filtered-items="filteredAndSortedUsers.length"
+                  @update:search-query="handleSearchChange"
+                  @update:sort-by="handleSortChange"
+                  @update:view-mode="handleUserViewModeChange"
+                  @clear-filters="handleClearFilters"
+                />
+
+                <!-- Users Display -->
+                <div v-if="!loadingSupportConversations && usersWithDirectMessages.length > 0">
+                  <!-- Table View -->
+                  <UsersDataTable
+                    v-if="userViewMode === 'table'"
+                    :users="filteredAndSortedUsers"
+                    :loading="loadingSupportConversations"
+                    :search="searchQuery"
+                    @view-user="selectUser"
+                    @mark-as-read="handleMarkUserAsRead"
+                  />
+
+                  <!-- Card View -->
+                  <UsersCardView
+                    v-else
+                    :users="filteredAndSortedUsers"
+                    @user-click="selectUser"
+                    @mark-as-read="handleMarkUserAsRead"
+                  />
+                </div>
+
                 <!-- Loading State -->
-                <div v-if="loadingSupportConversations && directMessageConversations.length === 0" class="text-center py-12">
+                <div v-else-if="loadingSupportConversations" class="text-center py-12">
                   <v-progress-circular indeterminate color="primary" size="48" />
                   <p class="text-body-1 mt-4">Loading direct messages...</p>
                 </div>
@@ -550,96 +748,25 @@ onBeforeUnmount(() => {
                   </p>
                 </div>
 
-                <!-- Users Grid -->
-                <v-row v-else>
-                  <v-col
-                    v-for="user in usersWithDirectMessages"
-                    :key="user.id"
-                    cols="12"
-                    sm="6"
-                    md="4"
-                    lg="3"
+                <!-- No Filtered Results -->
+                <div v-else-if="filteredAndSortedUsers.length === 0" class="text-center py-12">
+                  <v-icon size="80" color="grey-lighten-1" class="mb-4">
+                    mdi-magnify
+                  </v-icon>
+                  <h3 class="text-h5 text-grey-darken-1 mb-2">
+                    No Users Found
+                  </h3>
+                  <p class="text-body-1 text-grey-darken-2 mb-4">
+                    No users match your current filters. Try adjusting your search.
+                  </p>
+                  <v-btn
+                    color="primary"
+                    variant="outlined"
+                    @click="handleClearFilters"
                   >
-                    <v-card
-                      class="item-card h-100"
-                      elevation="2"
-                      hover
-                      @click="selectUser(user)"
-                    >
-                      <v-card-title class="d-flex justify-space-between align-start pb-2">
-                        <div class="d-flex align-center">
-                          <v-avatar
-                            color="info"
-                            size="40"
-                            class="me-2"
-                          >
-                            <span class="text-white font-weight-bold">
-                              {{ user.full_name.split(' ').map((n: string) => n[0]).join('').toUpperCase().substring(0, 2) }}
-                            </span>
-                          </v-avatar>
-                          <div>
-                            <div class="text-subtitle-1 font-weight-bold">{{ user.full_name }}</div>
-                          </div>
-                        </div>
-                        <div class="d-flex align-center gap-1">
-                          <!-- Unread Messages Badge -->
-                          <v-badge
-                            v-if="user.unread_count > 0"
-                            :content="user.unread_count"
-                            color="error"
-                            inline
-                            class="me-2"
-                          >
-                            <v-icon color="error" size="20">mdi-email-alert</v-icon>
-                          </v-badge>
-                          <v-chip
-                            color="info"
-                            size="x-small"
-                            variant="flat"
-                          >
-                            DIRECT
-                          </v-chip>
-                        </div>
-                      </v-card-title>
-
-                      <v-card-text>
-                        <p class="text-body-2 text-grey-darken-1 mb-3" style="min-height: 60px;">
-                          {{ user.email }}<br/>
-                          <span class="text-caption">
-                            General support conversations not related to specific items
-                          </span>
-                        </p>
-
-                        <v-divider class="my-3" />
-
-                        <!-- Conversation Count and Unread Messages -->
-                        <div class="d-flex align-center justify-space-between">
-                          <div class="d-flex flex-column">
-                            <div class="d-flex align-center text-caption text-grey-darken-1 mb-1">
-                              <v-icon size="16" class="me-1">mdi-message-text</v-icon>
-                              {{ user.conversations.length }}
-                              {{ user.conversations.length === 1 ? 'conversation' : 'conversations' }}
-                            </div>
-                          </div>
-                          <v-btn
-                            color="info"
-                            variant="text"
-                            size="small"
-                            append-icon="mdi-chevron-right"
-                          >
-                            View
-                          </v-btn>
-                        </div>
-
-                        <!-- Latest Message Date -->
-                        <div class="d-flex align-center text-caption text-grey mt-2">
-                          <v-icon size="14" class="me-1">mdi-clock-outline</v-icon>
-                          {{ new Date(user.latest_message_date).toLocaleDateString() }}
-                        </div>
-                      </v-card-text>
-                    </v-card>
-                  </v-col>
-                </v-row>
+                    Clear Filters
+                  </v-btn>
+                </div>
               </v-card>
             </div>
 
@@ -1468,16 +1595,6 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
-.item-card {
-  cursor: pointer;
-  transition: all 0.3s ease;
-}
-
-.item-card:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.15) !important;
-}
-
 .support-inbox-container {
   min-height: 600px;
 }
