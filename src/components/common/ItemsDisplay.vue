@@ -11,6 +11,7 @@ interface Props {
   itemsLoading: boolean
   isCurrentUserAdmin: boolean
   updatingItems: Set<number>
+  viewMode: string
   emptyStateConfig: {
     sectionTitle: string
     noItemsTitle: string
@@ -39,6 +40,15 @@ const emit = defineEmits<{
 const showingStart = computed(() => (props.page - 1) * props.itemsPerPage + 1)
 const showingEnd = computed(() => Math.min(props.page * props.itemsPerPage, props.filteredAndSortedItems.length))
 
+// Data table headers
+const tableHeaders = computed(() => [
+  { title: 'Title', key: 'title', align: 'start' as const },
+  { title: 'Description', key: 'description', align: 'start' as const, sortable: false },
+  { title: 'Status', key: 'status', align: 'center' as const },
+  { title: 'Date', key: 'created_at', align: 'start' as const },
+  { title: 'Actions', key: 'actions', align: 'center' as const, sortable: false },
+] as const)
+
 // Event handlers
 const handleOpenConversations = (item: any) => {
   emit('open-conversations', item)
@@ -62,6 +72,25 @@ const fetchItems = () => {
 
 const clearAllFilters = () => {
   emit('clear-all-filters')
+}
+
+// Helper functions for table view
+const formatDate = (dateString: string) => {
+  return new Date(dateString).toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric'
+  })
+}
+
+const getItemStatusColor = (item: any) => {
+  if (item.claimed_by) return 'success'
+  return item.status === 'lost' ? 'error' : 'info'
+}
+
+const getItemStatusText = (item: any) => {
+  if (item.claimed_by) return 'Claimed'
+  return item.status === 'lost' ? 'Lost' : 'Found'
 }
 </script>
 
@@ -136,9 +165,10 @@ const clearAllFilters = () => {
       </v-btn>
     </div>
 
-    <!-- Items grid -->
+    <!-- Items grid/table -->
     <div v-else>
-      <v-row class="items-grid">
+      <!-- Grid View -->
+      <v-row v-if="viewMode === 'grid'" class="items-grid">
         <v-col
           v-for="item in paginatedItems"
           :key="item.id"
@@ -166,6 +196,82 @@ const clearAllFilters = () => {
           />
         </v-col>
       </v-row>
+
+      <!-- Table View -->
+      <v-data-table
+        v-else-if="viewMode === 'table'"
+        :headers="tableHeaders"
+        :items="paginatedItems"
+        :loading="itemsLoading"
+        item-key="id"
+        class="elevation-1"
+        hide-default-footer
+      >
+        <!-- Title column -->
+        <template #item.title="{ item }">
+          <div class="font-weight-medium">{{ item.title }}</div>
+        </template>
+
+        <!-- Description column -->
+        <template #item.description="{ item }">
+          <div class="text-truncate" style="max-width: 200px;">
+            {{ item.description }}
+          </div>
+        </template>
+
+        <!-- Status column -->
+        <template #item.status="{ item }">
+          <v-chip
+            :color="getItemStatusColor(item)"
+            size="small"
+            variant="tonal"
+          >
+            {{ getItemStatusText(item) }}
+          </v-chip>
+        </template>
+
+        <!-- Date column -->
+        <template #item.created_at="{ item }">
+          {{ formatDate(item.created_at) }}
+        </template>
+
+        <!-- Actions column -->
+        <template #item.actions="{ item }">
+          <div class="d-flex gap-2 justify-center">
+            <v-btn
+              v-if="isCurrentUserAdmin"
+              size="small"
+              color="primary"
+              variant="outlined"
+              prepend-icon="mdi-message"
+              @click="handleOpenConversations(item)"
+            >
+              Messages
+            </v-btn>
+            <v-btn
+              v-if="isCurrentUserAdmin && !item.claimed_by"
+              size="small"
+              color="success"
+              variant="outlined"
+              prepend-icon="mdi-check"
+              :loading="updatingItems.has(item.id)"
+              @click="markAsClaimed(item.id)"
+            >
+              Mark Claimed
+            </v-btn>
+            <v-btn
+              v-else-if="!isCurrentUserAdmin"
+              size="small"
+              color="primary"
+              variant="outlined"
+              prepend-icon="mdi-message"
+              @click="isGuestUser ? handleGuestContact(item) : handleContact(item)"
+            >
+              Contact
+            </v-btn>
+          </div>
+        </template>
+      </v-data-table>
 
       <!-- Pagination -->
       <v-row v-if="totalPages > 1" class="mt-6">

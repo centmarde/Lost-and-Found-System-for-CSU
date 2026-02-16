@@ -62,6 +62,9 @@ const {
   formatDayLabel,
 } = useFilterSortPagination(items, 12);
 
+// View mode state
+const viewMode = ref('grid');
+
 // User chat composable
 const {
   showChatDialog,
@@ -279,6 +282,7 @@ onUnmounted(() => {
               v-model:selected-day="selectedDay"
               v-model:items-per-page="itemsPerPage"
               v-model:status-filter="statusFilter"
+              v-model:view-mode="viewMode"
               :available-months="availableMonths"
               :available-days="availableDays"
               :format-month-label="formatMonthLabel"
@@ -298,6 +302,7 @@ onUnmounted(() => {
               :items-loading="itemsLoading"
               :is-current-user-admin="isCurrentUserAdmin"
               :updating-items="updatingItems"
+              :view-mode="viewMode"
               :empty-state-config="emptyStateConfig"
               v-model:page="page"
               :items-per-page="itemsPerPage"

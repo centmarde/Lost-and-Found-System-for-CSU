@@ -52,6 +52,8 @@
       </v-col>
     </v-row>
 
+
+
     <!-- Filters row -->
     <v-row align="center">
       <v-col cols="12" sm="6" md="3">
@@ -93,7 +95,7 @@
         />
       </v-col>
 
-      <v-col cols="12" sm="6" md="3">
+      <v-col cols="12" sm="6" md="2">
         <v-select
           v-model="localSelectedDay"
           :items="[
@@ -122,7 +124,7 @@
         />
       </v-col>
 
-      <v-col cols="12" sm="6" md="3">
+      <v-col cols="12" sm="6" md="2">
         <v-select
           v-model="localItemsPerPage"
           :items="[8, 12, 16, 24, 48]"
@@ -132,6 +134,28 @@
           prepend-inner-icon="mdi-view-grid"
           hide-details
         />
+      </v-col>
+
+      <!-- View Mode Toggle - Right side -->
+      <v-col cols="12" md="2" class="d-flex justify-end">
+        <v-btn-toggle
+          v-model="localViewMode"
+          mandatory
+          density="compact"
+          variant="outlined"
+          divided
+        >
+          <v-btn
+            value="grid"
+            icon="mdi-view-grid"
+            size="default"
+          />
+          <v-btn
+            value="table"
+            icon="mdi-table"
+            size="default"
+          />
+        </v-btn-toggle>
       </v-col>
     </v-row>
 
@@ -218,6 +242,7 @@ interface Props {
   selectedDay: string;
   itemsPerPage: number;
   statusFilter: string;
+  viewMode: string;
   availableMonths: string[];
   availableDays: string[];
   formatMonthLabel: (month: string) => string;
@@ -231,6 +256,7 @@ interface Emits {
   (e: 'update:selectedDay', value: string): void;
   (e: 'update:itemsPerPage', value: number): void;
   (e: 'update:statusFilter', value: string): void;
+  (e: 'update:viewMode', value: string): void;
 }
 
 const props = defineProps<Props>();
@@ -243,6 +269,7 @@ const localSelectedMonth = ref(props.selectedMonth);
 const localSelectedDay = ref(props.selectedDay);
 const localItemsPerPage = ref(props.itemsPerPage);
 const localStatusFilter = ref(props.statusFilter);
+const localViewMode = ref(props.viewMode);
 
 // Watch for prop changes and update local values
 watch(() => props.searchQuery, (newVal) => {
@@ -269,6 +296,10 @@ watch(() => props.statusFilter, (newVal) => {
   localStatusFilter.value = newVal;
 });
 
+watch(() => props.viewMode, (newVal) => {
+  localViewMode.value = newVal;
+});
+
 // Watch local values and emit changes to parent
 watch(localSearchQuery, (newVal) => {
   emit('update:searchQuery', newVal);
@@ -292,6 +323,10 @@ watch(localItemsPerPage, (newVal) => {
 
 watch(localStatusFilter, (newVal) => {
   emit('update:statusFilter', newVal);
+});
+
+watch(localViewMode, (newVal) => {
+  emit('update:viewMode', newVal);
 });
 
 // Current date helpers

@@ -55,6 +55,9 @@ const {
   formatDayLabel,
 } = useFilterSortPagination(items, 12);
 
+// View mode state for guest users
+const viewMode = ref('grid');
+
 // Animation states
 const isVisible = ref(false);
 const searchText = ref("");
@@ -371,6 +374,7 @@ const updatingItems = ref(new Set<number>());
                   :is-current-user-admin="false"
                   :is-guest-user="true"
                   :updating-items="updatingItems"
+                  :view-mode="viewMode"
                   :empty-state-config="emptyStateConfig"
                   v-model:page="page"
                   :items-per-page="itemsPerPage"
