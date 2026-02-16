@@ -2,8 +2,9 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
 import { useAuthUserStore } from '@/stores/authUser'
+import { useUserRolesStore } from '@/stores/roles'
 import { useToast } from 'vue-toastification'
-import { getRoleName, getRoleColor } from '@/utils/usersTableHelpers'
+import { getRoleColor } from '@/utils/usersTableHelpers'
 import { useUserActions } from '@/composables/useUserActions'
 import UserDetailsDialog from './dialogs/UserDetailsDialog.vue'
 import EditUserDialog from './dialogs/EditUserDialog.vue'
@@ -11,6 +12,7 @@ import ConfirmationDialog from './dialogs/ConfirmationDialog.vue'
 
 // Store and utilities
 const authStore = useAuthUserStore()
+const rolesStore = useUserRolesStore()
 const toast = useToast()
 
 // User actions composable
@@ -41,7 +43,7 @@ const loading = ref(false)
 const error = ref<string | null>(null)
 const userDialog = ref(false)
 const selectedUser = ref<any>(null)
-const roleCache = ref<Record<number, string>>({}) // Cache for role titles from database
+const roleCache = ref<Record<number, string>>({}) // Cache for role titles from roles store
 
 // Table headers
 const headers = [
@@ -72,7 +74,7 @@ const headers = [
 ]
 
 // Methods
-const getRoleTitleAsync = async (roleId: number): Promise<string> => {
+const getRoleTitleById = async (roleId: number): Promise<string> => {
   if (!roleId) return 'No Role'
 
   // Check cache first
@@ -81,19 +83,24 @@ const getRoleTitleAsync = async (roleId: number): Promise<string> => {
   }
 
   try {
-    const result = await authStore.getRoleTitleById(roleId)
-
-    if (result.title) {
-      roleCache.value[roleId] = result.title
-      return result.title
-    } else {
-      // Fallback to helper function if database query fails
-      return getRoleName(roleId)
+    // Find role in the roles store
+    const role = rolesStore.roles.find(r => r.id === roleId)
+    if (role) {
+      roleCache.value[roleId] = role.title
+      return role.title
     }
+
+    // If not found in store, fetch a specific role
+    const fetchedRole = await rolesStore.fetchRoleById(roleId)
+    if (fetchedRole) {
+      roleCache.value[roleId] = fetchedRole.title
+      return fetchedRole.title
+    }
+
+    return 'Unknown Role'
   } catch (error) {
     console.error('Error fetching role title:', error)
-    // Fallback to helper function
-    return getRoleName(roleId)
+    return 'Unknown Role'
   }
 }
 
@@ -102,6 +109,10 @@ const fetchUsers = async () => {
   error.value = null
 
   try {
+    // First, fetch all roles to populate the store
+    await rolesStore.fetchRoles()
+
+    // Then fetch users
     const result = await authStore.getAllUsers()
 
     if (result.error) {
@@ -113,7 +124,7 @@ const fetchUsers = async () => {
     } else if (result.users) {
       users.value = result.users
 
-      // Preload role titles from database for all unique role IDs
+      // Preload role titles from roles store for all unique role IDs
       const roleIds = new Set<number>()
       result.users.forEach(user => {
         const roleId = user.raw_user_meta_data?.role || user.raw_app_meta_data?.role
@@ -122,9 +133,9 @@ const fetchUsers = async () => {
         }
       })
 
-      // Fetch all role titles from database
+      // Populate cache with role titles from the store
       for (const roleId of roleIds) {
-        await getRoleTitleAsync(roleId)
+        await getRoleTitleById(roleId)
       }
 
       //toast.success(`Loaded ${result.users.length} users`)
@@ -141,13 +152,20 @@ const fetchUsers = async () => {
 const getRoleTitleSync = (roleId: number): string => {
   if (!roleId) return 'No Role'
 
-  // Return from cache if available (database value)
+  // Return from cache if available (from roles store)
   if (roleCache.value[roleId]) {
     return roleCache.value[roleId]
   }
 
-  // Fallback to helper function while loading
-  return getRoleName(roleId)
+  // Try to find in current roles store
+  const role = rolesStore.roles.find(r => r.id === roleId)
+  if (role) {
+    roleCache.value[roleId] = role.title
+    return role.title
+  }
+
+  // Return unknown if not found
+  return 'Unknown Role'
 }
 
 const refreshUsers = () => {

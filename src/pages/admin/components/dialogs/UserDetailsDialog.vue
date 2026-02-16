@@ -1,6 +1,9 @@
 <script setup lang="ts">
-import { computed } from 'vue'
-import { getRoleName } from '@/utils/usersTableHelpers'
+import { computed, onMounted, ref, watch } from 'vue'
+import { useUserRolesStore } from '@/stores/roles'
+
+// Store
+const rolesStore = useUserRolesStore()
 
 // Props
 interface Props {
@@ -16,17 +19,71 @@ interface Emits {
 const props = defineProps<Props>()
 const emit = defineEmits<Emits>()
 
+// Reactive state
+const roleName = ref<string>('Loading...')
+
 // Computed properties
 const userDialog = computed({
   get: () => props.modelValue,
   set: (value: boolean) => emit('update:modelValue', value)
 })
 
+// Methods
+const getRoleTitle = async (roleId: number) => {
+  if (!roleId) {
+    roleName.value = 'No Role'
+    return
+  }
+
+  try {
+    // First try to find in existing roles
+    const existingRole = rolesStore.roles.find(r => r.id === roleId)
+    if (existingRole) {
+      roleName.value = existingRole.title
+      return
+    }
+
+    // If not found, fetch the specific role
+    const role = await rolesStore.fetchRoleById(roleId)
+    if (role) {
+      roleName.value = role.title
+    } else {
+      roleName.value = 'Unknown Role'
+    }
+  } catch (error) {
+    console.error('Error fetching role:', error)
+    roleName.value = 'Unknown Role'
+  }
+}
+
+// Load user role
+const loadUserRole = async () => {
+  if (props.selectedUser) {
+    const roleId = props.selectedUser.user_metadata?.role || props.selectedUser.app_metadata?.role
+    await getRoleTitle(roleId)
+  }
+}
+
 // Utility functions
 const formatDate = (dateString: string) => {
   if (!dateString) return 'N/A'
   return new Date(dateString).toLocaleDateString()
 }
+
+// Watch for dialog opening or user change
+watch([() => props.modelValue, () => props.selectedUser], () => {
+  if (props.modelValue && props.selectedUser) {
+    loadUserRole()
+  }
+}, { immediate: true })
+
+// Load roles when component mounts
+onMounted(async () => {
+  await rolesStore.fetchRoles()
+  if (props.modelValue && props.selectedUser) {
+    loadUserRole()
+  }
+})
 </script>
 
 <template>
@@ -71,7 +128,7 @@ const formatDate = (dateString: string) => {
               <v-col cols="12" md="6">
                 <v-text-field
                   label="Role"
-                  :model-value="getRoleName(props.selectedUser.user_metadata?.role || props.selectedUser.app_metadata?.role)"
+                  :model-value="roleName"
                   readonly
                   variant="outlined"
                   density="comfortable"

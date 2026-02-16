@@ -378,6 +378,44 @@ export const useAuthUserStore = defineStore("authUser", () => {
     }
   }
 
+  // Change password function
+  async function changePassword(currentPassword: string, newPassword: string) {
+    loading.value = true;
+    try {
+      // First verify the current password by attempting to sign in
+      const currentUser = await supabase.auth.getUser();
+      if (!currentUser.data.user?.email) {
+        return { error: new Error("No authenticated user found") };
+      }
+
+      // Verify current password
+      const { error: verifyError } = await supabase.auth.signInWithPassword({
+        email: currentUser.data.user.email,
+        password: currentPassword,
+      });
+
+      if (verifyError) {
+        return { error: new Error("Current password is incorrect") };
+      }
+
+      // Update password
+      const { data, error } = await supabase.auth.updateUser({
+        password: newPassword
+      });
+
+      if (error) {
+        return { error };
+      }
+
+      return { data };
+    } catch (error) {
+      console.error("Error changing password:", error);
+      return { error };
+    } finally {
+      loading.value = false;
+    }
+  }
+
   // Helper function to parse duration strings
   function parseDuration(duration: string): number {
     const units: { [key: string]: number } = {
@@ -396,7 +434,7 @@ export const useAuthUserStore = defineStore("authUser", () => {
     return parseFloat(value) * units[unit];
   }
 
-  // Get role title by role ID (for any user)
+  // Get role title by role ID (for any user) - now uses roles store
   async function getRoleTitleById(roleId: number) {
     try {
       console.log('getRoleTitleById - Getting role title for ID:', roleId);
@@ -406,24 +444,18 @@ export const useAuthUserStore = defineStore("authUser", () => {
         return { title: null, error: null };
       }
 
-      // Use hardcoded role mappings instead of database query
-      const roleMapping: { [key: number]: string } = {
-        1: 'Admin',
-        2: 'User',
-        3: 'Student',
-        4: 'Faculty'
-      };
+      // This method is deprecated - use roles store directly
+      console.warn('getRoleTitleById in authUser store is deprecated, use roles store instead');
 
-      const title = roleMapping[roleId] || 'Unknown Role';
-      console.log('getRoleTitleById - Role title:', title);
-      return { title, error: null };
+      // For backward compatibility, return unknown role
+      return { title: 'Unknown Role', error: null };
     } catch (error) {
       console.error('getRoleTitleById - Unexpected error:', error);
       return { title: null, error };
     }
   }
 
-  // Get current user's role title
+  // Get current user's role title - now uses roles store
   async function getCurrentUserRoleTitle() {
     try {
       const roleId = userData.value?.user_metadata?.role;
@@ -434,17 +466,11 @@ export const useAuthUserStore = defineStore("authUser", () => {
         return { title: null, error: null };
       }
 
-      // Use hardcoded role mappings instead of database query
-      const roleMapping: { [key: number]: string } = {
-        1: 'Admin',
-        2: 'User',
-        3: 'Student',
-        4: 'Faculty'
-      };
+      // This method is deprecated - use roles store directly
+      console.warn('getCurrentUserRoleTitle in authUser store is deprecated, use roles store instead');
 
-      const title = roleMapping[roleId] || 'Unknown Role';
-      console.log('getCurrentUserRoleTitle - Role title:', title);
-      return { title, error: null };
+      // For backward compatibility, return unknown role
+      return { title: 'Unknown Role', error: null };
     } catch (error) {
       console.error('getCurrentUserRoleTitle - Unexpected error:', error);
       return { title: null, error };
@@ -477,6 +503,7 @@ export const useAuthUserStore = defineStore("authUser", () => {
     updateUserMetadata,
     updateUserAppMetadata,
     deleteUser,
+    changePassword,
     banUser,
     unbanUser,
     getRoleTitleById,
