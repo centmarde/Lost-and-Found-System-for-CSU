@@ -350,7 +350,6 @@ export async function markConversationMessagesAsRead(
   currentUserId: string
 ): Promise<number> {
   try {
-    console.log('Attempting to mark messages as read for conversation:', conversationId, 'User:', currentUserId)
 
     // First, let's check how many unread messages exist
     const { data: unreadMessages, error: checkError } = await supabase
@@ -365,10 +364,8 @@ export async function markConversationMessagesAsRead(
       throw checkError
     }
 
-    console.log('Found unread messages to mark as read:', unreadMessages?.length || 0, unreadMessages)
 
     if (!unreadMessages || unreadMessages.length === 0) {
-      console.log('No unread messages to update')
       return 0
     }
 
@@ -386,7 +383,6 @@ export async function markConversationMessagesAsRead(
       throw error
     }
 
-    console.log('Successfully marked messages as read. Updated count:', data?.length || 0, 'Data:', data)
     return data?.length || 0
   } catch (error) {
     console.error('Error marking messages as read:', error)
@@ -416,10 +412,6 @@ export async function verifyMessagesMarkedAsRead(
     const unread = allMessages?.filter(m => !m.isread).length || 0
     const read = allMessages?.filter(m => m.isread).length || 0
 
-    console.log('Message verification for conversation:', conversationId)
-    console.log('Total messages (from others):', total)
-    console.log('Unread messages:', unread)
-    console.log('Read messages:', read)
 
     return { total, unread, read }
   } catch (error) {
@@ -495,29 +487,251 @@ export async function updateUnreadCountForConversation(
  */
 export async function getTotalUnreadMessageCount(currentUserId: string): Promise<number> {
   try {
-    // Get all conversations
-    const { data: conversations, error: convError } = await supabase
+    
+    // Get user role to determine which conversations to include
+    const { data: { user: currentUser } } = await supabase.auth.getUser();
+    const userRole = currentUser?.app_metadata?.role || currentUser?.user_metadata?.role;
+
+    // Get conversations where current user is the receiver (not the sender)
+    // For admins: only count conversations where they are the receiver (sender_id != currentUser)
+    // For students: count conversations where they are either sender or receiver
+    let conversationsQuery = supabase
       .from('conversations')
-      .select('id')
+      .select('id, item_id')
+
+    if (userRole === 2) {
+      // Students: show conversations where they are involved
+      conversationsQuery = conversationsQuery.or(`sender_id.eq.${currentUserId},receiver_id.eq.${currentUserId}`)
+    } else {
+      // Admins: only show conversations where they are NOT the sender (i.e., they are receiving messages)
+      conversationsQuery = conversationsQuery.neq('sender_id', currentUserId)
+    }
+
+    const { data: conversations, error: convError } = await conversationsQuery
 
     if (convError) throw convError
-    if (!conversations || conversations.length === 0) return 0
+    if (!conversations || conversations.length === 0) {
+      return 0
+    }
 
     // Get conversation IDs
     const conversationIds = conversations.map(conv => conv.id)
 
-    // Count all unread messages across all conversations (excluding current user's messages)
-    const { count, error: msgError } = await supabase
+    // Get all unread messages
+    const { data: unreadMessages, error: msgError } = await supabase
       .from('messages')
-      .select('*', { count: 'exact', head: true })
+      .select('id')
       .in('conversation_id', conversationIds)
       .eq('isread', false)
-      .neq('user_id', currentUserId) // Only count messages NOT sent by current user
+      .neq('user_id', currentUserId)
 
     if (msgError) throw msgError
-    return count || 0
+    
+    return unreadMessages?.length || 0
   } catch (error) {
-    console.error('Error getting total unread message count:', error)
+    console.error('[getTotalUnreadMessageCount] Error getting total unread message count:', error)
     return 0
+  }
+}
+
+/**
+ * Diagnostic function to list all unread messages for debugging
+ */
+export async function debugUnreadMessages(currentUserId: string): Promise<void> {
+  try {
+    const { data: { user: currentUser } } = await supabase.auth.getUser();
+    const userRole = currentUser?.app_metadata?.role || currentUser?.user_metadata?.role;
+
+    let conversationsQuery = supabase
+      .from('conversations')
+      .select('id')
+
+    if (userRole === 2) {
+      conversationsQuery = conversationsQuery.or(`sender_id.eq.${currentUserId},receiver_id.eq.${currentUserId}`)
+    } else {
+      conversationsQuery = conversationsQuery.neq('sender_id', currentUserId)
+    }
+
+    const { data: conversations, error: convError } = await conversationsQuery
+    if (convError) throw convError
+    if (!conversations || conversations.length === 0) return
+
+    const conversationIds = conversations.map(c => c.id)
+
+    const { data: messages, error } = await supabase
+      .from('messages')
+      .select('id, conversation_id, user_id, isread')
+      .in('conversation_id', conversationIds)
+      .eq('isread', false)
+      .neq('user_id', currentUserId)
+
+    if (error) throw error
+  } catch (error) {
+    console.error('Error in debugUnreadMessages:', error)
+  }
+}
+
+/**
+ * Marks ALL unread messages as read for the current user
+ * WARNING: This marks ALL unread messages across the user's relevant conversations
+ */
+export async function markAllUnreadMessagesAsRead(currentUserId: string): Promise<number> {
+  try {
+    const { data: { user: currentUser } } = await supabase.auth.getUser();
+    const userRole = currentUser?.app_metadata?.role || currentUser?.user_metadata?.role;
+
+    let conversationsQuery = supabase
+      .from('conversations')
+      .select('id')
+
+    if (userRole === 2) {
+      conversationsQuery = conversationsQuery.or(`sender_id.eq.${currentUserId},receiver_id.eq.${currentUserId}`)
+    } else {
+      conversationsQuery = conversationsQuery.neq('sender_id', currentUserId)
+    }
+
+    const { data: conversations, error: convError } = await conversationsQuery
+    if (convError) throw convError
+    if (!conversations || conversations.length === 0) return 0
+
+    const conversationIds = conversations.map(c => c.id)
+
+    const { data: unreadMessages, error: checkError } = await supabase
+      .from('messages')
+      .select('id')
+      .in('conversation_id', conversationIds)
+      .eq('isread', false)
+      .neq('user_id', currentUserId)
+
+    if (checkError) throw checkError
+    if (!unreadMessages || unreadMessages.length === 0) return 0
+
+    const { data, error } = await supabase
+      .from('messages')
+      .update({ isread: true })
+      .in('conversation_id', conversationIds)
+      .eq('isread', false)
+      .neq('user_id', currentUserId)
+      .select()
+
+    if (error) throw error
+
+    return data?.length || 0
+  } catch (error) {
+    console.error('[markAllUnreadMessagesAsRead] Error:', error)
+    throw new Error('Failed to mark all messages as read: ' + (error as any).message)
+  }
+}
+
+/**
+ * Gets list of conversation IDs that have unread messages
+ * Used to highlight conversations with unread messages in UI
+ */
+export async function getConversationsWithUnreadMessages(currentUserId: string): Promise<string[]> {
+  try {
+    const { data: { user: currentUser } } = await supabase.auth.getUser();
+    const userRole = currentUser?.app_metadata?.role || currentUser?.user_metadata?.role;
+
+    let conversationsQuery = supabase
+      .from('conversations')
+      .select('id')
+
+    if (userRole === 2) {
+      conversationsQuery = conversationsQuery.or(`sender_id.eq.${currentUserId},receiver_id.eq.${currentUserId}`)
+    } else {
+      conversationsQuery = conversationsQuery.neq('sender_id', currentUserId)
+    }
+
+    const { data: conversations, error: convError } = await conversationsQuery
+    if (convError) throw convError
+    if (!conversations || conversations.length === 0) return []
+
+    const conversationIds = conversations.map(c => c.id)
+
+    const { data: messages, error } = await supabase
+      .from('messages')
+      .select('conversation_id')
+      .in('conversation_id', conversationIds)
+      .eq('isread', false)
+      .neq('user_id', currentUserId)
+
+    if (error) throw error
+
+    const unreadConversationIds = [...new Set(messages?.map(m => m.conversation_id) || [])]
+    return unreadConversationIds
+  } catch (error) {
+    console.error('[getConversationsWithUnreadMessages] Error:', error)
+    return []
+  }
+}
+
+/**
+ * Gets detailed information about conversations with unread messages
+ * Including item info and message preview
+ */
+export async function getUnreadConversationsDetails(currentUserId: string): Promise<any[]> {
+  try {
+    const { data: { user: currentUser } } = await supabase.auth.getUser();
+    const userRole = currentUser?.app_metadata?.role || currentUser?.user_metadata?.role;
+
+    let conversationsQuery = supabase
+      .from('conversations')
+      .select(`
+        id,
+        item_id,
+        sender_id,
+        created_at,
+        items (
+          id,
+          title,
+          status
+        )
+      `)
+
+    if (userRole === 2) {
+      conversationsQuery = conversationsQuery.or(`sender_id.eq.${currentUserId},receiver_id.eq.${currentUserId}`)
+    } else {
+      conversationsQuery = conversationsQuery.neq('sender_id', currentUserId)
+    }
+
+    const { data: conversations, error: convError } = await conversationsQuery
+    if (convError) throw convError
+    if (!conversations || conversations.length === 0) return []
+
+    const conversationIds = conversations.map((c: any) => c.id)
+
+    const { data: messages, error } = await supabase
+      .from('messages')
+      .select('conversation_id')
+      .in('conversation_id', conversationIds)
+      .eq('isread', false)
+      .neq('user_id', currentUserId)
+
+    if (error) throw error
+
+    const conversationMap = new Map()
+    messages?.forEach((msg: any) => {
+      const convId = msg.conversation_id
+      const conv: any = conversations.find((c: any) => c.id === convId)
+      if (conv && !conversationMap.has(convId)) {
+        conversationMap.set(convId, {
+          conversation_id: convId,
+          item_id: conv.item_id,
+          item_title: conv.items?.title || 'Direct Message',
+          item_status: conv.items?.status || null,
+          sender_id: conv.sender_id,
+          created_at: conv.created_at,
+          unread_count: 0
+        })
+      }
+      if (conversationMap.has(convId)) {
+        conversationMap.get(convId).unread_count++
+      }
+    })
+
+    return Array.from(conversationMap.values())
+  } catch (error) {
+    console.error('[getUnreadConversationsDetails] Error:', error)
+    return []
   }
 }

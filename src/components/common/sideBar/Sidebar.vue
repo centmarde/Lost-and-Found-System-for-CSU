@@ -64,22 +64,17 @@ const loadUserRoleAndPages = async () => {
     const roleId = authStore.userData?.user_metadata?.role ||
                    authStore.userData?.app_metadata?.role;
 
-    console.log('Loading sidebar - User Role ID:', roleId);
-
     if (roleId) {
       // Find the role details from the store
       currentUserRole.value = rolesStore.roles.find(role => role.id === roleId);
-      console.log('Found user role:', currentUserRole.value);
 
       // Get pages accessible by this role
       const rolePages = await pagesStore.fetchRolePagesByRoleId(roleId);
-      console.log('Role pages from DB:', rolePages);
 
       if (rolePages && rolePages.length > 0) {
         userRolePages.value = rolePages
           .map(rolePage => rolePage.pages)
           .filter(Boolean);
-        console.log('User accessible pages:', userRolePages.value);
       }
     }
   } catch (error) {
@@ -91,8 +86,6 @@ const loadUserRoleAndPages = async () => {
 const setupMessagesRealtimeSubscription = () => {
   if (!authStore.userData?.id) return;
 
-  console.log('Setting up sidebar real-time subscription for messages');
-
   messagesSubscription = supabase
     .channel('sidebar-messages-changes')
     .on(
@@ -103,12 +96,11 @@ const setupMessagesRealtimeSubscription = () => {
         table: 'messages',
       },
       async (payload) => {
-        console.log('New message inserted - updating sidebar badge:', payload.new);
         const message = payload.new as any;
 
-        // Only count messages not sent by current user
-        if (message.user_id !== authStore.userData?.id) {
-          sidebarStore.incrementUnreadCount();
+        // Only refresh count for messages not sent by current user
+        if (authStore.userData?.id && message.user_id !== authStore.userData.id) {
+          await sidebarStore.updateUnreadMessageCount(authStore.userData.id);
         }
       }
     )
@@ -120,16 +112,16 @@ const setupMessagesRealtimeSubscription = () => {
         table: 'messages',
       },
       async (payload) => {
-        console.log('Message updated - checking sidebar badge:', payload.new);
-        // If a message was marked as read, update the count
-        if (authStore.userData?.id) {
-          await sidebarStore.updateUnreadMessageCount(authStore.userData.id);
+        const message = payload.new as any;
+        
+        // If a message was marked as read (isread changed to true), update the count
+        const userId = authStore.userData?.id;
+        if (userId && message.user_id !== userId) {
+          await sidebarStore.updateUnreadMessageCount(userId);
         }
       }
     )
-    .subscribe((status) => {
-      console.log('Sidebar messages real-time subscription status:', status);
-    });
+    .subscribe();
 };
 
 // Cleanup real-time subscription
@@ -137,7 +129,6 @@ const cleanupMessagesSubscription = () => {
   if (messagesSubscription) {
     supabase.removeChannel(messagesSubscription);
     messagesSubscription = null;
-    console.log('Sidebar messages real-time subscription cleaned up');
   }
 };
 
@@ -234,23 +225,18 @@ const showSidebar = computed(() => !smAndDown.value);
 
 // Helper function to check if user has access to a specific page/route
 const hasPageAccess = (route: string) => {
-  const hasAccess = userRolePages.value.includes(route);
-  console.log(`Checking access for route "${route}":`, hasAccess);
-  return hasAccess;
+  return userRolePages.value.includes(route);
 };
 
 // Filter individual navigation items based on user access
 const filteredIndividualNavItems = computed(() => {
-  const filtered = individualNavItems.filter(item => {
+  return individualNavItems.filter(item => {
     // If no permission specified, allow access
     if (!item.permission) return true;
 
     // Check if user has access to this specific route
     return hasPageAccess(item.route);
   });
-
-  console.log('Filtered individual nav items:', filtered);
-  return filtered;
 });
 
 // Filter navigation groups based on user access
@@ -276,9 +262,8 @@ const filteredNavigationGroups = computed(() => {
 
       return null;
     })
-    .filter((group): group is NonNullable<typeof group> => group !== null); // Remove null groups with type guard
+    .filter((group): group is NonNullable<typeof group> => group !== null);
 
-  console.log('Filtered navigation groups:', filtered);
   return filtered;
 });
 
