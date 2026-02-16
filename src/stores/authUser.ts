@@ -378,6 +378,44 @@ export const useAuthUserStore = defineStore("authUser", () => {
     }
   }
 
+  // Change password function
+  async function changePassword(currentPassword: string, newPassword: string) {
+    loading.value = true;
+    try {
+      // First verify the current password by attempting to sign in
+      const currentUser = await supabase.auth.getUser();
+      if (!currentUser.data.user?.email) {
+        return { error: new Error("No authenticated user found") };
+      }
+
+      // Verify current password
+      const { error: verifyError } = await supabase.auth.signInWithPassword({
+        email: currentUser.data.user.email,
+        password: currentPassword,
+      });
+
+      if (verifyError) {
+        return { error: new Error("Current password is incorrect") };
+      }
+
+      // Update password
+      const { data, error } = await supabase.auth.updateUser({
+        password: newPassword
+      });
+
+      if (error) {
+        return { error };
+      }
+
+      return { data };
+    } catch (error) {
+      console.error("Error changing password:", error);
+      return { error };
+    } finally {
+      loading.value = false;
+    }
+  }
+
   // Helper function to parse duration strings
   function parseDuration(duration: string): number {
     const units: { [key: string]: number } = {
@@ -465,6 +503,7 @@ export const useAuthUserStore = defineStore("authUser", () => {
     updateUserMetadata,
     updateUserAppMetadata,
     deleteUser,
+    changePassword,
     banUser,
     unbanUser,
     getRoleTitleById,
