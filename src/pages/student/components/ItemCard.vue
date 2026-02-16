@@ -33,13 +33,15 @@ interface Item {
 interface Props {
   item: Item;
   isUpdating: boolean;
+  isGuestUser?: boolean; // Add prop to indicate if user is a guest
 }
 
 const props = defineProps<Props>();
 
-defineEmits<{
+const emit = defineEmits<{
   contact: [id: number];
   markAsUnclaimed: [id: number];
+  guestContact: [item: Item]; // Add new emit for guest contact
 }>();
 
 const toast = useToast();
@@ -78,7 +80,7 @@ const loadAdminUsers = async () => {
     const { users, error } = await authStore.getAllUsers();
 
     if (error) throw error;
-    
+
     // Filter users with role 1 (admin role) and exclude current user
     adminUsers.value = (users || [])
       .filter(user => {
@@ -229,8 +231,15 @@ const setupMessageSubscription = () => {
   );
 };
 
-// Handle contact button click - opens admin selection dialog
+// Handle contact button click - opens admin selection dialog or shows auth dialog for guests
 const handleContact = async () => {
+  // Check if user is a guest
+  if (props.isGuestUser) {
+    // Emit guest contact event to show authentication dialog
+    emit('guestContact', props.item);
+    return;
+  }
+
   if (!currentUser.value) {
     toast.error("Please log in to contact the admin");
     return;

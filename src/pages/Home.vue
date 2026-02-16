@@ -10,6 +10,7 @@ import NotificationDialog from "@/pages/student/components/NotifDialog.vue";
 import FloatingAdminChat from "@/pages/student/components/FloatingAdminChat.vue";
 import ItemFilters from "@/components/common/ItemFilters.vue";
 import DirectAdminMessageCard from "@/components/common/DirectAdminMessageCard.vue";
+import ItemsDisplay from "@/components/common/ItemsDisplay.vue";
 
 // Composables
 import { useAuth } from "@/pages/admin/components/composables/useAuth";
@@ -290,133 +291,23 @@ onUnmounted(() => {
 
         <v-row>
           <v-col cols="12">
-            <v-card elevation="2" class="pa-4">
-              <v-card-title
-                class="text-h5 font-weight-bold mb-4 d-flex align-center"
-              >
-                <v-icon class="me-2" color="primary"
-                  >mdi-package-variant-closed</v-icon
-                >
-                {{ emptyStateConfig.sectionTitle }}
-                <v-spacer />
-                <v-chip
-                  v-if="!itemsLoading"
-                  color="info"
-                  variant="tonal"
-                  :size="$vuetify.display.xs ? 'x-small' : 'small'"
-                >
-                  <!-- Mobile view: shorter text -->
-                  <span class="d-sm-none">
-                    {{ filteredAndSortedItems.length }}/{{ items.length }}
-                  </span>
-                  <!-- Desktop view: full text -->
-                  <span class="d-none d-sm-inline">
-                    {{ filteredAndSortedItems.length }} of {{ items.length }} items
-                  </span>
-                </v-chip>
-              </v-card-title>
-
-              <div v-if="itemsLoading" class="text-center py-12">
-                <v-progress-circular indeterminate color="primary" size="48" />
-                <p class="text-body-1 mt-4">Loading items...</p>
-              </div>
-
-              <div
-                v-else-if="filteredAndSortedItems.length === 0"
-                class="text-center py-12"
-              >
-                <v-icon size="80" color="grey-lighten-1" class="mb-4">
-                  mdi-package-variant-closed-remove
-                </v-icon>
-                <h3 class="text-h5 text-grey-darken-1 mb-2">
-                  {{
-                    items.length === 0
-                      ? emptyStateConfig.noItemsTitle
-                      : "No items match your filters"
-                  }}
-                </h3>
-                <p class="text-body-1 text-grey-darken-2 mb-4">
-                  {{
-                    items.length === 0
-                      ? emptyStateConfig.noItemsMessage
-                      : "Try adjusting your search or filters to see more items."
-                  }}
-                </p>
-                <v-btn
-                  v-if="items.length === 0"
-                  color="primary"
-                  variant="outlined"
-                  prepend-icon="mdi-refresh"
-                  @click="fetchItems"
-                >
-                  Refresh
-                </v-btn>
-                <v-btn
-                  v-else
-                  color="primary"
-                  variant="outlined"
-                  prepend-icon="mdi-filter-remove"
-                  @click="clearAllFilters"
-                >
-                  Clear Filters
-                </v-btn>
-              </div>
-
-              <div v-else>
-                <v-row class="items-grid">
-                  <v-col
-                    v-for="item in paginatedItems"
-                    :key="item.id"
-                    cols="12"
-                    sm="6"
-                    md="4"
-                    lg="3"
-                    xl="3"
-                  >
-                    <AdminItemCard
-                      v-if="isCurrentUserAdmin"
-                      :item="item"
-                      :is-updating="updatingItems.has(item.id)"
-                      @open-conversations="handleOpenConversations"
-                      @mark-as-claimed="markAsClaimed"
-                    />
-
-                    <UserItemCard
-                      v-else
-                      :item="item"
-                      :is-updating="false"
-                      @contact="handleContact(item)"
-                    />
-                  </v-col>
-                </v-row>
-
-                <v-row v-if="totalPages > 1" class="mt-6">
-                  <v-col cols="12">
-                    <div
-                      class="d-flex justify-center align-center flex-wrap gap-2"
-                    >
-                      <v-pagination
-                        v-model="page"
-                        :length="totalPages"
-                        :total-visible="7"
-                        rounded="circle"
-                        color="primary"
-                      />
-
-                      <div class="text-caption text-grey-darken-1 ml-4">
-                        Showing {{ (page - 1) * itemsPerPage + 1 }}-{{
-                          Math.min(
-                            page * itemsPerPage,
-                            filteredAndSortedItems.length
-                          )
-                        }}
-                        of {{ filteredAndSortedItems.length }}
-                      </div>
-                    </div>
-                  </v-col>
-                </v-row>
-              </div>
-            </v-card>
+            <ItemsDisplay
+              :items="items"
+              :filtered-and-sorted-items="filteredAndSortedItems"
+              :paginated-items="paginatedItems"
+              :items-loading="itemsLoading"
+              :is-current-user-admin="isCurrentUserAdmin"
+              :updating-items="updatingItems"
+              :empty-state-config="emptyStateConfig"
+              v-model:page="page"
+              :items-per-page="itemsPerPage"
+              :total-pages="totalPages"
+              @open-conversations="handleOpenConversations"
+              @mark-as-claimed="markAsClaimed"
+              @contact="handleContact"
+              @fetch-items="fetchItems"
+              @clear-all-filters="clearAllFilters"
+            />
           </v-col>
         </v-row>
 
