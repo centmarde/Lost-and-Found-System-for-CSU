@@ -24,6 +24,7 @@ declare module 'vue-router/auto-routes' {
     '/admin/components/AdminSupportInbox': RouteRecordInfo<'/admin/components/AdminSupportInbox', '/admin/components/AdminSupportInbox', Record<never, never>, Record<never, never>>,
     '/admin/components/ClaimItemDialog': RouteRecordInfo<'/admin/components/ClaimItemDialog', '/admin/components/ClaimItemDialog', Record<never, never>, Record<never, never>>,
     '/admin/components/ConvoDialog': RouteRecordInfo<'/admin/components/ConvoDialog', '/admin/components/ConvoDialog', Record<never, never>, Record<never, never>>,
+    '/admin/components/DashboardFilters': RouteRecordInfo<'/admin/components/DashboardFilters', '/admin/components/DashboardFilters', Record<never, never>, Record<never, never>>,
     '/admin/components/DashboardItemCards': RouteRecordInfo<'/admin/components/DashboardItemCards', '/admin/components/DashboardItemCards', Record<never, never>, Record<never, never>>,
     '/admin/components/dialogs/AdminUserRolesDialog': RouteRecordInfo<'/admin/components/dialogs/AdminUserRolesDialog', '/admin/components/dialogs/AdminUserRolesDialog', Record<never, never>, Record<never, never>>,
     '/admin/components/dialogs/ConfirmationDialog': RouteRecordInfo<'/admin/components/dialogs/ConfirmationDialog', '/admin/components/dialogs/ConfirmationDialog', Record<never, never>, Record<never, never>>,
