@@ -11,6 +11,7 @@ import FloatingAdminChat from "@/pages/student/components/FloatingAdminChat.vue"
 import ItemFilters from "@/components/common/ItemFilters.vue";
 import DirectAdminMessageCard from "@/components/common/DirectAdminMessageCard.vue";
 import ItemsDisplay from "@/components/common/ItemsDisplay.vue";
+import VersionLog from "@/components/common/VersionLog.vue";
 
 // Composables
 import { useAuth } from "@/pages/admin/components/composables/useAuth";
@@ -271,6 +272,13 @@ onUnmounted(() => {
               :current-user="currentUser"
               :is-current-user-admin="isCurrentUserAdmin"
             />
+          </v-col>
+        </v-row>
+
+        <!-- Version Log Component -->
+        <v-row class="mb-4">
+          <v-col cols="12">
+            <VersionLog />
           </v-col>
         </v-row>
         <v-row class="mb-4">
