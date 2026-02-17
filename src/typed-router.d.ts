@@ -42,6 +42,7 @@ declare module 'vue-router/auto-routes' {
     '/admin/components/StatsCards': RouteRecordInfo<'/admin/components/StatsCards', '/admin/components/StatsCards', Record<never, never>, Record<never, never>>,
     '/admin/components/UsersCardView': RouteRecordInfo<'/admin/components/UsersCardView', '/admin/components/UsersCardView', Record<never, never>, Record<never, never>>,
     '/admin/components/UsersDataTable': RouteRecordInfo<'/admin/components/UsersDataTable', '/admin/components/UsersDataTable', Record<never, never>, Record<never, never>>,
+    '/admin/components/UserSearchFilters': RouteRecordInfo<'/admin/components/UserSearchFilters', '/admin/components/UserSearchFilters', Record<never, never>, Record<never, never>>,
     '/admin/components/UsersTable': RouteRecordInfo<'/admin/components/UsersTable', '/admin/components/UsersTable', Record<never, never>, Record<never, never>>,
     '/admin/DashboardView': RouteRecordInfo<'/admin/DashboardView', '/admin/DashboardView', Record<never, never>, Record<never, never>>,
     '/admin/RolePagesView': RouteRecordInfo<'/admin/RolePagesView', '/admin/RolePagesView', Record<never, never>, Record<never, never>>,

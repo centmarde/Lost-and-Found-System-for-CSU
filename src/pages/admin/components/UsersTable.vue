@@ -1,4 +1,16 @@
 
+<!--
+  UsersTable Component
+
+  Features:
+  - Search by name or email
+  - Filter by role and ban status
+  - Sort by multiple criteria (date, email, role, name)
+  - Date range filtering
+  - Responsive design with desktop table and mobile cards
+  - Real-time filter application
+  - Filter state preservation during user operations
+-->
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
 import { useAuthUserStore } from '@/stores/authUser'
@@ -9,6 +21,7 @@ import { useUserActions } from '@/composables/useUserActions'
 import UserDetailsDialog from './dialogs/UserDetailsDialog.vue'
 import EditUserDialog from './dialogs/EditUserDialog.vue'
 import ConfirmationDialog from './dialogs/ConfirmationDialog.vue'
+import UserSearchFilters from './UserSearchFilters.vue'
 
 // Store and utilities
 const authStore = useAuthUserStore()
@@ -39,30 +52,52 @@ const {
 
 // Reactive state
 const users = ref<any[]>([])
+const allUsers = ref<any[]>([]) // Store all users for filtering
 const loading = ref(false)
 const error = ref<string | null>(null)
 const userDialog = ref(false)
 const selectedUser = ref<any>(null)
 const roleCache = ref<Record<number, string>>({}) // Cache for role titles from roles store
 
+// Filter state
+interface FilterData {
+  search: string
+  roleFilter: number | null
+  statusFilter: string
+  sortBy: string
+  sortOrder: 'asc' | 'desc'
+  dateFrom: string
+  dateTo: string
+}
+
+const currentFilters = ref<FilterData>({
+  search: '',
+  roleFilter: null,
+  statusFilter: 'all',
+  sortBy: 'created_at',
+  sortOrder: 'desc',
+  dateFrom: '',
+  dateTo: '',
+})
+
 // Table headers
 const headers = [
   {
     title: 'User',
     align: 'start' as const,
-    sortable: true,
+    sortable: false,
     key: 'email',
   },
   {
     title: 'Created Date',
     align: 'start' as const,
-    sortable: true,
+    sortable: false,
     key: 'created_at',
   },
   {
     title: 'Role',
     align: 'center' as const,
-    sortable: true,
+    sortable: false,
     key: 'role',
   },
   {
@@ -122,7 +157,7 @@ const fetchUsers = async () => {
       error.value = errorMessage
       toast.error('Failed to load users')
     } else if (result.users) {
-      users.value = result.users
+      allUsers.value = result.users // Store all users
 
       // Preload role titles from roles store for all unique role IDs
       const roleIds = new Set<number>()
@@ -138,6 +173,9 @@ const fetchUsers = async () => {
         await getRoleTitleById(roleId)
       }
 
+      // Apply current filters
+      applyFilters()
+
       //toast.success(`Loaded ${result.users.length} users`)
     }
   } catch (err) {
@@ -147,6 +185,155 @@ const fetchUsers = async () => {
   } finally {
     loading.value = false
   }
+}
+
+// Filter methods
+const applyFilters = () => {
+  let filteredUsers = [...allUsers.value]
+
+  // Apply search filter
+  if (currentFilters.value.search) {
+    const searchTerm = currentFilters.value.search.toLowerCase()
+    filteredUsers = filteredUsers.filter(user => {
+      const email = user.email?.toLowerCase() || ''
+      const fullName = user.raw_user_meta_data?.full_name?.toLowerCase() || ''
+      return email.includes(searchTerm) || fullName.includes(searchTerm)
+    })
+  }
+
+  // Apply role filter
+  if (currentFilters.value.roleFilter !== null) {
+    filteredUsers = filteredUsers.filter(user => {
+      const userRole = user.raw_user_meta_data?.role || user.raw_app_meta_data?.role
+      return userRole === currentFilters.value.roleFilter
+    })
+  }
+
+  // Apply status filter
+  if (currentFilters.value.statusFilter !== 'all') {
+    filteredUsers = filteredUsers.filter(user => {
+      const isBanned = user.raw_app_meta_data?.banned
+      if (currentFilters.value.statusFilter === 'banned') {
+        return isBanned
+      } else if (currentFilters.value.statusFilter === 'active') {
+        return !isBanned
+      }
+      return true
+    })
+  }
+
+  // Apply date filters
+  if (currentFilters.value.dateFrom) {
+    const fromDate = new Date(currentFilters.value.dateFrom)
+    filteredUsers = filteredUsers.filter(user => {
+      const createdDate = new Date(user.created_at)
+      return createdDate >= fromDate
+    })
+  }
+
+  if (currentFilters.value.dateTo) {
+    const toDate = new Date(currentFilters.value.dateTo)
+    toDate.setHours(23, 59, 59, 999) // Include the entire day
+    filteredUsers = filteredUsers.filter(user => {
+      const createdDate = new Date(user.created_at)
+      return createdDate <= toDate
+    })
+  }
+
+  // Apply sorting
+  filteredUsers.sort((a, b) => {
+    let aValue, bValue
+    let isAlphabetical = false
+    let isDescending = false
+
+    switch (currentFilters.value.sortBy) {
+      case 'email':
+        aValue = a.email?.toLowerCase() || ''
+        bValue = b.email?.toLowerCase() || ''
+        break
+      case 'email_alpha_asc':
+        aValue = a.email?.toLowerCase() || ''
+        bValue = b.email?.toLowerCase() || ''
+        isAlphabetical = true
+        break
+      case 'email_alpha_desc':
+        aValue = a.email?.toLowerCase() || ''
+        bValue = b.email?.toLowerCase() || ''
+        isAlphabetical = true
+        isDescending = true
+        break
+      case 'full_name':
+        aValue = a.raw_user_meta_data?.full_name?.toLowerCase() || ''
+        bValue = b.raw_user_meta_data?.full_name?.toLowerCase() || ''
+        break
+      case 'name_alpha_asc':
+        aValue = a.raw_user_meta_data?.full_name?.toLowerCase() || ''
+        bValue = b.raw_user_meta_data?.full_name?.toLowerCase() || ''
+        isAlphabetical = true
+        break
+      case 'name_alpha_desc':
+        aValue = a.raw_user_meta_data?.full_name?.toLowerCase() || ''
+        bValue = b.raw_user_meta_data?.full_name?.toLowerCase() || ''
+        isAlphabetical = true
+        isDescending = true
+        break
+      case 'role':
+        aValue = getRoleTitleSync(a.raw_user_meta_data?.role || a.raw_app_meta_data?.role).toLowerCase()
+        bValue = getRoleTitleSync(b.raw_user_meta_data?.role || b.raw_app_meta_data?.role).toLowerCase()
+        break
+      case 'role_alpha_asc':
+        aValue = getRoleTitleSync(a.raw_user_meta_data?.role || a.raw_app_meta_data?.role).toLowerCase()
+        bValue = getRoleTitleSync(b.raw_user_meta_data?.role || b.raw_app_meta_data?.role).toLowerCase()
+        isAlphabetical = true
+        break
+      case 'role_alpha_desc':
+        aValue = getRoleTitleSync(a.raw_user_meta_data?.role || a.raw_app_meta_data?.role).toLowerCase()
+        bValue = getRoleTitleSync(b.raw_user_meta_data?.role || b.raw_app_meta_data?.role).toLowerCase()
+        isAlphabetical = true
+        isDescending = true
+        break
+      case 'created_at':
+      default:
+        aValue = new Date(a.created_at).getTime()
+        bValue = new Date(b.created_at).getTime()
+        break
+    }
+
+    // For alphabetical sorts, use predefined order
+    if (isAlphabetical) {
+      if (aValue < bValue) return isDescending ? 1 : -1
+      if (aValue > bValue) return isDescending ? -1 : 1
+      return 0
+    }
+
+    if (aValue < bValue) {
+      return currentFilters.value.sortOrder === 'asc' ? -1 : 1
+    }
+    if (aValue > bValue) {
+      return currentFilters.value.sortOrder === 'asc' ? 1 : -1
+    }
+    return 0
+  })
+
+  users.value = filteredUsers
+}
+
+const handleFiltersUpdate = (filters: FilterData) => {
+  currentFilters.value = filters
+  applyFilters()
+}
+
+const handleFiltersReset = () => {
+  currentFilters.value = {
+    search: '',
+    roleFilter: null,
+    statusFilter: 'all',
+    sortBy: 'created_at',
+    sortOrder: 'desc',
+    dateFrom: '',
+    dateTo: '',
+  }
+  applyFilters()
 }
 
 const getRoleTitleSync = (roleId: number): string => {
@@ -172,6 +359,11 @@ const refreshUsers = () => {
   fetchUsers()
 }
 
+// Computed property for available roles to pass to filter component
+const availableRoles = computed(() => {
+  return rolesStore.roles || []
+})
+
 const viewUser = (user: any) => {
   selectedUser.value = user
   userDialog.value = true
@@ -189,14 +381,14 @@ const deleteUser = (user: any) => {
 const handleUserUpdate = async () => {
   const result = await updateUser()
   if (result.success) {
-    await fetchUsers() // Refresh the users list
+    await fetchUsers() // Refresh the users list with current filters
   }
 }
 
 // Handle user deletion with refresh
 const handleUserDeletion = async () => {
   await executeConfirmedAction()
-  await fetchUsers() // Refresh the users list
+  await fetchUsers() // Refresh the users list with current filters
 }
 
 // Utility functions
@@ -248,6 +440,14 @@ onMounted(() => {
       </v-col>
     </v-row>
 
+    <!-- Search and Filters Component -->
+    <UserSearchFilters
+      :loading="loading"
+      :roles="availableRoles"
+      @update:filters="handleFiltersUpdate"
+      @reset:filters="handleFiltersReset"
+    />
+
 
 
       <v-card-text>
@@ -271,6 +471,16 @@ onMounted(() => {
           {{ error }}
         </v-alert>
 
+        <!-- Results Summary -->
+        <div v-if="!loading && users.length > 0" class="mb-3 d-flex justify-space-between align-center">
+          <div class="text-body-2 text-medium-emphasis">
+            Showing {{ users.length }} of {{ allUsers.length }} users
+          </div>
+          <div v-if="users.length !== allUsers.length" class="text-caption text-primary">
+            {{ allUsers.length - users.length }} users filtered out
+          </div>
+        </div>
+
         <!-- Desktop view - Data table for larger screens -->
         <div class="d-none d-md-block">
           <v-data-table
@@ -280,6 +490,8 @@ onMounted(() => {
             :items-per-page="10"
             class="elevation-1"
             item-key="id"
+            :sort-by="[]"
+            disable-sort
           >
             <!-- Email column with avatar -->
             <template v-slot:item.email="{ item }">
@@ -475,11 +687,11 @@ onMounted(() => {
                     <!-- Role chip moved below user info -->
                     <div class="mt-2 d-flex flex-wrap gap-1">
                       <v-chip
-                        :color="getRoleColor(user.raw_user_meta_data?.role)"
+                        :color="getRoleColor(user.raw_user_meta_data?.role || user.raw_app_meta_data?.role)"
                         size="small"
                         variant="tonal"
                       >
-                        {{ getRoleTitleSync(user.raw_user_meta_data?.role) }}
+                        {{ getRoleTitleSync(user.raw_user_meta_data?.role || user.raw_app_meta_data?.role) }}
                       </v-chip>
 
                       <!-- Ban status indicator -->
