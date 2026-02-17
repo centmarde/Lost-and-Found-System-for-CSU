@@ -37,6 +37,7 @@ const emit = defineEmits<{
 const conversations = ref<Conversation[]>([])
 const loadingConversations = ref(false)
 const selectedClaimant = ref<string>('')
+const showConfirmDialog = ref(false)
 
 // Load conversations when dialog opens using store function
 const loadConversations = async (itemId: number) => {
@@ -75,6 +76,13 @@ const closeDialog = () => {
   emit('update:modelValue', false)
   conversations.value = []
   selectedClaimant.value = ''
+  showConfirmDialog.value = false
+}
+
+const handleClaimClick = () => {
+  if (selectedClaimant.value && props.item) {
+    showConfirmDialog.value = true
+  }
 }
 
 const confirmClaim = () => {
@@ -83,11 +91,21 @@ const confirmClaim = () => {
     closeDialog()
   }
 }
+
+const cancelConfirm = () => {
+  showConfirmDialog.value = false
+}
+
+// Get selected user email for confirmation dialog
+const getSelectedUserEmail = () => {
+  const selectedConversation = conversations.value.find(conv => conv.sender_id === selectedClaimant.value)
+  return selectedConversation?.sender?.email || 'Unknown User'
+}
 </script>
 
 <template>
-  <v-dialog 
-    :model-value="modelValue" 
+  <v-dialog
+    :model-value="modelValue"
     @update:model-value="$emit('update:modelValue', $event)"
     max-width="600px"
     persistent
@@ -139,9 +157,9 @@ const confirmClaim = () => {
                     <div class="font-weight-medium">
                       {{ conversation.sender?.email || 'Unknown User' }}
                     </div>
-                    <div class="text-caption text-grey-darken-1">
+                    <!-- <div class="text-caption text-grey-darken-1">
                       User ID: {{ conversation.sender_id }}
-                    </div>
+                    </div> -->
                   </div>
                 </div>
               </template>
@@ -163,12 +181,85 @@ const confirmClaim = () => {
           variant="flat"
           :disabled="!selectedClaimant || conversations.length === 0"
           :loading="loading"
-          @click="confirmClaim"
+          @click="handleClaimClick"
         >
           Mark as Claimed
         </v-btn>
       </v-card-actions>
     </v-card>
+
+    <!-- Confirmation Dialog -->
+    <v-dialog
+      v-model="showConfirmDialog"
+      max-width="500px"
+      persistent
+    >
+      <v-card>
+        <v-card-title class="d-flex align-center">
+          <v-icon class="me-2" color="warning">mdi-alert-circle</v-icon>
+          Confirm Item Claim
+        </v-card-title>
+
+        <v-card-text>
+          <div class="text-body-1 mb-4">
+            Are you sure you want to mark this item as claimed?
+          </div>
+
+          <v-card
+            variant="outlined"
+            class="mb-4"
+          >
+            <v-card-text class="pb-2">
+              <div class="d-flex align-center mb-2">
+                <v-icon class="me-2" color="primary">mdi-package-variant</v-icon>
+                <span class="font-weight-medium">Item:</span>
+              </div>
+              <div class="text-body-2 mb-3 ms-6">
+                {{ item?.title }}
+              </div>
+
+              <div class="d-flex align-center mb-2">
+                <v-icon class="me-2" color="success">mdi-account-check</v-icon>
+                <span class="font-weight-medium">Claimant:</span>
+              </div>
+              <div class="text-body-2 ms-6">
+                {{ getSelectedUserEmail() }}
+              </div>
+            </v-card-text>
+          </v-card>
+
+          <v-alert
+            type="warning"
+            variant="tonal"
+            class="mb-0"
+          >
+            <div class="text-body-2">
+              <strong>Warning:</strong> This action cannot be undone. The item will be marked as claimed and removed from active listings.
+            </div>
+          </v-alert>
+        </v-card-text>
+
+        <v-card-actions>
+          <v-spacer />
+          <v-btn
+            variant="text"
+            color="grey"
+            @click="cancelConfirm"
+            :disabled="loading"
+          >
+            Cancel
+          </v-btn>
+          <v-btn
+            color="success"
+            variant="flat"
+            :loading="loading"
+            @click="confirmClaim"
+          >
+            Yes, Mark as Claimed
+          </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
   </v-dialog>
 </template>
 
