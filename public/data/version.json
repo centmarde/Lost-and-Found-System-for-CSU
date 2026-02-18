@@ -5,7 +5,10 @@
       "date": "2026-02-18",
       "title": "UI Improvements & Bug Fixes",
       "changes": [
-        "added forgot password shell, for future development "
+        "added forgot password shell, for future development ",
+        "added claimant notifications for their claims.",
+        "added v-badge component for displaying conversation count in each item on admin dashboard.",
+        "added edit description functionality for items on admin dashboard"
       ]
     },
     {
