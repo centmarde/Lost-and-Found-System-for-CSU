@@ -358,23 +358,363 @@ export const useAuthUserStore = defineStore("authUser", () => {
     return await updateUserAppMetadata(userId, unbanData);
   }
 
-  // Delete user function (admin only)
+  // Helper function to perform soft delete on user-related data
+  async function softDeleteUserData(userId: string, userEmail: string): Promise<void> {
+    console.log(`Starting soft delete for user: ${userEmail} (${userId})`);
+
+    try {
+      // 1. Soft delete user items by marking them as deleted
+      const { error: itemsError } = await supabaseAdmin
+        .from('items')
+        .update({
+          deleted_at: new Date().toISOString(),
+          deleted_by: 'system_admin',
+          deleted_reason: 'User account deleted'
+        })
+        .or(`user_id.eq.${userId},claimed_by.eq.${userId}`)
+        .is('deleted_at', null); // Only update items that aren't already deleted
+
+      if (itemsError) {
+        console.warn('Error soft deleting items:', itemsError);
+        // If the items table doesn't have deleted_at column, anonymize instead
+        const { error: anonymizeError } = await supabaseAdmin
+          .from('items')
+          .update({
+            title: '[Deleted User Item]',
+            description: `Item from deleted user account (${userEmail})`,
+            status: 'lost' // Keep a consistent status
+          })
+          .or(`user_id.eq.${userId},claimed_by.eq.${userId}`);
+
+        if (anonymizeError) {
+          console.warn('Error anonymizing items:', anonymizeError);
+        } else {
+          console.log('✓ Anonymized user items (table lacks soft delete support)');
+        }
+      } else {
+        console.log('✓ Soft deleted user items');
+      }
+
+      // 2. Mark conversations as deleted instead of removing them
+      const { error: conversationsError } = await supabaseAdmin
+        .from('conversations')
+        .update({
+          deleted_at: new Date().toISOString(),
+          deleted_by: 'system_admin',
+          deleted_reason: 'User account deleted'
+        })
+        .or(`sender_id.eq.${userId},receiver_id.eq.${userId}`)
+        .is('deleted_at', null); // Only update conversations that aren't already deleted
+
+      if (conversationsError) {
+        console.warn('Error soft deleting conversations:', conversationsError);
+        // If conversations table doesn't support soft delete, leave them as is
+        console.log('! Conversations preserved (table lacks soft delete support)');
+      } else {
+        console.log('✓ Soft deleted user conversations');
+      }
+
+      // 3. Mark messages as deleted but preserve them for audit trail
+      const { error: messagesError } = await supabaseAdmin
+        .from('messages')
+        .update({
+          deleted_at: new Date().toISOString(),
+          deleted_by: 'system_admin',
+          original_message: null, // Store original in separate column if available
+          message: '[Message from deleted user]'
+        })
+        .eq('user_id', userId)
+        .is('deleted_at', null); // Only update messages that aren't already deleted
+
+      if (messagesError) {
+        console.warn('Error soft deleting messages:', messagesError);
+        // If messages table doesn't have deleted_at column, anonymize the content
+        const { error: anonymizeMessagesError } = await supabaseAdmin
+          .from('messages')
+          .update({
+            message: '[Message from deleted user]'
+          })
+          .eq('user_id', userId);
+
+        if (anonymizeMessagesError) {
+          console.warn('Error anonymizing messages:', anonymizeMessagesError);
+        } else {
+          console.log('✓ Anonymized user messages (table lacks soft delete support)');
+        }
+      } else {
+        console.log('✓ Soft deleted user messages');
+      }
+
+      console.log(`✓ Completed soft delete for user: ${userEmail}`);
+
+    } catch (error) {
+      console.error('Error during user data soft delete:', error);
+      throw new Error(`Failed to soft delete user data: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }  // Delete user function (admin only)
   async function deleteUser(userId: string) {
     loading.value = true;
     try {
-      // Delete the user using admin client
-      const { data, error } = await supabaseAdmin.auth.admin.deleteUser(userId);
+      console.log(`Attempting to delete user with ID: ${userId}`);
 
-      if (error) {
-        return { error };
+      // First, check if user exists and get user info for better error messages
+      const { data: existingUser, error: getUserError } = await supabaseAdmin.auth.admin.getUserById(userId);
+
+      if (getUserError) {
+        console.error("Error fetching user before deletion:", getUserError);
+        return {
+          error: {
+            message: "User not found or cannot be accessed",
+            code: "user_not_found",
+            details: getUserError
+          }
+        };
       }
 
-      return { data };
+      if (!existingUser.user) {
+        return {
+          error: {
+            message: "User does not exist",
+            code: "user_not_found"
+          }
+        };
+      }
+
+      // Soft delete related data before marking user as deleted
+      await softDeleteUserData(userId, existingUser.user.email || 'unknown@email.com');
+
+      console.log(`Soft deleting user: ${existingUser.user.email} (${userId})`);
+
+      // Instead of hard deleting, mark user as deleted in app_metadata and disable account
+      const { data, error } = await supabaseAdmin.auth.admin.updateUserById(userId, {
+        app_metadata: {
+          ...existingUser.user.app_metadata,
+          deleted: true,
+          deleted_at: new Date().toISOString(),
+          deleted_by: userData.value?.id || 'admin',
+          deleted_reason: 'Account deleted by administrator',
+          original_email: existingUser.user.email,
+          status: 'deleted',
+          // Ban the user by setting ban metadata
+          banned: true,
+          ban_duration: 'permanent',
+          ban_reason: 'Account deleted by administrator',
+          banned_at: new Date().toISOString(),
+          banned_until: null // Permanent ban
+        },
+        // Disable email confirmation to prevent login
+        email_confirm: false
+      });
+
+      if (error) {
+        console.error("Supabase soft delete user error:", error);
+
+        // Provide more specific error messages based on the error
+        let errorMessage = "Failed to soft delete user";
+        let errorCode = "soft_deletion_failed";
+
+        if (error.message?.includes("not found")) {
+          errorMessage = "User not found";
+          errorCode = "user_not_found";
+        } else if (error.message?.includes("permission")) {
+          errorMessage = "Insufficient permissions to delete user";
+          errorCode = "permission_denied";
+        } else {
+          errorMessage = "An error occurred while marking user as deleted. The user account may still be active.";
+          errorCode = "soft_delete_error";
+        }
+
+        return {
+          error: {
+            message: errorMessage,
+            code: errorCode,
+            originalError: error,
+            userId: userId,
+            userEmail: existingUser.user.email
+          }
+        };
+      }
+
+      console.log(`Successfully soft deleted user: ${existingUser.user.email} (${userId})`);
+      return { data, softDeletedUser: existingUser.user, message: "User has been soft deleted and can be restored if needed" };
+
     } catch (error) {
-      console.error("Error deleting user:", error);
-      return { error };
+      console.error("Unexpected error deleting user:", error);
+      return {
+        error: {
+          message: "An unexpected error occurred while deleting the user",
+          code: "unexpected_error",
+          details: error
+        }
+      };
     } finally {
       loading.value = false;
+    }
+  }
+
+  // Restore soft-deleted user function (admin only)
+  async function restoreUser(userId: string) {
+    loading.value = true;
+    try {
+      console.log(`Attempting to restore user with ID: ${userId}`);
+
+      // First, check if user exists and is soft deleted
+      const { data: existingUser, error: getUserError } = await supabaseAdmin.auth.admin.getUserById(userId);
+
+      if (getUserError) {
+        console.error("Error fetching user before restore:", getUserError);
+        return {
+          error: {
+            message: "User not found or cannot be accessed",
+            code: "user_not_found",
+            details: getUserError
+          }
+        };
+      }
+
+      if (!existingUser.user) {
+        return {
+          error: {
+            message: "User does not exist",
+            code: "user_not_found"
+          }
+        };
+      }
+
+      // Check if user is actually soft deleted
+      const isDeleted = existingUser.user.app_metadata?.deleted;
+      if (!isDeleted) {
+        return {
+          error: {
+            message: "User is not deleted and doesn't need to be restored",
+            code: "user_not_deleted"
+          }
+        };
+      }
+
+      console.log(`Restoring user: ${existingUser.user.email} (${userId})`);
+
+      // Remove deletion metadata and unban the user
+      const { data, error } = await supabaseAdmin.auth.admin.updateUserById(userId, {
+        app_metadata: {
+          ...existingUser.user.app_metadata,
+          deleted: false,
+          deleted_at: null,
+          deleted_by: null,
+          deleted_reason: null,
+          status: 'active',
+          // Remove ban metadata
+          banned: false,
+          ban_duration: null,
+          ban_reason: null,
+          banned_at: null,
+          banned_until: null,
+          // Add restoration metadata
+          restored: true,
+          restored_at: new Date().toISOString(),
+          restored_by: userData.value?.id || 'admin'
+        },
+        // Re-enable email confirmation
+        email_confirm: true
+      });
+
+      if (error) {
+        console.error("Supabase restore user error:", error);
+        return {
+          error: {
+            message: "Failed to restore user account",
+            code: "restore_failed",
+            originalError: error,
+            userId: userId,
+            userEmail: existingUser.user.email
+          }
+        };
+      }
+
+      // Restore related data
+      await restoreUserData(userId, existingUser.user.email || 'unknown@email.com');
+
+      console.log(`Successfully restored user: ${existingUser.user.email} (${userId})`);
+      return { data, restoredUser: existingUser.user, message: "User has been successfully restored" };
+
+    } catch (error) {
+      console.error("Unexpected error restoring user:", error);
+      return {
+        error: {
+          message: "An unexpected error occurred while restoring the user",
+          code: "unexpected_error",
+          details: error
+        }
+      };
+    } finally {
+      loading.value = false;
+    }
+  }
+
+  // Helper function to restore user-related data
+  async function restoreUserData(userId: string, userEmail: string): Promise<void> {
+    console.log(`Starting data restoration for user: ${userEmail} (${userId})`);
+
+    try {
+      // 1. Restore user items
+      const { error: itemsError } = await supabaseAdmin
+        .from('items')
+        .update({
+          deleted_at: null,
+          deleted_by: null,
+          deleted_reason: null
+        })
+        .eq('deleted_by', 'system_admin')
+        .or(`user_id.eq.${userId},claimed_by.eq.${userId}`)
+        .not('deleted_at', 'is', null);
+
+      if (itemsError) {
+        console.warn('Error restoring items:', itemsError);
+      } else {
+        console.log('✓ Restored user items');
+      }
+
+      // 2. Restore conversations
+      const { error: conversationsError } = await supabaseAdmin
+        .from('conversations')
+        .update({
+          deleted_at: null,
+          deleted_by: null,
+          deleted_reason: null
+        })
+        .eq('deleted_by', 'system_admin')
+        .or(`sender_id.eq.${userId},receiver_id.eq.${userId}`)
+        .not('deleted_at', 'is', null);
+
+      if (conversationsError) {
+        console.warn('Error restoring conversations:', conversationsError);
+      } else {
+        console.log('✓ Restored user conversations');
+      }
+
+      // 3. Restore messages
+      const { error: messagesError } = await supabaseAdmin
+        .from('messages')
+        .update({
+          deleted_at: null,
+          deleted_by: null,
+          message: '[Message restored]' // Could be improved with original message backup
+        })
+        .eq('user_id', userId)
+        .eq('deleted_by', 'system_admin')
+        .not('deleted_at', 'is', null);
+
+      if (messagesError) {
+        console.warn('Error restoring messages:', messagesError);
+      } else {
+        console.log('✓ Restored user messages');
+      }
+
+      console.log(`✓ Completed data restoration for user: ${userEmail}`);
+
+    } catch (error) {
+      console.error('Error during user data restoration:', error);
+      throw new Error(`Failed to restore user data: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 
@@ -503,6 +843,7 @@ export const useAuthUserStore = defineStore("authUser", () => {
     updateUserMetadata,
     updateUserAppMetadata,
     deleteUser,
+    restoreUser,
     changePassword,
     banUser,
     unbanUser,

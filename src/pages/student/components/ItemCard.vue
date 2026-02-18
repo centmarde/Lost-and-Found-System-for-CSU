@@ -81,12 +81,21 @@ const loadAdminUsers = async () => {
 
     if (error) throw error;
 
-    // Filter users with role 1 (admin role) and exclude current user
+    // Filter users with role 1 (admin role), exclude current user, and exclude banned/deleted users
     adminUsers.value = (users || [])
       .filter(user => {
         const role = user.raw_app_meta_data?.role || user.raw_user_meta_data?.role;
-        // Show admin users (role === 1) but exclude the currently logged-in user
-        return role === 1 && user.id !== currentUser.value?.id;
+        const isBanned = user.raw_app_meta_data?.banned || false;
+        const isDeleted = user.raw_app_meta_data?.deleted || false;
+
+        // Show admin users (role === 1) but exclude:
+        // - currently logged-in user
+        // - banned users
+        // - deleted users
+        return role === 1 &&
+               user.id !== currentUser.value?.id &&
+               !isBanned &&
+               !isDeleted;
       })
       .map(user => ({
         id: user.id,
@@ -94,7 +103,7 @@ const loadAdminUsers = async () => {
         email: user.email
       }));
 
-    console.log('Loaded admin users (excluding current user):', adminUsers.value);
+    console.log('Loaded admin users (excluding current user, banned, and deleted users):', adminUsers.value);
   } catch (error) {
     console.error('Error loading admin users:', error);
     toast.error('Failed to load admin users');
