@@ -44,6 +44,7 @@ const {
   closeEditDialog,
   updateUser,
   confirmDeleteUser,
+  restoreUser,
   confirmBanUser,
   confirmUnbanUser,
   closeConfirmationDialog,
@@ -58,6 +59,8 @@ const error = ref<string | null>(null)
 const userDialog = ref(false)
 const selectedUser = ref<any>(null)
 const roleCache = ref<Record<number, string>>({}) // Cache for role titles from roles store
+
+
 
 // Filter state
 interface FilterData {
@@ -210,17 +213,15 @@ const applyFilters = () => {
   }
 
   // Apply status filter
-  if (currentFilters.value.statusFilter !== 'all') {
-    filteredUsers = filteredUsers.filter(user => {
-      const isBanned = user.raw_app_meta_data?.banned
-      if (currentFilters.value.statusFilter === 'banned') {
-        return isBanned
-      } else if (currentFilters.value.statusFilter === 'active') {
-        return !isBanned
-      }
-      return true
-    })
-  }
+  filteredUsers = filteredUsers.filter(user => {
+    const isBanned = user.raw_app_meta_data?.banned || user.raw_app_meta_data?.deleted
+    if (currentFilters.value.statusFilter === 'banned') {
+      return isBanned
+    } else {
+      // For 'all' and 'active' status, exclude banned/deleted users
+      return !isBanned
+    }
+  })
 
   // Apply date filters
   if (currentFilters.value.dateFrom) {
@@ -336,6 +337,8 @@ const handleFiltersReset = () => {
   applyFilters()
 }
 
+
+
 const getRoleTitleSync = (roleId: number): string => {
   if (!roleId) return 'No Role'
 
@@ -364,6 +367,8 @@ const availableRoles = computed(() => {
   return rolesStore.roles || []
 })
 
+
+
 const viewUser = (user: any) => {
   selectedUser.value = user
   userDialog.value = true
@@ -375,6 +380,14 @@ const editUser = (user: any) => {
 
 const deleteUser = (user: any) => {
   confirmDeleteUser(user)
+}
+
+// Handle user restoration
+const handleUserRestore = async (user: any) => {
+  const result = await restoreUser(user)
+  if (result.success) {
+    await fetchUsers() // Refresh the users list
+  }
 }
 
 // Handle user update with refresh
@@ -423,8 +436,10 @@ onMounted(() => {
             </p>
           </div>
 
-          <!-- Refresh button -->
-          <div class="d-flex align-center flex-shrink-0">
+          <!-- Control buttons -->
+          <div class="d-flex align-center flex-shrink-0 gap-2">
+
+            <!-- Refresh button -->
             <v-btn
               color="primary"
               variant="tonal"
@@ -433,7 +448,8 @@ onMounted(() => {
               class="refresh-btn"
               size="small"
             >
-              Refresh
+              <v-icon size="16" class="mr-1">mdi-refresh</v-icon>
+              <span class="d-none d-sm-inline">Refresh</span>
             </v-btn>
           </div>
         </div>
@@ -472,13 +488,17 @@ onMounted(() => {
         </v-alert>
 
         <!-- Results Summary -->
-        <div v-if="!loading && users.length > 0" class="mb-3 d-flex justify-space-between align-center">
-          <div class="text-body-2 text-medium-emphasis">
-            Showing {{ users.length }} of {{ allUsers.length }} users
+        <div v-if="!loading && allUsers.length > 0" class="mb-3">
+          <div class="d-flex justify-space-between align-center">
+            <div class="text-body-2 text-medium-emphasis">
+              Showing {{ users.length }} of {{ allUsers.length }} users
+            </div>
+            <div v-if="users.length !== allUsers.length" class="text-caption text-primary">
+              {{ allUsers.length - users.length }} users filtered out
+            </div>
           </div>
-          <div v-if="users.length !== allUsers.length" class="text-caption text-primary">
-            {{ allUsers.length - users.length }} users filtered out
-          </div>
+
+
         </div>
 
         <!-- Desktop view - Data table for larger screens -->
@@ -529,9 +549,18 @@ onMounted(() => {
                   {{ getRoleTitleSync(item.raw_user_meta_data?.role || item.raw_app_meta_data?.role) }}
                 </v-chip>
 
-                <!-- Ban status indicator -->
+                <!-- Ban/Delete status indicator -->
                 <v-chip
-                  v-if="item.raw_app_meta_data?.banned"
+                  v-if="item.raw_app_meta_data?.deleted"
+                  color="warning"
+                  size="x-small"
+                  variant="tonal"
+                >
+                  <v-icon start size="12">mdi-delete</v-icon>
+                  Deleted
+                </v-chip>
+                <v-chip
+                  v-else-if="item.raw_app_meta_data?.banned"
                   color="error"
                   size="x-small"
                   variant="tonal"
@@ -565,10 +594,27 @@ onMounted(() => {
                   color="orange"
                   @click="editUser(item)"
                   :loading="editingUser"
+                  :disabled="item.raw_app_meta_data?.deleted"
                 >
                   <v-icon>mdi-pencil</v-icon>
                   <v-tooltip activator="parent" location="top">
                     Edit User
+                  </v-tooltip>
+                </v-btn>
+
+                <!-- Restore button (only for deleted users) -->
+                <v-btn
+                  v-if="item.raw_app_meta_data?.deleted"
+                  icon="mdi-restore"
+                  size="small"
+                  variant="text"
+                  color="success"
+                  @click="handleUserRestore(item)"
+                  :loading="deletingUser"
+                >
+                  <v-icon>mdi-restore</v-icon>
+                  <v-tooltip activator="parent" location="top">
+                    Restore User
                   </v-tooltip>
                 </v-btn>
 
@@ -590,34 +636,37 @@ onMounted(() => {
                   </template>
 
                   <v-list density="compact" min-width="160">
-                    <!-- Ban/Unban Actions -->
-                    <v-list-item
-                      v-if="!item.raw_app_meta_data?.banned"
-                      @click="confirmBanUser(item)"
-                      prepend-icon="mdi-account-cancel"
-                    >
-                      <v-list-item-title>Ban User</v-list-item-title>
-                    </v-list-item>
+                    <!-- Ban/Unban Actions (only for active users) -->
+                    <template v-if="!item.raw_app_meta_data?.deleted">
+                      <v-list-item
+                        v-if="!item.raw_app_meta_data?.banned"
+                        @click="confirmBanUser(item)"
+                        prepend-icon="mdi-account-cancel"
+                      >
+                        <v-list-item-title>Ban User</v-list-item-title>
+                      </v-list-item>
 
-                    <v-list-item
-                      v-else
-                      @click="confirmUnbanUser(item)"
-                      prepend-icon="mdi-account-check"
-                      class="text-success"
-                    >
-                      <v-list-item-title>Unban User</v-list-item-title>
-                    </v-list-item>
+                      <v-list-item
+                        v-else
+                        @click="confirmUnbanUser(item)"
+                        prepend-icon="mdi-account-check"
+                        class="text-success"
+                      >
+                        <v-list-item-title>Unban User</v-list-item-title>
+                      </v-list-item>
+                    </template>
 
-                    <v-divider class="my-1"></v-divider>
+                    <v-divider v-if="!item.raw_app_meta_data?.deleted" class="my-1"></v-divider>
 
-                    <!-- Delete Action -->
+                    <!-- Delete Action (only for active users) -->
                     <v-list-item
+                      v-if="!item.raw_app_meta_data?.deleted"
                       @click="deleteUser(item)"
                       prepend-icon="mdi-delete"
                       class="text-error"
                       :disabled="deletingUser"
                     >
-                      <v-list-item-title>Delete User</v-list-item-title>
+                      <v-list-item-title>Soft Delete User</v-list-item-title>
                     </v-list-item>
                   </v-list>
                 </v-menu>
@@ -694,9 +743,18 @@ onMounted(() => {
                         {{ getRoleTitleSync(user.raw_user_meta_data?.role || user.raw_app_meta_data?.role) }}
                       </v-chip>
 
-                      <!-- Ban status indicator -->
+                      <!-- Ban/Delete status indicator -->
                       <v-chip
-                        v-if="user.raw_app_meta_data?.banned"
+                        v-if="user.raw_app_meta_data?.deleted"
+                        color="warning"
+                        size="small"
+                        variant="tonal"
+                      >
+                        <v-icon start size="12">mdi-delete</v-icon>
+                        Deleted
+                      </v-chip>
+                      <v-chip
+                        v-else-if="user.raw_app_meta_data?.banned"
                         color="error"
                         size="small"
                         variant="tonal"
@@ -724,7 +782,7 @@ onMounted(() => {
                   <v-btn
                     size="x-small"
                     variant="tonal"
-                    color="primary"
+
                     @click="viewUser(user)"
                     class="mobile-action-btn"
                     density="compact"
@@ -733,7 +791,23 @@ onMounted(() => {
                     <span class="mobile-btn-text">View</span>
                   </v-btn>
 
+                  <!-- Restore button (only for deleted users) -->
                   <v-btn
+                    v-if="user.raw_app_meta_data?.deleted"
+                    size="x-small"
+                    variant="tonal"
+                    color="success"
+                    @click="handleUserRestore(user)"
+                    class="mobile-action-btn mx-1"
+                    density="compact"
+                    :loading="deletingUser"
+                  >
+                    <v-icon size="14" class="me-1">mdi-restore</v-icon>
+                    <span class="mobile-btn-text">Restore</span>
+                  </v-btn>
+
+                  <v-btn
+                    v-else
                     size="x-small"
                     variant="tonal"
                     color="orange"
@@ -763,9 +837,9 @@ onMounted(() => {
                     </template>
 
                     <v-list density="compact" min-width="140">
-                      <!-- Ban/Unban Actions -->
+                      <!-- Ban Action (only for active, non-banned users) -->
                       <v-list-item
-                        v-if="!user.raw_app_meta_data?.banned"
+                        v-if="!user.raw_app_meta_data?.deleted && !user.raw_app_meta_data?.banned"
                         @click="confirmBanUser(user)"
                         prepend-icon="mdi-account-cancel"
                         density="compact"
@@ -773,8 +847,9 @@ onMounted(() => {
                         <v-list-item-title class="text-caption">Ban</v-list-item-title>
                       </v-list-item>
 
+                      <!-- Unban Action (only for active, banned users) -->
                       <v-list-item
-                        v-else
+                        v-if="!user.raw_app_meta_data?.deleted && user.raw_app_meta_data?.banned"
                         @click="confirmUnbanUser(user)"
                         prepend-icon="mdi-account-check"
                         class="text-success"
@@ -783,17 +858,30 @@ onMounted(() => {
                         <v-list-item-title class="text-caption">Unban</v-list-item-title>
                       </v-list-item>
 
-                      <v-divider class="my-1"></v-divider>
-
-                      <!-- Delete Action -->
+                      <!-- Restore Action (only for deleted users) -->
                       <v-list-item
+                        v-if="user.raw_app_meta_data?.deleted"
+                        @click="restoreUser(user)"
+                        prepend-icon="mdi-restore"
+                        class="text-success"
+                        density="compact"
+                        :disabled="deletingUser"
+                      >
+                        <v-list-item-title class="text-caption">Restore</v-list-item-title>
+                      </v-list-item>
+
+                      <v-divider v-if="!user.raw_app_meta_data?.deleted" class="my-1"></v-divider>
+
+                      <!-- Delete Action (only for active users) -->
+                      <v-list-item
+                        v-if="!user.raw_app_meta_data?.deleted"
                         @click="deleteUser(user)"
                         prepend-icon="mdi-delete"
                         class="text-error"
                         density="compact"
                         :disabled="deletingUser"
                       >
-                        <v-list-item-title class="text-caption">Delete</v-list-item-title>
+                        <v-list-item-title class="text-caption">Soft Delete</v-list-item-title>
                       </v-list-item>
                     </v-list>
                   </v-menu>
@@ -908,7 +996,7 @@ onMounted(() => {
   height: 36px !important;
 }
 
-/* Ensure button is visible on all screen sizes */
+/* Ensure buttons are visible on all screen sizes */
 .refresh-btn .v-btn__content {
   display: flex !important;
   align-items: center !important;
