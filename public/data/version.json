@@ -1,5 +1,13 @@
 {
   "versions": [
+      {
+      "version": "v0.0.5",
+      "date": "2026-02-18",
+      "title": "UI Improvements & Bug Fixes",
+      "changes": [
+        "added forgot password shell, for future development "
+      ]
+    },
     {
       "version": "v0.0.4",
       "date": "2026-02-17",
