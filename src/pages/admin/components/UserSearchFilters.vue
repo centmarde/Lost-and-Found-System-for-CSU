@@ -44,9 +44,9 @@ const rolesStore = useUserRolesStore()
 
 // Status options
 const statusOptions = [
-  { value: 'all', title: 'All Users' },
+  { value: 'all', title: 'All Active Users' },
   { value: 'active', title: 'Active Users' },
-  { value: 'banned', title: 'Banned Users' },
+  { value: 'banned', title: 'Banned/Deleted Users' },
 ]
 
 // Sort options

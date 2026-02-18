@@ -104,6 +104,33 @@ export async function markItemAsUnclaimed(itemId: number): Promise<void> {
 }
 
 /**
+ * Updates an item's description
+ */
+export async function updateItemDescription(
+  itemId: number,
+  newDescription: string
+): Promise<Item> {
+  updatingItems.value.add(itemId)
+
+  try {
+    const { data, error } = await supabase
+      .from('items')
+      .update({ description: newDescription })
+      .eq('id', itemId)
+      .select()
+      .single()
+
+    if (error) throw error
+    return data
+  } catch (error) {
+    console.error('Error updating item description:', error)
+    throw new Error('Failed to update item description')
+  } finally {
+    updatingItems.value.delete(itemId)
+  }
+}
+
+/**
  * Deletes an item from the database
  */
 export async function deleteItem(itemId: number): Promise<void> {

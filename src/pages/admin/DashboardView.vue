@@ -13,7 +13,8 @@ import DashboardFilters from '@/pages/admin/components/DashboardFilters.vue'
 import { useDashboardData } from '@/pages/admin/components/composables/useDashboardData'
 import { useAdminItemActions } from '@/pages/admin/components/composables/useAdminItems'
 // import { handleClaimItem } from '@/stores/items'
-import { markItemAsClaimed } from '@/stores/items'
+import { markItemAsClaimed, updateItemDescription } from '@/stores/items'
+import { getMultipleItemsConversationCounts } from '@/stores/conversation'
 
 
 import '@/styles/dashboardview.css'
@@ -48,6 +49,7 @@ interface FilterData {
 }
 
 const allItems = ref<Item[]>([]) // Store all items for filtering
+const conversationCounts = ref<Record<number, number>>({}) // Store conversation counts per item
 const currentFilters = ref<FilterData>({
   search: '',
   statusFilter: 'all',
@@ -172,6 +174,18 @@ const applyFilters = () => {
 const fetchAndApplyFilters = async () => {
   await fetchDashboardStats()
   allItems.value = [...items.value] // Store all items before filtering
+
+  // Load conversation counts for all items
+  if (allItems.value.length > 0) {
+    const itemIds = allItems.value.map(item => item.id)
+    try {
+      conversationCounts.value = await getMultipleItemsConversationCounts(itemIds)
+    } catch (error) {
+      console.error('Error loading conversation counts:', error)
+      conversationCounts.value = {}
+    }
+  }
+
   applyFilters() // Apply current filters
 }
 
@@ -205,6 +219,18 @@ const handleShowClaimDialog = (item: Item) => {
 const onClaimItem = async (itemId: number, claimedBy: string) => {
   await markItemAsClaimed(itemId, claimedBy)
   await fetchAndApplyFilters()
+}
+
+// Handle update item description
+const handleUpdateDescription = async (itemId: number, newDescription: string) => {
+  try {
+    await updateItemDescription(itemId, newDescription)
+    // Refresh the items to show the updated description
+    await fetchAndApplyFilters()
+  } catch (error) {
+    console.error('Failed to update item description:', error)
+    // You could show an error dialog here if needed
+  }
 }
 
 // Handle delete item with confirmation
@@ -355,8 +381,10 @@ onMounted(async () => {
                     <AdminDashboardItemCard
                       :item="item"
                       :is-updating="updatingItems.has(item.id)"
+                      :conversation-count="conversationCounts[item.id] || 0"
                       @show-claim-dialog="handleShowClaimDialog"
                       @delete-item="handleDeleteItem"
+                      @update-description="handleUpdateDescription"
                     />
                   </v-col>
                 </v-row>

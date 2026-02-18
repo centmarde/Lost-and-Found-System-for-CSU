@@ -1,6 +1,8 @@
 <script lang="ts" setup>
 import { ref, watch } from 'vue'
 import { loadConversationsForItem } from '@/stores/conversation'
+import { useNotificationsStore } from '@/stores/notificationsData'
+import { useUserNotificationsStore } from '@/stores/userNotificationsData'
 
 interface Item {
   id: number
@@ -38,6 +40,11 @@ const conversations = ref<Conversation[]>([])
 const loadingConversations = ref(false)
 const selectedClaimant = ref<string>('')
 const showConfirmDialog = ref(false)
+const sendingNotification = ref(false)
+
+// Initialize notification stores
+const notificationsStore = useNotificationsStore()
+const userNotificationsStore = useUserNotificationsStore()
 
 // Load conversations when dialog opens using store function
 const loadConversations = async (itemId: number) => {
@@ -77,6 +84,7 @@ const closeDialog = () => {
   conversations.value = []
   selectedClaimant.value = ''
   showConfirmDialog.value = false
+  sendingNotification.value = false
 }
 
 const handleClaimClick = () => {
@@ -85,8 +93,43 @@ const handleClaimClick = () => {
   }
 }
 
-const confirmClaim = () => {
+// Send notification to claimant about successful claim
+const sendClaimNotification = async (claimantUserId: string, item: Item) => {
+  sendingNotification.value = true
+  try {
+    // Create the notification
+    const notificationResult = await notificationsStore.createNotification({
+      title: `Item Claim Confirmed - ${item.title}`,
+      description: `Great news! Your lost item "${item.title}" has been confirmed and is ready for pickup at the Lost & Found office. Please bring a valid ID when collecting your item. Office hours: Monday-Friday, 8:00 AM - 5:00 PM.`
+    })
+
+    if (notificationResult.data) {
+      // Send notification to the specific user
+      await userNotificationsStore.createUserNotification({
+        user_id: claimantUserId,
+        notification_id: notificationResult.data.id!,
+        is_read: false
+      })
+
+      console.log('Claim notification sent successfully to user:', claimantUserId)
+    } else {
+      throw new Error('Failed to create notification')
+    }
+  } catch (error) {
+    console.error('Error sending claim notification:', error)
+    // Note: We don't block the claim process if notification fails
+    // The admin should still be able to mark the item as claimed
+  } finally {
+    sendingNotification.value = false
+  }
+}
+
+const confirmClaim = async () => {
   if (selectedClaimant.value && props.item) {
+    // Send the claim notification first
+    await sendClaimNotification(selectedClaimant.value, props.item)
+
+    // Then emit the claim event
     emit('claim-item', props.item.id, selectedClaimant.value)
     closeDialog()
   }
@@ -229,6 +272,17 @@ const getSelectedUserEmail = () => {
           </v-card>
 
           <v-alert
+            type="info"
+            variant="tonal"
+            class="mb-3"
+          >
+            <div class="text-body-2">
+              <v-icon class="me-2" size="small">mdi-bell-outline</v-icon>
+              A notification will be automatically sent to <strong>{{ getSelectedUserEmail() }}</strong> confirming that their lost item is ready for pickup at the office.
+            </div>
+          </v-alert>
+
+          <v-alert
             type="warning"
             variant="tonal"
             class="mb-0"
@@ -245,17 +299,18 @@ const getSelectedUserEmail = () => {
             variant="text"
             color="grey"
             @click="cancelConfirm"
-            :disabled="loading"
+            :disabled="loading || sendingNotification"
           >
             Cancel
           </v-btn>
           <v-btn
             color="success"
             variant="flat"
-            :loading="loading"
+            :loading="loading || sendingNotification"
             @click="confirmClaim"
           >
-            Yes, Mark as Claimed
+            <span v-if="sendingNotification">Sending Notification...</span>
+            <span v-else>Yes, Mark as Claimed</span>
           </v-btn>
         </v-card-actions>
       </v-card>

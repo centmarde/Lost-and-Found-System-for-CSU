@@ -1,5 +1,17 @@
 {
   "versions": [
+      {
+      "version": "v0.0.5",
+      "date": "2026-02-18",
+      "title": "UI Improvements & Bug Fixes",
+      "changes": [
+        "Added forgot password shell, for future development ",
+        "Added claimant notifications for their claims.",
+        "Added v-badge component for displaying conversation count in each item on admin dashboard.",
+        "Added edit description functionality for items on admin dashboard",
+        "Added soft delete and ban functionality on user accounts"
+      ]
+    },
     {
       "version": "v0.0.4",
       "date": "2026-02-17",

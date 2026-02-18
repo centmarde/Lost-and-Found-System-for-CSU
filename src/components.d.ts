@@ -11,6 +11,7 @@ declare module 'vue' {
     ConfirmationDialog: typeof import('./components/common/ConfirmationDialog.vue')['default']
     DirectAdminMessageCard: typeof import('./components/common/DirectAdminMessageCard.vue')['default']
     ErrorDialog: typeof import('./components/common/ErrorDialog.vue')['default']
+    ForgotPasswordDialog: typeof import('./components/auth/dialogs/ForgotPasswordDialog.vue')['default']
     InsideNavbar1: typeof import('./components/common/insideNavbar/InsideNavbar1.vue')['default']
     InsideNavbar2: typeof import('./components/common/insideNavbar/InsideNavbar2.vue')['default']
     InsideNavbar3: typeof import('./components/common/insideNavbar/InsideNavbar3.vue')['default']
