@@ -36,6 +36,15 @@ export const useAuthUserStore = defineStore("authUser", () => {
     null
   );
 
+  const isUserBanned = computed(() => userData.value?.app_metadata?.banned || false);
+  const isUserDeleted = computed(() => userData.value?.app_metadata?.deleted || false);
+  const isUserRestricted = computed(() => isUserBanned.value || isUserDeleted.value);
+  const userStatus = computed(() => {
+    if (isUserDeleted.value) return 'deleted';
+    if (isUserBanned.value) return 'banned';
+    return 'active';
+  });
+
 
   async function registerUser(
     email: string,
@@ -832,6 +841,10 @@ export const useAuthUserStore = defineStore("authUser", () => {
     userEmail,
     userName,
     userRoleId,
+    isUserBanned,
+    isUserDeleted,
+    isUserRestricted,
+    userStatus,
 
     // Actions
     registerUser,

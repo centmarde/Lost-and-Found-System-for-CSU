@@ -1,6 +1,7 @@
 import { useToast } from 'vue-toastification';
 import { useAuthUserStore } from '@/stores/authUser';
 import { useUserPagesStore } from '@/stores/pages';
+import { shouldRedirectToBanned, allowedRoutesForRestrictedUsers } from '@/utils/navigation';
 import type { RouteLocationNormalized, NavigationGuardNext, Router } from 'vue-router';
 
 /**
@@ -17,6 +18,36 @@ export const authGuard = async (to: RouteLocationNormalized, from: RouteLocation
     return next("/auth");
   }
 
+  // Check if user is banned/deleted and redirect accordingly (for authenticated users)
+  if (isLoggedIn) {
+    try {
+      const authStore = useAuthUserStore();
+      const currentUserResult = await authStore.getCurrentUser();
+
+      if (currentUserResult.user) {
+        const userData = currentUserResult.user;
+
+        // Check if user should be redirected to banned page
+        if (shouldRedirectToBanned(userData)) {
+          console.log(`Banned/deleted user detected. Current path: ${to.path}, Allowed routes:`, allowedRoutesForRestrictedUsers);
+          // Allow access only to allowed routes for restricted users
+          if (!allowedRoutesForRestrictedUsers.includes(to.path)) {
+            console.log(`Redirecting ${userData.app_metadata?.deleted ? 'deleted' : 'banned'} user from ${to.path} to banned page`);
+            return next("/banned");
+          }
+          // If already on allowed page, continue
+          if (allowedRoutesForRestrictedUsers.includes(to.path)) {
+            console.log(`Allowing ${userData.app_metadata?.deleted ? 'deleted' : 'banned'} user to access ${to.path}`);
+            return next();
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error checking user ban/deletion status:', error);
+      // Continue with normal flow if there's an error
+    }
+  }
+
   // If user is authenticated and trying to access public/auth pages, redirect to appropriate page
   if (isLoggedIn && publicPages.includes(to.path)) {
     /*  toast.info("You are already logged in. Redirecting to appropriate page."); */
@@ -28,8 +59,15 @@ export const authGuard = async (to: RouteLocationNormalized, from: RouteLocation
       const currentUserResult = await authStore.getCurrentUser();
 
       if (currentUserResult.user) {
-        const userRoleId = currentUserResult.user.user_metadata?.role ||
-                           currentUserResult.user.app_metadata?.role;
+        const userData = currentUserResult.user;
+
+        // FIRST: Check if user is banned or deleted - this takes precedence
+        if (shouldRedirectToBanned(userData)) {
+          console.log(`Banned/deleted user trying to access public page ${to.path}, redirecting to banned page`);
+          return next("/banned");
+        }
+
+        const userRoleId = userData.user_metadata?.role || userData.app_metadata?.role;
 
         if (userRoleId) {
           // Fetch pages accessible by this role
@@ -66,8 +104,15 @@ export const authGuard = async (to: RouteLocationNormalized, from: RouteLocation
       const currentUserResult = await authStore.getCurrentUser();
 
       if (currentUserResult.user) {
-        const userRoleId = currentUserResult.user.user_metadata?.role ||
-                           currentUserResult.user.app_metadata?.role;
+        const userData = currentUserResult.user;
+
+        // If user is banned or deleted, they shouldn't access protected routes
+        if (shouldRedirectToBanned(userData)) {
+          console.log(`Blocking ${userData.app_metadata?.deleted ? 'deleted' : 'banned'} user from protected route:`, to.path);
+          return next("/banned");
+        }
+
+        const userRoleId = userData.user_metadata?.role || userData.app_metadata?.role;
 
         if (userRoleId) {
           console.log('Checking page access for role ID:', userRoleId);
