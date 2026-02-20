@@ -451,6 +451,22 @@ const handleMarkAllAsRead = async () => {
   }
 };
 
+// Helper functions for conversation display
+const getConversationDisplayName = (conversation: any) => {
+  if (currentUser.value && conversation.sender_id === currentUser.value.id) {
+    return 'Admin';
+  }
+  return conversation.sender_profile?.full_name || 'Student User';
+};
+
+const getConversationInitials = (conversation: any) => {
+  if (currentUser.value && conversation.sender_id === currentUser.value.id) {
+    return 'A';
+  }
+  const name = conversation.sender_profile?.full_name || 'U';
+  return name.split(' ').map((n: string) => n[0]).join('').toUpperCase().substring(0, 2);
+};
+
 // Update unread count for a conversation and its item
 const updateUnreadCountForConversation = async (conversationId: string) => {
   try {
@@ -911,7 +927,7 @@ onBeforeUnmount(() => {
                                     class="me-3"
                                   >
                                     <span class="text-white font-weight-bold text-h6">
-                                      {{ (conversation.sender_profile?.full_name || 'U').split(' ').map((n: string) => n[0]).join('').toUpperCase().substring(0, 2) }}
+                                      {{ getConversationInitials(conversation) }}
                                     </span>
                                   </v-avatar>
                                 </v-badge>
@@ -922,7 +938,7 @@ onBeforeUnmount(() => {
                                   class="me-3"
                                 >
                                   <span class="text-white font-weight-bold text-h6">
-                                    {{ (conversation.sender_profile?.full_name || 'U').split(' ').map((n: string) => n[0]).join('').toUpperCase().substring(0, 2) }}
+                                    {{ getConversationInitials(conversation) }}
                                   </span>
                                 </v-avatar>
 
@@ -930,11 +946,8 @@ onBeforeUnmount(() => {
                                   <div class="d-flex align-center justify-space-between">
                                     <div>
                                       <h3 class="text-h6 font-weight-bold mb-1">
-                                        {{ conversation.sender_profile?.full_name || 'Student User' }}
+                                        {{ getConversationDisplayName(conversation) }}
                                       </h3>
-                                      <p class="text-body-2 text-grey-darken-1 mb-0">
-                                        {{ conversation.sender_profile?.email || 'No email available' }}
-                                      </p>
                                     </div>
                                     <div class="d-flex align-center">
                                       <!-- Typing indicator -->
@@ -1053,12 +1066,12 @@ onBeforeUnmount(() => {
                                   class="me-3"
                                 >
                                   <span class="text-white font-weight-bold">
-                                    {{ (selectedSupportConversation.sender_profile?.full_name || 'U').split(' ').map((n: string) => n[0]).join('').toUpperCase().substring(0, 2) }}
+                                    {{ getConversationInitials(selectedSupportConversation) }}
                                   </span>
                                 </v-avatar>
                                 <div>
                                   <div class="text-h6 font-weight-bold">
-                                    {{ selectedSupportConversation.sender_profile?.full_name || 'Student User' }}
+                                    {{ getConversationDisplayName(selectedSupportConversation) }}
                                   </div>
                                   <div class="text-caption text-grey-darken-1">
                                     {{ selectedSupportConversation.sender_profile?.email }}
@@ -1305,7 +1318,7 @@ onBeforeUnmount(() => {
                                   class="me-3"
                                 >
                                   <span class="text-white font-weight-bold">
-                                    {{ (conversation.sender_profile?.full_name || 'U').split(' ').map((n: string) => n[0]).join('').toUpperCase().substring(0, 2) }}
+                                    {{ getConversationInitials(conversation) }}
                                   </span>
                                 </v-avatar>
                               </v-badge>
@@ -1316,7 +1329,7 @@ onBeforeUnmount(() => {
                                 class="me-3"
                               >
                                 <span class="text-white font-weight-bold">
-                                  {{ (conversation.sender_profile?.full_name || 'U').split(' ').map((n: string) => n[0]).join('').toUpperCase().substring(0, 2) }}
+                                  {{ getConversationInitials(conversation) }}
                                 </span>
                               </v-avatar>
                             </template>
@@ -1327,7 +1340,7 @@ onBeforeUnmount(() => {
                               <div class="d-flex align-center justify-space-between mb-1">
                                 <div class="d-flex align-center">
                                   <v-list-item-title class="font-weight-bold">
-                                    {{ conversation.sender_profile?.full_name || 'Student User' }}
+                                    {{ getConversationDisplayName(conversation) }}
                                   </v-list-item-title>
                                   <!-- Typing indicator in conversation list -->
                                   <span
@@ -1348,37 +1361,7 @@ onBeforeUnmount(() => {
                               </div>
 
                               <!-- Item Information - Made More Prominent -->
-                              <div v-if="conversation.item" class="mb-2">
-                                <v-chip
-                                  :color="conversation.item.status === 'lost' ? 'error' : 'success'"
-                                  variant="elevated"
-                                  size="small"
-                                  class="me-2 font-weight-bold"
-                                >
-                                  <v-icon start>
-                                    {{ conversation.item.status === 'lost' ? 'mdi-help' : 'mdi-check-circle' }}
-                                  </v-icon>
-                                  {{ conversation.item.status.toUpperCase() }} ITEM
-                                </v-chip>
-                                <div class="text-subtitle-2 font-weight-medium text-primary mt-1">
-                                  📦 {{ conversation.item.title }}
-                                </div>
-                                <div v-if="conversation.item.description" class="text-caption text-grey-darken-1 mt-1">
-                                  {{ conversation.item.description.substring(0, 60) }}{{ conversation.item.description.length > 60 ? '...' : '' }}
-                                </div>
-                              </div>
-
-                              <div v-else class="mb-2">
-                                <v-chip
-                                  color="info"
-                                  variant="elevated"
-                                  size="small"
-                                  class="font-weight-bold"
-                                >
-                                  <v-icon start>mdi-lifebuoy</v-icon>
-                                  GENERAL SUPPORT
-                                </v-chip>
-                              </div>
+                             
                             </div>
 
                             <template v-slot:append>
@@ -1444,15 +1427,12 @@ onBeforeUnmount(() => {
                                 class="me-3"
                               >
                                 <span class="text-white font-weight-bold">
-                                  {{ (selectedSupportConversation.sender_profile?.full_name || 'U').split(' ').map((n: string) => n[0]).join('').toUpperCase().substring(0, 2) }}
+                                  {{ getConversationInitials(selectedSupportConversation) }}
                                 </span>
                               </v-avatar>
                               <div>
                                 <div class="text-h6 font-weight-bold">
-                                  {{ selectedSupportConversation.sender_profile?.full_name || 'Student User' }}
-                                </div>
-                                <div class="text-caption text-grey-darken-1">
-                                  {{ selectedSupportConversation.sender_profile?.email }}
+                                  {{ getConversationDisplayName(selectedSupportConversation) }}
                                 </div>
                               </div>
                             </div>
