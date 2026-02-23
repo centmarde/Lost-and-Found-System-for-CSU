@@ -72,9 +72,25 @@
             </v-btn>
           </v-col>
         </v-row>
+
+        <v-row no-gutters>
+          <v-col cols="12" class="text-center">
+            <v-btn
+              variant="text"
+              size="small"
+              class="text-caption white-text"
+              @click="showForgotPasswordDialog = true"
+            >
+              Forgot your password?
+            </v-btn>
+          </v-col>
+        </v-row>
       </v-container>
     </v-form>
   </v-card-text>
+
+  <!-- Forgot Password Dialog -->
+  <ForgotPasswordDialog v-model="showForgotPasswordDialog" />
 </template>
 
 <script setup lang="ts">
@@ -87,6 +103,7 @@ import {
 import { useAuthUserStore } from "@/stores/authUser";
 import { useToast } from "vue-toastification";
 import { useRouter } from "vue-router";
+import ForgotPasswordDialog from "@/components/auth/dialogs/ForgotPasswordDialog.vue";
 
 // Emits
 defineEmits<{
@@ -104,6 +121,7 @@ const formValid = ref(false);
 const loading = ref(false);
 const showPassword = ref(false);
 const passwordTouched = ref(false);
+const showForgotPasswordDialog = ref(false);
 
 // Form data
 const loginForm = reactive({

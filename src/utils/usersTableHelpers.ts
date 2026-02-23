@@ -1,6 +1,10 @@
+// This function is deprecated - use roles store instead
 export const getRoleName = (roleId: number | undefined) => {
+  console.warn('getRoleName is deprecated - use roles store instead');
+
   if (!roleId) return 'No Role'
 
+  // For backward compatibility only
   switch (roleId) {
     case 1:
       return 'Admin'

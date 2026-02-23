@@ -23,6 +23,61 @@ interface ConfirmationDialogData {
   action: (() => Promise<void>) | null
 }
 
+// Type definitions for auth store result types
+interface AuthError {
+  message: string
+  code: string
+  details?: any
+  originalError?: any
+  userId?: string
+  userEmail?: string
+}
+
+interface DeleteUserSuccess {
+  data: any
+  softDeletedUser: User
+  message: string
+}
+
+interface DeleteUserError {
+  error: AuthError
+}
+
+type DeleteUserResult = DeleteUserSuccess | DeleteUserError
+
+interface RestoreUserSuccess {
+  data: any
+  restoredUser: User
+  message: string
+}
+
+interface RestoreUserError {
+  error: AuthError
+}
+
+type RestoreUserResult = RestoreUserSuccess | RestoreUserError
+
+interface BanUserSuccess {
+  data: any
+  message?: string
+}
+
+interface BanUserError {
+  error: AuthError | string
+}
+
+type BanUserResult = BanUserSuccess | BanUserError
+
+interface UpdateUserSuccess {
+  data: any
+}
+
+interface UpdateUserError {
+  error: AuthError | string
+}
+
+type UpdateUserResult = UpdateUserSuccess | UpdateUserError
+
 export function useUserActions() {
   const authStore = useAuthUserStore()
   const toast = useToast()
@@ -83,12 +138,12 @@ export function useUserActions() {
           full_name: editForm.value.full_name,
           role: editForm.value.role  // Add role to user_metadata too
         }
-      )
+      ) as UpdateUserResult
 
-      if (userMetadataResult.error) {
+      if ('error' in userMetadataResult) {
         const errorMsg = typeof userMetadataResult.error === 'string'
           ? userMetadataResult.error
-          : (userMetadataResult.error as any)?.message || 'Failed to update user metadata'
+          : (userMetadataResult.error as AuthError)?.message || 'Failed to update user metadata'
         throw new Error(errorMsg)
       }
 
@@ -98,12 +153,12 @@ export function useUserActions() {
         {
           role: editForm.value.role
         }
-      )
+      ) as UpdateUserResult
 
-      if (appMetadataResult.error) {
+      if ('error' in appMetadataResult) {
         const errorMsg = typeof appMetadataResult.error === 'string'
           ? appMetadataResult.error
-          : (appMetadataResult.error as any)?.message || 'Failed to update user role'
+          : (appMetadataResult.error as AuthError)?.message || 'Failed to update user role'
         throw new Error(errorMsg)
       }
 
@@ -126,8 +181,8 @@ export function useUserActions() {
   const confirmDeleteUser = (user: User) => {
     showConfirmationDialog.value = {
       show: true,
-      title: 'Delete User',
-      message: `Are you sure you want to permanently delete ${user.email}? This action cannot be undone.`,
+      title: 'Soft Delete User',
+      message: `Are you sure you want to delete ${user.email}? The user will be disabled but can be restored later if needed.`,
       action: () => executeDeleteUser(user)
     }
   }
@@ -139,21 +194,117 @@ export function useUserActions() {
     deletingUser.value = true
 
     try {
-      const result = await authStore.deleteUser(user.id)
+      console.log(`Attempting to delete user: ${user.email} (${user.id})`)
+      const result = await authStore.deleteUser(user.id) as DeleteUserResult
 
-      if (result.error) {
-        const errorMsg = typeof result.error === 'string'
-          ? result.error
-          : (result.error as any)?.message || 'Failed to delete user'
-        throw new Error(errorMsg)
+      if ('error' in result) {
+        console.error('Delete user error:', result.error)
+
+        // Handle different types of error objects
+        let errorMessage = 'Failed to delete user'
+
+        if (typeof result.error === 'string') {
+          errorMessage = result.error
+        } else if (result.error && typeof result.error === 'object') {
+          // Handle our enhanced error object structure
+          const errorObj = result.error
+
+          if (errorObj.message) {
+            errorMessage = errorObj.message
+          } else if ('error' in errorObj && (errorObj as any).error?.message) {
+            errorMessage = (errorObj as any).error.message
+          } else if (errorObj.originalError?.message) {
+            errorMessage = errorObj.originalError.message
+          }
+
+          // Log additional error details for debugging
+          if (errorObj.code) {
+            console.error(`Error code: ${errorObj.code}`)
+          }
+          if (errorObj.details) {
+            console.error('Error details:', errorObj.details)
+          }
+          if (errorObj.originalError) {
+            console.error('Original error:', errorObj.originalError)
+          }
+        }
+
+        // Show user-friendly error message
+        throw new Error(errorMessage)
       }
 
-      toast.success(`Successfully deleted ${user.email}`)
+      // Success case
+      const deletedUserEmail = result.softDeletedUser?.email || user.email
+      const successMessage = result.message || `Successfully soft deleted ${deletedUserEmail}`
+      toast.success(successMessage)
+      console.log(`Successfully soft deleted user: ${deletedUserEmail}`)
       closeConfirmationDialog()
 
     } catch (error) {
+      console.error('Unexpected error in executeDeleteUser:', error)
       const errorMessage = error instanceof Error ? error.message : 'Failed to delete user'
-      toast.error(errorMessage)
+
+      // Show error toast with more context
+      toast.error(`Delete Failed: ${errorMessage}`, {
+        timeout: 8000, // Show error longer
+        closeOnClick: true
+      })
+    } finally {
+      deletingUser.value = false
+    }
+  }
+
+  /**
+   * Restore soft-deleted user
+   */
+  const restoreUser = async (user: User): Promise<{ success: boolean }> => {
+    deletingUser.value = true
+
+    try {
+      console.log(`Attempting to restore user: ${user.email} (${user.id})`)
+      const result = await authStore.restoreUser(user.id) as RestoreUserResult
+
+      if ('error' in result) {
+        console.error('Restore user error:', result.error)
+
+        let errorMessage = 'Failed to restore user'
+
+        if (typeof result.error === 'string') {
+          errorMessage = result.error
+        } else if (result.error && typeof result.error === 'object') {
+          const errorObj = result.error
+          if (errorObj.message) {
+            errorMessage = errorObj.message
+          } else if (errorObj.originalError?.message) {
+            errorMessage = errorObj.originalError.message
+          }
+
+          if (errorObj.code) {
+            console.error(`Error code: ${errorObj.code}`)
+          }
+        }
+
+        throw new Error(errorMessage)
+      }
+
+      // Success case
+      const restoredUserEmail = result.restoredUser?.email || user.email
+      const successMessage = result.message || `Successfully restored ${restoredUserEmail}`
+      toast.success(successMessage)
+      console.log(`Successfully restored user: ${restoredUserEmail}`)
+
+      return { success: true }
+
+    } catch (error) {
+      console.error('Unexpected error in restoreUser:', error)
+      const errorMessage = error instanceof Error ? error.message : 'Failed to restore user'
+
+      toast.error(`Restore Failed: ${errorMessage}`, {
+        timeout: 8000,
+        closeOnClick: true
+      })
+
+      return { success: false }
     } finally {
       deletingUser.value = false
     }
@@ -197,12 +348,12 @@ export function useUserActions() {
    */
   const executeBanUser = async (user: User, duration: string = '24h', reason?: string): Promise<void> => {
     try {
-      const result = await authStore.banUser(user.id, duration, reason)
+      const result = await authStore.banUser(user.id, duration, reason) as BanUserResult
 
-      if (result.error) {
+      if ('error' in result) {
         const errorMsg = typeof result.error === 'string'
           ? result.error
-          : (result.error as any)?.message || 'Failed to ban user'
+          : (result.error as AuthError)?.message || 'Failed to ban user'
         throw new Error(errorMsg)
       }
 
@@ -232,12 +383,12 @@ export function useUserActions() {
    */
   const executeUnbanUser = async (user: User): Promise<void> => {
     try {
-      const result = await authStore.unbanUser(user.id)
+      const result = await authStore.unbanUser(user.id) as BanUserResult
 
-      if (result.error) {
+      if ('error' in result) {
         const errorMsg = typeof result.error === 'string'
           ? result.error
-          : (result.error as any)?.message || 'Failed to unban user'
+          : (result.error as AuthError)?.message || 'Failed to unban user'
         throw new Error(errorMsg)
       }
 
@@ -268,6 +419,7 @@ export function useUserActions() {
     closeEditDialog,
     updateUser,
     confirmDeleteUser,
+    restoreUser,
     confirmBanUser,
     confirmUnbanUser,
     closeConfirmationDialog,

@@ -109,3 +109,23 @@ export const getNavigationWithSelection = (selectedPermissions: string[] = []): 
 
   return { individual, grouped }
 }
+
+// Helper function to check if a user should be redirected to banned page
+export const shouldRedirectToBanned = (userData: any): boolean => {
+  if (!userData) return false;
+  return userData.app_metadata?.banned || userData.app_metadata?.deleted || false;
+}
+
+// Helper function to get user restriction status
+export const getUserRestrictionStatus = (userData: any): 'active' | 'banned' | 'deleted' => {
+  if (!userData) return 'active';
+  if (userData.app_metadata?.deleted) return 'deleted';
+  if (userData.app_metadata?.banned) return 'banned';
+  return 'active';
+}
+
+// Routes that banned/deleted users can access
+export const allowedRoutesForRestrictedUsers = [
+  '/auth',
+  '/banned'
+];

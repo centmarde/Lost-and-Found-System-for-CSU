@@ -83,7 +83,7 @@ export async function fetchConversations(itemId: number): Promise<Conversation[]
           : { message: "No messages yet", created_at: conv.created_at },
       message_count: conv.messages?.length || 0,
     }));
-    
+
     return processedConversations;
 
   } catch (error) {
@@ -173,5 +173,77 @@ export async function createConversation(
   } catch (error) {
     console.error("Error creating conversation:", error);
     throw new Error("Failed to create conversation");
+  }
+}
+
+/**
+ * Gets the count of unique users who have chatted about a specific item
+ * Returns the number of unique senders who have contacted about the item
+ */
+export async function getItemConversationCount(itemId: number): Promise<number> {
+  try {
+    const { data: conversations, error } = await supabase
+      .from('conversations')
+      .select('sender_id')
+      .eq('item_id', itemId)
+
+    if (error) throw error
+
+    if (!conversations || conversations.length === 0) return 0
+
+    // Get unique senders (people who contacted about this item)
+    const uniqueSenders = new Set(conversations.map(conv => conv.sender_id))
+    return uniqueSenders.size
+
+  } catch (error) {
+    console.error('Error getting item conversation count:', error)
+    return 0
+  }
+}
+
+/**
+ * Gets conversation counts for multiple items
+ * Returns a map of item_id -> conversation_count
+ */
+export async function getMultipleItemsConversationCounts(itemIds: number[]): Promise<Record<number, number>> {
+  try {
+    if (itemIds.length === 0) return {}
+
+    const { data: conversations, error } = await supabase
+      .from('conversations')
+      .select('item_id, sender_id')
+      .in('item_id', itemIds)
+
+    if (error) throw error
+
+    // Initialize counts
+    const conversationCounts: Record<number, number> = {}
+    itemIds.forEach(id => {
+      conversationCounts[id] = 0
+    })
+
+    if (!conversations || conversations.length === 0) return conversationCounts
+
+    // Group by item_id and count unique senders
+    const itemSendersMap: Record<number, Set<string>> = {}
+
+    conversations.forEach(conv => {
+      if (!itemSendersMap[conv.item_id]) {
+        itemSendersMap[conv.item_id] = new Set()
+      }
+      itemSendersMap[conv.item_id].add(conv.sender_id)
+    })
+
+    // Set the counts
+    Object.keys(itemSendersMap).forEach(itemId => {
+      const itemIdNum = parseInt(itemId)
+      conversationCounts[itemIdNum] = itemSendersMap[itemIdNum].size
+    })
+
+    return conversationCounts
+
+  } catch (error) {
+    console.error('Error getting multiple items conversation counts:', error)
+    return {}
   }
 }

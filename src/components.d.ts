@@ -11,11 +11,13 @@ declare module 'vue' {
     ConfirmationDialog: typeof import('./components/common/ConfirmationDialog.vue')['default']
     DirectAdminMessageCard: typeof import('./components/common/DirectAdminMessageCard.vue')['default']
     ErrorDialog: typeof import('./components/common/ErrorDialog.vue')['default']
+    ForgotPasswordDialog: typeof import('./components/auth/dialogs/ForgotPasswordDialog.vue')['default']
     InsideNavbar1: typeof import('./components/common/insideNavbar/InsideNavbar1.vue')['default']
     InsideNavbar2: typeof import('./components/common/insideNavbar/InsideNavbar2.vue')['default']
     InsideNavbar3: typeof import('./components/common/insideNavbar/InsideNavbar3.vue')['default']
     InsideNavbar4: typeof import('./components/common/insideNavbar/InsideNavbar4.vue')['default']
     ItemFilters: typeof import('./components/common/ItemFilters.vue')['default']
+    ItemsDisplay: typeof import('./components/common/ItemsDisplay.vue')['default']
     LoginForm: typeof import('./components/auth/LoginForm.vue')['default']
     OuterFooter: typeof import('./components/common/outerFooters/OuterFooter.vue')['default']
     OuterFooter2: typeof import('./components/common/outerFooters/OuterFooter2.vue')['default']
@@ -27,5 +29,6 @@ declare module 'vue' {
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
     Sidebar: typeof import('./components/common/sideBar/Sidebar.vue')['default']
+    VersionLog: typeof import('./components/common/VersionLog.vue')['default']
   }
 }

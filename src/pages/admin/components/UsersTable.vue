@@ -1,16 +1,31 @@
 
+<!--
+  UsersTable Component
+
+  Features:
+  - Search by name or email
+  - Filter by role and ban status
+  - Sort by multiple criteria (date, email, role, name)
+  - Date range filtering
+  - Responsive design with desktop table and mobile cards
+  - Real-time filter application
+  - Filter state preservation during user operations
+-->
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
 import { useAuthUserStore } from '@/stores/authUser'
+import { useUserRolesStore } from '@/stores/roles'
 import { useToast } from 'vue-toastification'
-import { getRoleName, getRoleColor } from '@/utils/usersTableHelpers'
+import { getRoleColor } from '@/utils/usersTableHelpers'
 import { useUserActions } from '@/composables/useUserActions'
 import UserDetailsDialog from './dialogs/UserDetailsDialog.vue'
 import EditUserDialog from './dialogs/EditUserDialog.vue'
 import ConfirmationDialog from './dialogs/ConfirmationDialog.vue'
+import UserSearchFilters from './UserSearchFilters.vue'
 
 // Store and utilities
 const authStore = useAuthUserStore()
+const rolesStore = useUserRolesStore()
 const toast = useToast()
 
 // User actions composable
@@ -29,6 +44,7 @@ const {
   closeEditDialog,
   updateUser,
   confirmDeleteUser,
+  restoreUser,
   confirmBanUser,
   confirmUnbanUser,
   closeConfirmationDialog,
@@ -37,30 +53,54 @@ const {
 
 // Reactive state
 const users = ref<any[]>([])
+const allUsers = ref<any[]>([]) // Store all users for filtering
 const loading = ref(false)
 const error = ref<string | null>(null)
 const userDialog = ref(false)
 const selectedUser = ref<any>(null)
-const roleCache = ref<Record<number, string>>({}) // Cache for role titles from database
+const roleCache = ref<Record<number, string>>({}) // Cache for role titles from roles store
+
+
+
+// Filter state
+interface FilterData {
+  search: string
+  roleFilter: number | null
+  statusFilter: string
+  sortBy: string
+  sortOrder: 'asc' | 'desc'
+  dateFrom: string
+  dateTo: string
+}
+
+const currentFilters = ref<FilterData>({
+  search: '',
+  roleFilter: null,
+  statusFilter: 'all',
+  sortBy: 'created_at',
+  sortOrder: 'desc',
+  dateFrom: '',
+  dateTo: '',
+})
 
 // Table headers
 const headers = [
   {
     title: 'User',
     align: 'start' as const,
-    sortable: true,
+    sortable: false,
     key: 'email',
   },
   {
     title: 'Created Date',
     align: 'start' as const,
-    sortable: true,
+    sortable: false,
     key: 'created_at',
   },
   {
     title: 'Role',
     align: 'center' as const,
-    sortable: true,
+    sortable: false,
     key: 'role',
   },
   {
@@ -72,7 +112,7 @@ const headers = [
 ]
 
 // Methods
-const getRoleTitleAsync = async (roleId: number): Promise<string> => {
+const getRoleTitleById = async (roleId: number): Promise<string> => {
   if (!roleId) return 'No Role'
 
   // Check cache first
@@ -81,19 +121,24 @@ const getRoleTitleAsync = async (roleId: number): Promise<string> => {
   }
 
   try {
-    const result = await authStore.getRoleTitleById(roleId)
-
-    if (result.title) {
-      roleCache.value[roleId] = result.title
-      return result.title
-    } else {
-      // Fallback to helper function if database query fails
-      return getRoleName(roleId)
+    // Find role in the roles store
+    const role = rolesStore.roles.find(r => r.id === roleId)
+    if (role) {
+      roleCache.value[roleId] = role.title
+      return role.title
     }
+
+    // If not found in store, fetch a specific role
+    const fetchedRole = await rolesStore.fetchRoleById(roleId)
+    if (fetchedRole) {
+      roleCache.value[roleId] = fetchedRole.title
+      return fetchedRole.title
+    }
+
+    return 'Unknown Role'
   } catch (error) {
     console.error('Error fetching role title:', error)
-    // Fallback to helper function
-    return getRoleName(roleId)
+    return 'Unknown Role'
   }
 }
 
@@ -102,6 +147,10 @@ const fetchUsers = async () => {
   error.value = null
 
   try {
+    // First, fetch all roles to populate the store
+    await rolesStore.fetchRoles()
+
+    // Then fetch users
     const result = await authStore.getAllUsers()
 
     if (result.error) {
@@ -111,9 +160,9 @@ const fetchUsers = async () => {
       error.value = errorMessage
       toast.error('Failed to load users')
     } else if (result.users) {
-      users.value = result.users
+      allUsers.value = result.users // Store all users
 
-      // Preload role titles from database for all unique role IDs
+      // Preload role titles from roles store for all unique role IDs
       const roleIds = new Set<number>()
       result.users.forEach(user => {
         const roleId = user.raw_user_meta_data?.role || user.raw_app_meta_data?.role
@@ -122,10 +171,13 @@ const fetchUsers = async () => {
         }
       })
 
-      // Fetch all role titles from database
+      // Populate cache with role titles from the store
       for (const roleId of roleIds) {
-        await getRoleTitleAsync(roleId)
+        await getRoleTitleById(roleId)
       }
+
+      // Apply current filters
+      applyFilters()
 
       //toast.success(`Loaded ${result.users.length} users`)
     }
@@ -138,21 +190,184 @@ const fetchUsers = async () => {
   }
 }
 
+// Filter methods
+const applyFilters = () => {
+  let filteredUsers = [...allUsers.value]
+
+  // Apply search filter
+  if (currentFilters.value.search) {
+    const searchTerm = currentFilters.value.search.toLowerCase()
+    filteredUsers = filteredUsers.filter(user => {
+      const email = user.email?.toLowerCase() || ''
+      const fullName = user.raw_user_meta_data?.full_name?.toLowerCase() || ''
+      return email.includes(searchTerm) || fullName.includes(searchTerm)
+    })
+  }
+
+  // Apply role filter
+  if (currentFilters.value.roleFilter !== null) {
+    filteredUsers = filteredUsers.filter(user => {
+      const userRole = user.raw_user_meta_data?.role || user.raw_app_meta_data?.role
+      return userRole === currentFilters.value.roleFilter
+    })
+  }
+
+  // Apply status filter
+  filteredUsers = filteredUsers.filter(user => {
+    const isBanned = user.raw_app_meta_data?.banned || user.raw_app_meta_data?.deleted
+    if (currentFilters.value.statusFilter === 'banned') {
+      return isBanned
+    } else {
+      // For 'all' and 'active' status, exclude banned/deleted users
+      return !isBanned
+    }
+  })
+
+  // Apply date filters
+  if (currentFilters.value.dateFrom) {
+    const fromDate = new Date(currentFilters.value.dateFrom)
+    filteredUsers = filteredUsers.filter(user => {
+      const createdDate = new Date(user.created_at)
+      return createdDate >= fromDate
+    })
+  }
+
+  if (currentFilters.value.dateTo) {
+    const toDate = new Date(currentFilters.value.dateTo)
+    toDate.setHours(23, 59, 59, 999) // Include the entire day
+    filteredUsers = filteredUsers.filter(user => {
+      const createdDate = new Date(user.created_at)
+      return createdDate <= toDate
+    })
+  }
+
+  // Apply sorting
+  filteredUsers.sort((a, b) => {
+    let aValue, bValue
+    let isAlphabetical = false
+    let isDescending = false
+
+    switch (currentFilters.value.sortBy) {
+      case 'email':
+        aValue = a.email?.toLowerCase() || ''
+        bValue = b.email?.toLowerCase() || ''
+        break
+      case 'email_alpha_asc':
+        aValue = a.email?.toLowerCase() || ''
+        bValue = b.email?.toLowerCase() || ''
+        isAlphabetical = true
+        break
+      case 'email_alpha_desc':
+        aValue = a.email?.toLowerCase() || ''
+        bValue = b.email?.toLowerCase() || ''
+        isAlphabetical = true
+        isDescending = true
+        break
+      case 'full_name':
+        aValue = a.raw_user_meta_data?.full_name?.toLowerCase() || ''
+        bValue = b.raw_user_meta_data?.full_name?.toLowerCase() || ''
+        break
+      case 'name_alpha_asc':
+        aValue = a.raw_user_meta_data?.full_name?.toLowerCase() || ''
+        bValue = b.raw_user_meta_data?.full_name?.toLowerCase() || ''
+        isAlphabetical = true
+        break
+      case 'name_alpha_desc':
+        aValue = a.raw_user_meta_data?.full_name?.toLowerCase() || ''
+        bValue = b.raw_user_meta_data?.full_name?.toLowerCase() || ''
+        isAlphabetical = true
+        isDescending = true
+        break
+      case 'role':
+        aValue = getRoleTitleSync(a.raw_user_meta_data?.role || a.raw_app_meta_data?.role).toLowerCase()
+        bValue = getRoleTitleSync(b.raw_user_meta_data?.role || b.raw_app_meta_data?.role).toLowerCase()
+        break
+      case 'role_alpha_asc':
+        aValue = getRoleTitleSync(a.raw_user_meta_data?.role || a.raw_app_meta_data?.role).toLowerCase()
+        bValue = getRoleTitleSync(b.raw_user_meta_data?.role || b.raw_app_meta_data?.role).toLowerCase()
+        isAlphabetical = true
+        break
+      case 'role_alpha_desc':
+        aValue = getRoleTitleSync(a.raw_user_meta_data?.role || a.raw_app_meta_data?.role).toLowerCase()
+        bValue = getRoleTitleSync(b.raw_user_meta_data?.role || b.raw_app_meta_data?.role).toLowerCase()
+        isAlphabetical = true
+        isDescending = true
+        break
+      case 'created_at':
+      default:
+        aValue = new Date(a.created_at).getTime()
+        bValue = new Date(b.created_at).getTime()
+        break
+    }
+
+    // For alphabetical sorts, use predefined order
+    if (isAlphabetical) {
+      if (aValue < bValue) return isDescending ? 1 : -1
+      if (aValue > bValue) return isDescending ? -1 : 1
+      return 0
+    }
+
+    if (aValue < bValue) {
+      return currentFilters.value.sortOrder === 'asc' ? -1 : 1
+    }
+    if (aValue > bValue) {
+      return currentFilters.value.sortOrder === 'asc' ? 1 : -1
+    }
+    return 0
+  })
+
+  users.value = filteredUsers
+}
+
+const handleFiltersUpdate = (filters: FilterData) => {
+  currentFilters.value = filters
+  applyFilters()
+}
+
+const handleFiltersReset = () => {
+  currentFilters.value = {
+    search: '',
+    roleFilter: null,
+    statusFilter: 'all',
+    sortBy: 'created_at',
+    sortOrder: 'desc',
+    dateFrom: '',
+    dateTo: '',
+  }
+  applyFilters()
+}
+
+
+
 const getRoleTitleSync = (roleId: number): string => {
   if (!roleId) return 'No Role'
 
-  // Return from cache if available (database value)
+  // Return from cache if available (from roles store)
   if (roleCache.value[roleId]) {
     return roleCache.value[roleId]
   }
 
-  // Fallback to helper function while loading
-  return getRoleName(roleId)
+  // Try to find in current roles store
+  const role = rolesStore.roles.find(r => r.id === roleId)
+  if (role) {
+    roleCache.value[roleId] = role.title
+    return role.title
+  }
+
+  // Return unknown if not found
+  return 'Unknown Role'
 }
 
 const refreshUsers = () => {
   fetchUsers()
 }
+
+// Computed property for available roles to pass to filter component
+const availableRoles = computed(() => {
+  return rolesStore.roles || []
+})
+
+
 
 const viewUser = (user: any) => {
   selectedUser.value = user
@@ -167,18 +382,26 @@ const deleteUser = (user: any) => {
   confirmDeleteUser(user)
 }
 
+// Handle user restoration
+const handleUserRestore = async (user: any) => {
+  const result = await restoreUser(user)
+  if (result.success) {
+    await fetchUsers() // Refresh the users list
+  }
+}
+
 // Handle user update with refresh
 const handleUserUpdate = async () => {
   const result = await updateUser()
   if (result.success) {
-    await fetchUsers() // Refresh the users list
+    await fetchUsers() // Refresh the users list with current filters
   }
 }
 
 // Handle user deletion with refresh
 const handleUserDeletion = async () => {
   await executeConfirmedAction()
-  await fetchUsers() // Refresh the users list
+  await fetchUsers() // Refresh the users list with current filters
 }
 
 // Utility functions
@@ -213,8 +436,10 @@ onMounted(() => {
             </p>
           </div>
 
-          <!-- Refresh button -->
-          <div class="d-flex align-center flex-shrink-0">
+          <!-- Control buttons -->
+          <div class="d-flex align-center flex-shrink-0 gap-2">
+
+            <!-- Refresh button -->
             <v-btn
               color="primary"
               variant="tonal"
@@ -223,12 +448,21 @@ onMounted(() => {
               class="refresh-btn"
               size="small"
             >
-              Refresh
+              <v-icon size="16" class="mr-1">mdi-refresh</v-icon>
+              <span class="d-none d-sm-inline">Refresh</span>
             </v-btn>
           </div>
         </div>
       </v-col>
     </v-row>
+
+    <!-- Search and Filters Component -->
+    <UserSearchFilters
+      :loading="loading"
+      :roles="availableRoles"
+      @update:filters="handleFiltersUpdate"
+      @reset:filters="handleFiltersReset"
+    />
 
 
 
@@ -253,6 +487,20 @@ onMounted(() => {
           {{ error }}
         </v-alert>
 
+        <!-- Results Summary -->
+        <div v-if="!loading && allUsers.length > 0" class="mb-3">
+          <div class="d-flex justify-space-between align-center">
+            <div class="text-body-2 text-medium-emphasis">
+              Showing {{ users.length }} of {{ allUsers.length }} users
+            </div>
+            <div v-if="users.length !== allUsers.length" class="text-caption text-primary">
+              {{ allUsers.length - users.length }} users filtered out
+            </div>
+          </div>
+
+
+        </div>
+
         <!-- Desktop view - Data table for larger screens -->
         <div class="d-none d-md-block">
           <v-data-table
@@ -262,6 +510,8 @@ onMounted(() => {
             :items-per-page="10"
             class="elevation-1"
             item-key="id"
+            :sort-by="[]"
+            disable-sort
           >
             <!-- Email column with avatar -->
             <template v-slot:item.email="{ item }">
@@ -299,9 +549,18 @@ onMounted(() => {
                   {{ getRoleTitleSync(item.raw_user_meta_data?.role || item.raw_app_meta_data?.role) }}
                 </v-chip>
 
-                <!-- Ban status indicator -->
+                <!-- Ban/Delete status indicator -->
                 <v-chip
-                  v-if="item.raw_app_meta_data?.banned"
+                  v-if="item.raw_app_meta_data?.deleted"
+                  color="warning"
+                  size="x-small"
+                  variant="tonal"
+                >
+                  <v-icon start size="12">mdi-delete</v-icon>
+                  Deleted
+                </v-chip>
+                <v-chip
+                  v-else-if="item.raw_app_meta_data?.banned"
                   color="error"
                   size="x-small"
                   variant="tonal"
@@ -335,10 +594,27 @@ onMounted(() => {
                   color="orange"
                   @click="editUser(item)"
                   :loading="editingUser"
+                  :disabled="item.raw_app_meta_data?.deleted"
                 >
                   <v-icon>mdi-pencil</v-icon>
                   <v-tooltip activator="parent" location="top">
                     Edit User
+                  </v-tooltip>
+                </v-btn>
+
+                <!-- Restore button (only for deleted users) -->
+                <v-btn
+                  v-if="item.raw_app_meta_data?.deleted"
+                  icon="mdi-restore"
+                  size="small"
+                  variant="text"
+                  color="success"
+                  @click="handleUserRestore(item)"
+                  :loading="deletingUser"
+                >
+                  <v-icon>mdi-restore</v-icon>
+                  <v-tooltip activator="parent" location="top">
+                    Restore User
                   </v-tooltip>
                 </v-btn>
 
@@ -360,34 +636,37 @@ onMounted(() => {
                   </template>
 
                   <v-list density="compact" min-width="160">
-                    <!-- Ban/Unban Actions -->
-                    <v-list-item
-                      v-if="!item.raw_app_meta_data?.banned"
-                      @click="confirmBanUser(item)"
-                      prepend-icon="mdi-account-cancel"
-                    >
-                      <v-list-item-title>Ban User</v-list-item-title>
-                    </v-list-item>
+                    <!-- Ban/Unban Actions (only for active users) -->
+                    <template v-if="!item.raw_app_meta_data?.deleted">
+                      <v-list-item
+                        v-if="!item.raw_app_meta_data?.banned"
+                        @click="confirmBanUser(item)"
+                        prepend-icon="mdi-account-cancel"
+                      >
+                        <v-list-item-title>Ban User</v-list-item-title>
+                      </v-list-item>
 
-                    <v-list-item
-                      v-else
-                      @click="confirmUnbanUser(item)"
-                      prepend-icon="mdi-account-check"
-                      class="text-success"
-                    >
-                      <v-list-item-title>Unban User</v-list-item-title>
-                    </v-list-item>
+                      <v-list-item
+                        v-else
+                        @click="confirmUnbanUser(item)"
+                        prepend-icon="mdi-account-check"
+                        class="text-success"
+                      >
+                        <v-list-item-title>Unban User</v-list-item-title>
+                      </v-list-item>
+                    </template>
 
-                    <v-divider class="my-1"></v-divider>
+                    <v-divider v-if="!item.raw_app_meta_data?.deleted" class="my-1"></v-divider>
 
-                    <!-- Delete Action -->
+                    <!-- Delete Action (only for active users) -->
                     <v-list-item
+                      v-if="!item.raw_app_meta_data?.deleted"
                       @click="deleteUser(item)"
                       prepend-icon="mdi-delete"
                       class="text-error"
                       :disabled="deletingUser"
                     >
-                      <v-list-item-title>Delete User</v-list-item-title>
+                      <v-list-item-title>Soft Delete User</v-list-item-title>
                     </v-list-item>
                   </v-list>
                 </v-menu>
@@ -457,16 +736,25 @@ onMounted(() => {
                     <!-- Role chip moved below user info -->
                     <div class="mt-2 d-flex flex-wrap gap-1">
                       <v-chip
-                        :color="getRoleColor(user.raw_user_meta_data?.role)"
+                        :color="getRoleColor(user.raw_user_meta_data?.role || user.raw_app_meta_data?.role)"
                         size="small"
                         variant="tonal"
                       >
-                        {{ getRoleTitleSync(user.raw_user_meta_data?.role) }}
+                        {{ getRoleTitleSync(user.raw_user_meta_data?.role || user.raw_app_meta_data?.role) }}
                       </v-chip>
 
-                      <!-- Ban status indicator -->
+                      <!-- Ban/Delete status indicator -->
                       <v-chip
-                        v-if="user.raw_app_meta_data?.banned"
+                        v-if="user.raw_app_meta_data?.deleted"
+                        color="warning"
+                        size="small"
+                        variant="tonal"
+                      >
+                        <v-icon start size="12">mdi-delete</v-icon>
+                        Deleted
+                      </v-chip>
+                      <v-chip
+                        v-else-if="user.raw_app_meta_data?.banned"
                         color="error"
                         size="small"
                         variant="tonal"
@@ -494,7 +782,7 @@ onMounted(() => {
                   <v-btn
                     size="x-small"
                     variant="tonal"
-                    color="primary"
+
                     @click="viewUser(user)"
                     class="mobile-action-btn"
                     density="compact"
@@ -503,7 +791,23 @@ onMounted(() => {
                     <span class="mobile-btn-text">View</span>
                   </v-btn>
 
+                  <!-- Restore button (only for deleted users) -->
                   <v-btn
+                    v-if="user.raw_app_meta_data?.deleted"
+                    size="x-small"
+                    variant="tonal"
+                    color="success"
+                    @click="handleUserRestore(user)"
+                    class="mobile-action-btn mx-1"
+                    density="compact"
+                    :loading="deletingUser"
+                  >
+                    <v-icon size="14" class="me-1">mdi-restore</v-icon>
+                    <span class="mobile-btn-text">Restore</span>
+                  </v-btn>
+
+                  <v-btn
+                    v-else
                     size="x-small"
                     variant="tonal"
                     color="orange"
@@ -533,9 +837,9 @@ onMounted(() => {
                     </template>
 
                     <v-list density="compact" min-width="140">
-                      <!-- Ban/Unban Actions -->
+                      <!-- Ban Action (only for active, non-banned users) -->
                       <v-list-item
-                        v-if="!user.raw_app_meta_data?.banned"
+                        v-if="!user.raw_app_meta_data?.deleted && !user.raw_app_meta_data?.banned"
                         @click="confirmBanUser(user)"
                         prepend-icon="mdi-account-cancel"
                         density="compact"
@@ -543,8 +847,9 @@ onMounted(() => {
                         <v-list-item-title class="text-caption">Ban</v-list-item-title>
                       </v-list-item>
 
+                      <!-- Unban Action (only for active, banned users) -->
                       <v-list-item
-                        v-else
+                        v-if="!user.raw_app_meta_data?.deleted && user.raw_app_meta_data?.banned"
                         @click="confirmUnbanUser(user)"
                         prepend-icon="mdi-account-check"
                         class="text-success"
@@ -553,17 +858,30 @@ onMounted(() => {
                         <v-list-item-title class="text-caption">Unban</v-list-item-title>
                       </v-list-item>
 
-                      <v-divider class="my-1"></v-divider>
-
-                      <!-- Delete Action -->
+                      <!-- Restore Action (only for deleted users) -->
                       <v-list-item
+                        v-if="user.raw_app_meta_data?.deleted"
+                        @click="restoreUser(user)"
+                        prepend-icon="mdi-restore"
+                        class="text-success"
+                        density="compact"
+                        :disabled="deletingUser"
+                      >
+                        <v-list-item-title class="text-caption">Restore</v-list-item-title>
+                      </v-list-item>
+
+                      <v-divider v-if="!user.raw_app_meta_data?.deleted" class="my-1"></v-divider>
+
+                      <!-- Delete Action (only for active users) -->
+                      <v-list-item
+                        v-if="!user.raw_app_meta_data?.deleted"
                         @click="deleteUser(user)"
                         prepend-icon="mdi-delete"
                         class="text-error"
                         density="compact"
                         :disabled="deletingUser"
                       >
-                        <v-list-item-title class="text-caption">Delete</v-list-item-title>
+                        <v-list-item-title class="text-caption">Soft Delete</v-list-item-title>
                       </v-list-item>
                     </v-list>
                   </v-menu>
@@ -678,7 +996,7 @@ onMounted(() => {
   height: 36px !important;
 }
 
-/* Ensure button is visible on all screen sizes */
+/* Ensure buttons are visible on all screen sizes */
 .refresh-btn .v-btn__content {
   display: flex !important;
   align-items: center !important;
