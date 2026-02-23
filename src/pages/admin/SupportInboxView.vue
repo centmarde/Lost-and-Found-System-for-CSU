@@ -6,7 +6,7 @@ import { supabase } from "@/lib/supabase";
 import { loadItems as loadItemsFromStore, getUnreadMessageCountsForItems, updateUnreadCountForConversation as updateUnreadCountForConversationStore, markAllUnreadMessagesAsRead, getUnreadConversationsDetails } from "@/stores/messages";
 import { useSidebarStore } from "@/stores/sidebar";
 import { useToast } from 'vue-toastification';
-
+import { getUserProfile } from "@/stores/adminSupport";
 // Composables
 import { useAuth } from "@/pages/admin/components/composables/useAuth";
 import { useAdminSupportInbox } from "@/pages/admin/components/composables/useAdminSupportInbox";
@@ -76,6 +76,22 @@ const directMessageConversations = computed(() => {
     return conversation.item_id === null || conversation.item_id === undefined;
   });
 });
+
+// Computed property for direct messages where current user is sender or receiver
+const directMessageFilteredConversations = computed(() => {
+  if (!currentUser.value) return [];
+  return supportConversations.value.filter(conversation => {
+    const isDirect = conversation.item_id === null || conversation.item_id === undefined;
+    const isParticipant = conversation.sender_id === currentUser.value.id || conversation.receiver_id === currentUser.value.id;
+    return isDirect && isParticipant;
+  });
+});
+
+// Computed property for direct message conversation count for current user
+const directMessageConversationCount = computed(() => {
+  return directMessageFilteredConversations.value.length;
+});
+
 
 // Computed property to count conversations per item
 const getItemConversationCount = (itemId: number) => {
@@ -201,15 +217,6 @@ const selectItem = async (item: any) => {
   await loadSupportConversations(1);
 };
 
-// Show direct messages view (user grid)
-const showDirectMessagesView = async () => {
-  viewMode.value = 'direct-messages';
-  selectedItem.value = null;
-  selectedUser.value = null;
-  selectedSupportConversation.value = null;
-  await loadSupportConversations(1);
-};
-
 // Select a user to view their direct messages
 const selectUser = async (user: any) => {
   selectedUser.value = user;
@@ -276,9 +283,42 @@ const handleMarkAllAsRead = async () => {
 // Helper functions for conversation display
 const getConversationDisplayName = (conversation: any) => {
   if (currentUser.value && conversation.sender_id === currentUser.value.id) {
-    return 'Admin';
+    return `${conversation.sender_profile?.full_name}`;
   }
-  return conversation.sender_profile?.full_name || 'Student User';
+  return conversation.sender_profile?.full_name ;
+};
+
+
+const getConversationReceiverDisplayName = (conversation: any) => {
+  // If current user is normal user (role 2), fetch/display receiver's profile
+  if (currentUser.value && (currentUser.value.app_metadata?.role === 2 || currentUser.value.user_metadata?.role === 2)) {
+    if (conversation.receiver_profile && conversation.receiver_profile.full_name) {
+      return conversation.receiver_profile.full_name;
+    }
+    if (conversation.receiver_id && !conversation.receiver_profile) {
+      getUserProfile(conversation.receiver_id).then(profile => {
+        if (profile && profile.full_name) {
+          conversation.receiver_profile = profile;
+        }
+      });
+    }
+    return "";
+  }
+  // If current user is admin (role 1), fetch/display sender's profile
+  if (currentUser.value && (currentUser.value.app_metadata?.role === 1 || currentUser.value.user_metadata?.role === 1)) {
+    if (conversation.sender_profile && conversation.sender_profile.full_name) {
+      return conversation.sender_profile.full_name;
+    }
+    if (conversation.sender_id && !conversation.sender_profile) {
+      getUserProfile(conversation.sender_id).then(profile => {
+        if (profile && profile.full_name) {
+          conversation.sender_profile = profile;
+        }
+      });
+    }
+    return "";
+  }
+  return "";
 };
 
 const getConversationInitials = (conversation: any) => {
@@ -537,14 +577,6 @@ onBeforeUnmount(() => {
                   <v-icon class="me-2" color="info">mdi-account-message</v-icon>
                   Users with Direct Messages
                   <v-spacer />
-                  <v-chip
-                    v-if="!loadingSupportConversations"
-                    color="info"
-                    variant="tonal"
-                    :size="$vuetify.display.xs ? 'x-small' : 'small'"
-                  >
-                    {{ usersWithDirectMessages.length }} {{ usersWithDirectMessages.length === 1 ? 'User' : 'Users' }}
-                  </v-chip>
                 </v-card-title>
 
                 <!-- Loading State -->
@@ -553,20 +585,13 @@ onBeforeUnmount(() => {
                   <p class="text-body-1 mt-4">Loading direct messages...</p>
                 </div>
 
-                <!-- Empty State -->
-                <div v-else-if="usersWithDirectMessages.length === 0" class="text-center py-12">
-                  <v-icon size="80" color="grey-lighten-1" class="mb-4">
-                    mdi-account-message-outline
-                  </v-icon>
-                  <h3 class="text-h5 text-grey-darken-1 mb-2">
-                    No Direct Messages
-                  </h3>
-                  <p class="text-body-1 text-grey-darken-2 mb-4">
-                    Students haven't sent any direct messages yet.
-                  </p>
+                <!-- Users Grid -->
+                <div v-else-if="directMessageConversationCount === 0" class="text-center py-12">
+                  <v-icon size="48" color="grey-lighten-1" class="mb-4">mdi-message-text</v-icon>
+                  <h3 class="text-h6 text-grey-darken-1 mb-2">No direct conversation initiated</h3>
+                  <p class="text-body-2 text-grey-darken-2 mb-0">No students have started a direct message yet.</p>
                 </div>
 
-                <!-- Users Grid -->
                 <v-row v-else>
                   <v-col
                     v-for="user in usersWithDirectMessages"
@@ -583,20 +608,6 @@ onBeforeUnmount(() => {
                       @click="selectUser(user)"
                     >
                       <v-card-title class="d-flex justify-space-between align-start pb-2">
-                        <div class="d-flex align-center">
-                          <v-avatar
-                            color="info"
-                            size="40"
-                            class="me-2"
-                          >
-                            <span class="text-white font-weight-bold">
-                              {{ user.full_name.split(' ').map((n: string) => n[0]).join('').toUpperCase().substring(0, 2) }}
-                            </span>
-                          </v-avatar>
-                          <div>
-                            <div class="text-subtitle-1 font-weight-bold">{{ user.full_name }}</div>
-                          </div>
-                        </div>
                         <div class="d-flex align-center gap-1">
                           <!-- Unread Messages Badge -->
                           <v-badge
@@ -613,14 +624,13 @@ onBeforeUnmount(() => {
                             size="x-small"
                             variant="flat"
                           >
-                            DIRECT
+                            DIRECT MESSAGES
                           </v-chip>
                         </div>
                       </v-card-title>
 
                       <v-card-text>
                         <p class="text-body-2 text-grey-darken-1 mb-3" style="min-height: 60px;">
-                          {{ user.email }}<br/>
                           <span class="text-caption">
                             General support conversations not related to specific items
                           </span>
@@ -628,23 +638,22 @@ onBeforeUnmount(() => {
 
                         <v-divider class="my-3" />
 
-                        <!-- Conversation Count and Unread Messages -->
                         <div class="d-flex align-center justify-space-between">
-                          <div class="d-flex flex-column">
-                            <div class="d-flex align-center text-caption text-grey-darken-1 mb-1">
-                              <v-icon size="16" class="me-1">mdi-message-text</v-icon>
-                              {{ user.conversations.length }}
-                              {{ user.conversations.length === 1 ? 'conversation' : 'conversations' }}
-                            </div>
-                          </div>
-                          <v-btn
-                            color="info"
-                            variant="text"
-                            size="small"
-                            append-icon="mdi-chevron-right"
-                          >
-                            View
-                          </v-btn>
+                            <div class="d-flex flex-column">
+                              <div class="d-flex align-center text-caption text-grey-darken-1 mb-1">
+                                  <v-icon size="16" class="me-1">mdi-message-text</v-icon>
+                                  {{ directMessageConversationCount }}
+                                  {{ directMessageConversationCount === 1 ? 'conversation' : 'conversations' }}
+                              </div>
+                              </div>
+                              <v-btn
+                                color="info"
+                                variant="text"
+                                size="small"
+                                append-icon="mdi-chevron-right"
+                              >
+                                View
+                              </v-btn>
                         </div>
 
                         <!-- Latest Message Date -->
@@ -667,32 +676,18 @@ onBeforeUnmount(() => {
                   <v-btn
                     icon="mdi-arrow-left"
                     variant="text"
-                    @click="backToUsers"
-                    class="me-3"
+                    @click="backToMainView"
                   />
                   <div class="flex-grow-1">
                     <div class="d-flex align-center">
-                      <v-avatar
-                        color="info"
-                        size="45"
-                        class="me-3"
-                      >
-                        <span class="text-white font-weight-bold">
-                          {{ selectedUser.full_name.split(' ').map((n: string) => n[0]).join('').toUpperCase().substring(0, 2) }}
-                        </span>
-                      </v-avatar>
-                      <div>
-                        <h2 class="text-h5 font-weight-bold">{{ selectedUser.full_name }}</h2>
-                        <p class="text-body-2 text-grey-darken-1 mb-0">{{ selectedUser.email }}</p>
-                      </div>
                       <v-chip
                         color="info"
-                        size="small"
+                        size="large"
                         variant="flat"
                         class="ml-3"
                       >
                         <v-icon start>mdi-lifebuoy</v-icon>
-                        DIRECT SUPPORT
+                        DIRECT MESSAGES
                       </v-chip>
                     </div>
                   </div>
@@ -702,17 +697,8 @@ onBeforeUnmount(() => {
 
                 <v-card-title class="text-h6 font-weight-bold mb-4 d-flex align-center px-0">
                   <v-icon class="me-2" color="info">mdi-inbox</v-icon>
-                  Direct Messages from {{ selectedUser.full_name }}
+                  Direct Messages from Admins
                   <v-spacer />
-                  <v-chip
-                    v-if="!loadingSupportConversations"
-                    color="info"
-                    variant="tonal"
-                    :size="$vuetify.display.xs ? 'x-small' : 'small'"
-                  >
-                    {{ filteredConversations.length }}
-                    {{ filteredConversations.length === 1 ? 'Conversation' : 'Conversations' }}
-                  </v-chip>
                 </v-card-title>
 
                 <!-- Loading State -->
@@ -775,7 +761,7 @@ onBeforeUnmount(() => {
 
                           <div v-else class="pa-2">
                             <v-card
-                              v-for="conversation in filteredConversations"
+                              v-for="conversation in directMessageFilteredConversations"
                               :key="conversation.id"
                               @click="selectSupportConversation(conversation)"
                               :class="{
@@ -819,7 +805,7 @@ onBeforeUnmount(() => {
                                   <div class="d-flex align-center justify-space-between">
                                     <div>
                                       <h3 class="text-h6 font-weight-bold mb-1">
-                                        {{ getConversationDisplayName(conversation) }}
+                                        {{ getConversationReceiverDisplayName(conversation) }}
                                       </h3>
                                     </div>
                                     <div class="d-flex align-center">
@@ -851,28 +837,10 @@ onBeforeUnmount(() => {
                               <!-- Direct Message Badge and Info -->
                               <div class="d-flex align-center justify-space-between">
                                 <div class="d-flex align-center">
-                                  <v-chip
-                                    color="info"
-                                    variant="elevated"
-                                    size="small"
-                                    class="font-weight-bold me-2"
-                                  >
-                                    <v-icon start size="16">mdi-lifebuoy</v-icon>
-                                    GENERAL SUPPORT
-                                  </v-chip>
                                   <span class="text-caption text-grey-darken-1">
                                     Direct message to admin support
                                   </span>
                                 </div>
-
-                                <v-btn
-                                  color="info"
-                                  variant="text"
-                                  size="small"
-                                  append-icon="mdi-chevron-right"
-                                >
-                                  Open
-                                </v-btn>
                               </div>
 
                               <!-- Conversation started info -->
@@ -944,10 +912,7 @@ onBeforeUnmount(() => {
                                 </v-avatar>
                                 <div>
                                   <div class="text-h6 font-weight-bold">
-                                    {{ getConversationDisplayName(selectedSupportConversation) }}
-                                  </div>
-                                  <div class="text-caption text-grey-darken-1">
-                                    {{ selectedSupportConversation.sender_profile?.email }}
+                                    {{ getConversationReceiverDisplayName(selectedSupportConversation) }}
                                   </div>
                                 </div>
                               </div>

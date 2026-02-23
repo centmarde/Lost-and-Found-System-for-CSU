@@ -5,11 +5,13 @@ import type { Conversation, Message } from "@/types/chat";
  * Helper function to get user details via database function
  * Creates a function that returns user metadata from auth.users
  */
-async function getUserDetails(userId: string) {
+export async function getUserDetails(userId: string) {
   try {
     const { data, error } = await supabase.rpc("get_user_details", {
       user_id: userId,
     });
+
+    console.log("Fetched user details for", userId, data);
     if (error) throw error;
     return data;
   } catch (error) {
@@ -18,6 +20,17 @@ async function getUserDetails(userId: string) {
       full_name: "Unknown User",
       email: "No email",
     };
+  }
+}
+
+export async function getUserProfile(userId: string) {
+  try {
+    const { data, error } = await supabase.from("profiles").select("*").eq("id", userId).single();
+
+    if (error) throw error;
+    return data;
+  } catch (error) {
+    console.warn("Could not fetch profile for", userId);
   }
 }
 

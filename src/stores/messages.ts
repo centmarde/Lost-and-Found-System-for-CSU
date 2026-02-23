@@ -503,8 +503,8 @@ export async function getTotalUnreadMessageCount(currentUserId: string): Promise
       // Students: show conversations where they are involved
       conversationsQuery = conversationsQuery.or(`sender_id.eq.${currentUserId},receiver_id.eq.${currentUserId}`)
     } else {
-      // Admins: only show conversations where they are NOT the sender (i.e., they are receiving messages)
-      conversationsQuery = conversationsQuery.neq('sender_id', currentUserId)
+      // Admins: only show conversations where they are the receiver (i.e., intended for them)
+      conversationsQuery = conversationsQuery.eq('receiver_id', currentUserId)
     }
 
     const { data: conversations, error: convError } = await conversationsQuery
