@@ -6,13 +6,46 @@ import { supabase } from "@/lib/supabase";
 import { loadItems as loadItemsFromStore, getUnreadMessageCountsForItems, updateUnreadCountForConversation as updateUnreadCountForConversationStore, markAllUnreadMessagesAsRead, getUnreadConversationsDetails } from "@/stores/messages";
 import { useSidebarStore } from "@/stores/sidebar";
 import { useToast } from 'vue-toastification';
-import { getUserProfile } from "@/stores/adminSupport";
+import { getUserDetails } from "@/stores/adminSupport";
 // Composables
 import { useAuth } from "@/pages/admin/components/composables/useAuth";
 import { useAdminSupportInbox } from "@/pages/admin/components/composables/useAdminSupportInbox";
 
+
 // Auth composable
 const { currentUser, isCurrentUserAdmin, getCurrentUser } = useAuth();
+// Admin Support Inbox composable
+const {
+  showInbox: showAdminSupportInbox,
+  supportConversations,
+  selectedConversation: selectedSupportConversation,
+  messages: supportInboxMessages,
+  loadingConversations: loadingSupportConversations,
+  loadingMessages: loadingSupportMessages,
+  sendingMessage: sendingSupportInboxMessage,
+  unreadCounts: conversationUnreadCounts,
+  isOtherUserTyping,
+  otherUserTypingName,
+  conversationTypingStatus, // For showing typing in conversation list
+  // Pagination state
+  currentPage,
+  pageSize,
+  totalCount,
+  totalPages,
+  // Functions
+  openInbox,
+  closeInbox,
+  selectConversation: selectSupportConversation,
+  sendMessageToStudent,
+  loadSupportConversations,
+  handleTyping,
+  // Pagination functions
+  goToPage,
+  nextPage,
+  previousPage,
+  changePageSize,
+} = useAdminSupportInbox(currentUser);
+
 
 // Sidebar store for updating badge
 const sidebarStore = useSidebarStore();
@@ -153,38 +186,6 @@ const usersWithDirectMessages = computed(() => {
   );
 });
 
-// Admin Support Inbox composable
-const {
-  showInbox: showAdminSupportInbox,
-  supportConversations,
-  selectedConversation: selectedSupportConversation,
-  messages: supportInboxMessages,
-  loadingConversations: loadingSupportConversations,
-  loadingMessages: loadingSupportMessages,
-  sendingMessage: sendingSupportInboxMessage,
-  unreadCounts: conversationUnreadCounts,
-  isOtherUserTyping,
-  otherUserTypingName,
-  conversationTypingStatus, // For showing typing in conversation list
-  // Pagination state
-  currentPage,
-  pageSize,
-  totalCount,
-  totalPages,
-  // Functions
-  openInbox,
-  closeInbox,
-  selectConversation: selectSupportConversation,
-  sendMessageToStudent,
-  loadSupportConversations,
-  handleTyping,
-  // Pagination functions
-  goToPage,
-  nextPage,
-  previousPage,
-  changePageSize,
-} = useAdminSupportInbox(currentUser);
-
 // Page title and description
 const pageTitle = computed(() => "Support Inbox");
 const pageDescription = computed(() => "Manage student support conversations and provide assistance");
@@ -280,46 +281,41 @@ const handleMarkAllAsRead = async () => {
   }
 };
 
-// Helper functions for conversation display
-const getConversationDisplayName = (conversation: any) => {
+// Cache for conversation display names
+const conversationDisplayNames = ref<Record<string, string>>({});
+
+// Helper to determine display name id
+const getDisplayNameId = (conversation: any) => {
   if (currentUser.value && conversation.sender_id === currentUser.value.id) {
-    return `${conversation.sender_profile?.full_name}`;
+    return conversation.receiver_id;
+  } else {
+    return conversation.sender_id;
   }
-  return conversation.sender_profile?.full_name ;
 };
 
-
-const getConversationReceiverDisplayName = (conversation: any) => {
-  // If current user is normal user (role 2), fetch/display receiver's profile
-  if (currentUser.value && (currentUser.value.app_metadata?.role === 2 || currentUser.value.user_metadata?.role === 2)) {
-    if (conversation.receiver_profile && conversation.receiver_profile.full_name) {
-      return conversation.receiver_profile.full_name;
+// Pre-fetch and cache display names for all conversations
+const fetchAllConversationDisplayNames = async (conversations: any[]) => {
+  for (const conv of conversations) {
+    const displayNameId = getDisplayNameId(conv);
+    if (!conversationDisplayNames.value[conv.id]) {
+      const user = await getUserDetails(displayNameId);
+      conversationDisplayNames.value[conv.id] = user?.email || 'No email';
     }
-    if (conversation.receiver_id && !conversation.receiver_profile) {
-      getUserProfile(conversation.receiver_id).then(profile => {
-        if (profile && profile.full_name) {
-          conversation.receiver_profile = profile;
-        }
-      });
-    }
-    return "";
   }
-  // If current user is admin (role 1), fetch/display sender's profile
-  if (currentUser.value && (currentUser.value.app_metadata?.role === 1 || currentUser.value.user_metadata?.role === 1)) {
-    if (conversation.sender_profile && conversation.sender_profile.full_name) {
-      return conversation.sender_profile.full_name;
-    }
-    if (conversation.sender_id && !conversation.sender_profile) {
-      getUserProfile(conversation.sender_id).then(profile => {
-        if (profile && profile.full_name) {
-          conversation.sender_profile = profile;
-        }
-      });
-    }
-    return "";
-  }
-  return "";
 };
+
+// Watch for changes in conversations and fetch display names
+import { watch } from 'vue';
+watch(
+  () => supportConversations.value,
+  (newConvs) => {
+    if (Array.isArray(newConvs)) {
+      fetchAllConversationDisplayNames(newConvs);
+    }
+  },
+  { immediate: true }
+);
+
 
 const getConversationInitials = (conversation: any) => {
   if (currentUser.value && conversation.sender_id === currentUser.value.id) {
@@ -575,7 +571,7 @@ onBeforeUnmount(() => {
               <v-card elevation="2" class="pa-4">
                 <v-card-title class="text-h5 font-weight-bold mb-4 d-flex align-center">
                   <v-icon class="me-2" color="info">mdi-account-message</v-icon>
-                  Users with Direct Messages
+                  Direct Messages
                   <v-spacer />
                 </v-card-title>
 
@@ -585,34 +581,28 @@ onBeforeUnmount(() => {
                   <p class="text-body-1 mt-4">Loading direct messages...</p>
                 </div>
 
-                <!-- Users Grid -->
+                <!-- Empty State -->
                 <div v-else-if="directMessageConversationCount === 0" class="text-center py-12">
                   <v-icon size="48" color="grey-lighten-1" class="mb-4">mdi-message-text</v-icon>
                   <h3 class="text-h6 text-grey-darken-1 mb-2">No direct conversation initiated</h3>
                   <p class="text-body-2 text-grey-darken-2 mb-0">No students have started a direct message yet.</p>
                 </div>
 
+                <!-- Single Direct Messages Card -->
                 <v-row v-else>
-                  <v-col
-                    v-for="user in usersWithDirectMessages"
-                    :key="user.id"
-                    cols="12"
-                    sm="6"
-                    md="4"
-                    lg="3"
-                  >
+                  <v-col cols="12" sm="6" md="4" lg="3">
                     <v-card
                       class="item-card h-100"
                       elevation="2"
                       hover
-                      @click="selectUser(user)"
+                      @click="viewMode = 'direct-messages'; selectedUser = null; loadSupportConversations(1)"
                     >
                       <v-card-title class="d-flex justify-space-between align-start pb-2">
                         <div class="d-flex align-center gap-1">
                           <!-- Unread Messages Badge -->
                           <v-badge
-                            v-if="user.unread_count > 0"
-                            :content="user.unread_count"
+                            v-if="getDirectMessageUnreadCount() > 0"
+                            :content="getDirectMessageUnreadCount()"
                             color="error"
                             inline
                             class="me-2"
@@ -639,27 +629,27 @@ onBeforeUnmount(() => {
                         <v-divider class="my-3" />
 
                         <div class="d-flex align-center justify-space-between">
-                            <div class="d-flex flex-column">
-                              <div class="d-flex align-center text-caption text-grey-darken-1 mb-1">
-                                  <v-icon size="16" class="me-1">mdi-message-text</v-icon>
-                                  {{ directMessageConversationCount }}
-                                  {{ directMessageConversationCount === 1 ? 'conversation' : 'conversations' }}
-                              </div>
-                              </div>
-                              <v-btn
-                                color="info"
-                                variant="text"
-                                size="small"
-                                append-icon="mdi-chevron-right"
-                              >
-                                View
-                              </v-btn>
+                          <div class="d-flex flex-column">
+                            <div class="d-flex align-center text-caption text-grey-darken-1 mb-1">
+                              <v-icon size="16" class="me-1">mdi-message-text</v-icon>
+                              {{ directMessageConversationCount }}
+                              {{ directMessageConversationCount === 1 ? 'conversation' : 'conversations' }}
+                            </div>
+                          </div>
+                          <v-btn
+                            color="info"
+                            variant="text"
+                            size="small"
+                            append-icon="mdi-chevron-right"
+                          >
+                            View
+                          </v-btn>
                         </div>
 
                         <!-- Latest Message Date -->
                         <div class="d-flex align-center text-caption text-grey mt-2">
                           <v-icon size="14" class="me-1">mdi-clock-outline</v-icon>
-                          {{ new Date(user.latest_message_date).toLocaleDateString() }}
+                          {{ directMessageConversations.length > 0 ? new Date(Math.max(...directMessageConversations.map(c => new Date(c.created_at).getTime()))).toLocaleDateString() : 'N/A' }}
                         </div>
                       </v-card-text>
                     </v-card>
@@ -668,10 +658,10 @@ onBeforeUnmount(() => {
               </v-card>
             </div>
 
-            <!-- Show User Messages View -->
-            <div v-else-if="viewMode === 'user-messages' && selectedUser">
+            <!-- Show Direct Messages View -->
+            <div v-else-if="viewMode === 'direct-messages'">
               <v-card elevation="2" class="pa-4">
-                <!-- Back Button and User Info Header -->
+                <!-- Back Button and Header -->
                 <div class="d-flex align-center mb-4">
                   <v-btn
                     icon="mdi-arrow-left"
@@ -697,14 +687,14 @@ onBeforeUnmount(() => {
 
                 <v-card-title class="text-h6 font-weight-bold mb-4 d-flex align-center px-0">
                   <v-icon class="me-2" color="info">mdi-inbox</v-icon>
-                  Direct Messages from Admins
+                  All Direct Messages
                   <v-spacer />
                 </v-card-title>
 
                 <!-- Loading State -->
                 <div v-if="loadingSupportConversations && supportConversations.length === 0" class="text-center py-12">
                   <v-progress-circular indeterminate color="primary" size="48" />
-                  <p class="text-body-1 mt-4">Loading messages from {{ selectedUser.full_name }}...</p>
+                  <p class="text-body-1 mt-4">Loading direct messages...</p>
                 </div>
 
                 <!-- Empty State -->
@@ -716,18 +706,18 @@ onBeforeUnmount(() => {
                     mdi-message-outline
                   </v-icon>
                   <h3 class="text-h5 text-grey-darken-1 mb-2">
-                    No Messages from {{ selectedUser.full_name }}
+                    No Direct Messages
                   </h3>
                   <p class="text-body-1 text-grey-darken-2 mb-4">
-                    This user hasn't sent any direct messages yet.
+                    No direct messages found.
                   </p>
                   <v-btn
                     color="info"
                     variant="outlined"
                     prepend-icon="mdi-arrow-left"
-                    @click="backToUsers"
+                    @click="backToMainView"
                   >
-                    Back to Users
+                    Back to Main View
                   </v-btn>
                 </div>
 
@@ -743,14 +733,6 @@ onBeforeUnmount(() => {
                             <div class="d-flex align-center">
                               <v-icon class="me-2">mdi-forum</v-icon>
                               Conversations
-                              <v-btn
-                                icon="mdi-refresh"
-                                variant="text"
-                                size="small"
-                                class="ml-2"
-                                :loading="loadingSupportConversations"
-                                @click="loadSupportConversations(currentPage)"
-                              />
                             </div>
                           </v-card-title>
 
@@ -761,7 +743,7 @@ onBeforeUnmount(() => {
 
                           <div v-else class="pa-2">
                             <v-card
-                              v-for="conversation in directMessageFilteredConversations"
+                              v-for="conversation in filteredConversations"
                               :key="conversation.id"
                               @click="selectSupportConversation(conversation)"
                               :class="{
@@ -773,7 +755,7 @@ onBeforeUnmount(() => {
                               hover
                             >
                               <!-- Sender Information Header -->
-                              <div class="d-flex align-center mb-3">
+                              <div class="d-flex align-start mb-2">
                                 <v-badge
                                   v-if="conversationUnreadCounts[conversation.id] > 0"
                                   :content="conversationUnreadCounts[conversation.id]"
@@ -782,10 +764,10 @@ onBeforeUnmount(() => {
                                 >
                                   <v-avatar
                                     color="info"
-                                    size="50"
-                                    class="me-3"
+                                    size="40"
+                                    class="me-2"
                                   >
-                                    <span class="text-white font-weight-bold text-h6">
+                                    <span class="text-white font-weight-bold">
                                       {{ getConversationInitials(conversation) }}
                                     </span>
                                   </v-avatar>
@@ -793,61 +775,48 @@ onBeforeUnmount(() => {
                                 <v-avatar
                                   v-else
                                   color="info"
-                                  size="50"
-                                  class="me-3"
+                                  size="40"
+                                  class="me-2"
                                 >
-                                  <span class="text-white font-weight-bold text-h6">
+                                  <span class="text-white font-weight-bold">
                                     {{ getConversationInitials(conversation) }}
                                   </span>
                                 </v-avatar>
 
-                                <div class="flex-grow-1">
-                                  <div class="d-flex align-center justify-space-between">
-                                    <div>
-                                      <h3 class="text-h6 font-weight-bold mb-1">
-                                        {{ getConversationReceiverDisplayName(conversation) }}
-                                      </h3>
-                                    </div>
-                                    <div class="d-flex align-center">
-                                      <!-- Typing indicator -->
-                                      <span
-                                        v-if="conversationTypingStatus[conversation.id]?.isTyping"
-                                        class="text-caption text-primary me-2"
-                                      >
-                                        typing...
-                                      </span>
+                                <div class="flex-grow-1" style="min-width: 0;">
+                                  <div class="d-flex align-center justify-space-between mb-1">
+                                    <h3 class="text-subtitle-1 font-weight-bold text-truncate" style="max-width: 200px;">
+                                      {{ conversationDisplayNames[conversation.id] || 'Loading...' }}
+                                    </h3>
+                                    <div class="d-flex align-center flex-shrink-0">
                                       <!-- Unread indicator -->
                                       <v-icon
                                         v-if="conversationUnreadCounts[conversation.id] > 0"
                                         color="error"
-                                        size="20"
-                                        class="me-2"
+                                        size="16"
+                                        class="me-1"
                                       >
-                                        mdi-email-alert
+                                        mdi-circle
                                       </v-icon>
-                                      <!-- Date -->
-                                      <div class="text-caption text-grey">
-                                        {{ new Date(conversation.created_at).toLocaleDateString() }}
-                                      </div>
                                     </div>
                                   </div>
-                                </div>
-                              </div>
 
-                              <!-- Direct Message Badge and Info -->
-                              <div class="d-flex align-center justify-space-between">
-                                <div class="d-flex align-center">
-                                  <span class="text-caption text-grey-darken-1">
-                                    Direct message to admin support
-                                  </span>
-                                </div>
-                              </div>
+                                  <!-- Typing indicator or message preview -->
+                                  <div class="text-caption text-grey-darken-1 mb-1">
+                                    <span v-if="conversationTypingStatus[conversation.id]?.isTyping" class="text-primary">
+                                      typing...
+                                    </span>
+                                    <span v-else class="text-truncate d-block">
+                                      Direct message to admin support
+                                    </span>
+                                  </div>
 
-                              <!-- Conversation started info -->
-                              <v-divider class="my-2" />
-                              <div class="d-flex align-center text-caption text-grey">
-                                <v-icon size="14" class="me-1">mdi-clock-outline</v-icon>
-                                Conversation started {{ new Date(conversation.created_at).toLocaleString() }}
+                                  <!-- Date -->
+                                  <div class="text-caption text-grey d-flex align-center">
+                                    <v-icon size="12" class="me-1">mdi-clock-outline</v-icon>
+                                    {{ new Date(conversation.created_at).toLocaleDateString() }}
+                                  </div>
+                                </div>
                               </div>
                             </v-card>
                           </div>
@@ -912,7 +881,7 @@ onBeforeUnmount(() => {
                                 </v-avatar>
                                 <div>
                                   <div class="text-h6 font-weight-bold">
-                                    {{ getConversationReceiverDisplayName(selectedSupportConversation) }}
+                                    {{ conversationDisplayNames[selectedSupportConversation?.id] || 'Loading...' }}
                                   </div>
                                 </div>
                               </div>
@@ -1178,7 +1147,7 @@ onBeforeUnmount(() => {
                               <div class="d-flex align-center justify-space-between mb-1">
                                 <div class="d-flex align-center">
                                   <v-list-item-title class="font-weight-bold">
-                                    {{ getConversationDisplayName(conversation) }}
+                                    {{ conversationDisplayNames[conversation.id] || 'Loading...' }}
                                   </v-list-item-title>
                                   <!-- Typing indicator in conversation list -->
                                   <span
@@ -1270,7 +1239,7 @@ onBeforeUnmount(() => {
                               </v-avatar>
                               <div>
                                 <div class="text-h6 font-weight-bold">
-                                  {{ getConversationDisplayName(selectedSupportConversation) }}
+                                  {{ conversationDisplayNames[selectedSupportConversation?.id] || 'Loading...' }}
                                 </div>
                               </div>
                             </div>

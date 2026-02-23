@@ -1,4 +1,4 @@
-import { supabase } from "@/lib/supabase";
+import { supabase, supabaseAdmin } from "@/lib/supabase";
 import type { Conversation, Message } from "@/types/chat";
 
 /**
@@ -7,30 +7,17 @@ import type { Conversation, Message } from "@/types/chat";
  */
 export async function getUserDetails(userId: string) {
   try {
-    const { data, error } = await supabase.rpc("get_user_details", {
-      user_id: userId,
-    });
-
-    console.log("Fetched user details for", userId, data);
-    if (error) throw error;
-    return data;
+    const { data: adminData, error: adminError } = await supabaseAdmin.auth.admin.getUserById(userId);
+    console.log("Fetched user using supabase auth admin getUserById", JSON.stringify(adminData));
+    if (adminError) throw adminError;
+    // Always return a user object with fallback
+    return adminData?.user
   } catch (error) {
     console.warn("Could not fetch user details for", userId);
     return {
       full_name: "Unknown User",
       email: "No email",
     };
-  }
-}
-
-export async function getUserProfile(userId: string) {
-  try {
-    const { data, error } = await supabase.from("profiles").select("*").eq("id", userId).single();
-
-    if (error) throw error;
-    return data;
-  } catch (error) {
-    console.warn("Could not fetch profile for", userId);
   }
 }
 
@@ -121,13 +108,8 @@ export async function getAllAdminSupportConversations(
       .from("conversations")
       .select("*", { count: "exact", head: true });
 
-    // For role 2 (students), show conversations where they are involved
-    // For admins, exclude conversations where they are the sender
-    if (userRole === 2) {
+
       countQuery = countQuery.or(`sender_id.eq.${currentUser.id},receiver_id.eq.${currentUser.id}`);
-    } else {
-      countQuery = countQuery.neq("sender_id", currentUser.id);
-    }
 
     // Exclude conversations with deleted user items
     // Keep conversations with item_id = null (direct messages) OR item_id not in deletedItemIds

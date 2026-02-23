@@ -1,3 +1,23 @@
+/**
+ * Fetch all direct messages for a user (as sender or receiver) from the Supabase view
+ * @param userId - The user's id (sender or receiver)
+ * @returns Array of direct conversation messages
+ */
+export async function getAllDirectMessagesForUser(userId: string) {
+  try {
+    const { data, error } = await supabase
+      .from("direct_conversation_messages")
+      .select("*")
+      .or(`conversation_sender_id.eq.${userId},conversation_receiver_id.eq.${userId}`)
+      .order("message_created_at", { ascending: true });
+
+    if (error) throw error;
+    return data;
+  } catch (error) {
+    console.error("Error fetching direct messages for user:", error);
+    return [];
+  }
+}
 // messages.ts
 import { supabase } from '@/lib/supabase'
 import type { Message } from '@/types/chat'
