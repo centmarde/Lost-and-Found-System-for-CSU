@@ -93,6 +93,16 @@ export async function getAllAdminSupportConversations(
     // Check user role
     const userRole = currentUser.app_metadata?.role || currentUser.user_metadata?.role;
 
+    // First, get all item IDs that are marked as deleted user items
+    const { data: deletedItems, error: deletedItemsError } = await supabase
+      .from("items")
+      .select("id")
+      .eq("title", "[Deleted User Item]");
+
+    if (deletedItemsError) throw deletedItemsError;
+
+    const deletedItemIds = deletedItems?.map(item => item.id) || [];
+
     // Build query based on user role
     let countQuery = supabase
       .from("conversations")
@@ -104,6 +114,12 @@ export async function getAllAdminSupportConversations(
       countQuery = countQuery.or(`sender_id.eq.${currentUser.id},receiver_id.eq.${currentUser.id}`);
     } else {
       countQuery = countQuery.neq("sender_id", currentUser.id);
+    }
+
+    // Exclude conversations with deleted user items
+    // Keep conversations with item_id = null (direct messages) OR item_id not in deletedItemIds
+    if (deletedItemIds.length > 0) {
+      countQuery = countQuery.or(`item_id.is.null,item_id.not.in.(${deletedItemIds.join(",")})`);
     }
 
     const { count: totalCount, error: countError } = await countQuery;
@@ -139,6 +155,11 @@ export async function getAllAdminSupportConversations(
       conversationsQuery = conversationsQuery.or(`sender_id.eq.${currentUser.id},receiver_id.eq.${currentUser.id}`);
     } else {
       conversationsQuery = conversationsQuery.neq("sender_id", currentUser.id);
+    }
+
+    // Exclude conversations with deleted user items at database level
+    if (deletedItemIds.length > 0) {
+      conversationsQuery = conversationsQuery.or(`item_id.is.null,item_id.not.in.(${deletedItemIds.join(",")})`);
     }
 
     // Get conversations with messages and item details

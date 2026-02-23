@@ -113,7 +113,7 @@ const setupMessagesRealtimeSubscription = () => {
       },
       async (payload) => {
         const message = payload.new as any;
-        
+
         // If a message was marked as read (isread changed to true), update the count
         const userId = authStore.userData?.id;
         if (userId && message.user_id !== userId) {
@@ -416,7 +416,7 @@ const handleLogout = async () => {
       <v-divider class="mx-4 mb-2"></v-divider>
 
       <!-- Logout Button -->
-      <v-list class="pa-2">
+    <!--   <v-list class="pa-2">
         <v-list-item
           @click="handleLogout"
           class="mb-2 rounded-lg logout-button"
@@ -426,7 +426,7 @@ const handleLogout = async () => {
             Logout
           </v-list-item-title>
         </v-list-item>
-      </v-list>
+      </v-list> -->
 
       <!-- Version Info -->
       <v-list-item class="pa-4">

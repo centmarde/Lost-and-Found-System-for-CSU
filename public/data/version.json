@@ -1,6 +1,15 @@
 {
   "versions": [
       {
+      "version": "v0.0.6",
+      "date": "2026-02-20",
+      "title": "UI Improvements & Bug Fixes",
+      "changes": [
+        "feature: enhance DashboardItemCards with title editing functionality and dialog",
+        "fix: claimant name bug on conversation view"
+      ]
+    },
+      {
       "version": "v0.0.5",
       "date": "2026-02-18",
       "title": "UI Improvements & Bug Fixes",
@@ -9,7 +18,8 @@
         "Added claimant notifications for their claims.",
         "Added v-badge component for displaying conversation count in each item on admin dashboard.",
         "Added edit description functionality for items on admin dashboard",
-        "Added soft delete and ban functionality on user accounts"
+        "Added soft delete and ban functionality on user accounts",
+        "feat: enhance DashboardItemCards with title editing functionality and dialog"
       ]
     },
     {

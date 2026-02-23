@@ -50,6 +50,7 @@ declare module 'vue-router/auto-routes' {
     '/admin/SupportInboxView': RouteRecordInfo<'/admin/SupportInboxView', '/admin/SupportInboxView', Record<never, never>, Record<never, never>>,
     '/admin/UserManagement': RouteRecordInfo<'/admin/UserManagement', '/admin/UserManagement', Record<never, never>, Record<never, never>>,
     '/Auth': RouteRecordInfo<'/Auth', '/Auth', Record<never, never>, Record<never, never>>,
+    '/BannedView': RouteRecordInfo<'/BannedView', '/BannedView', Record<never, never>, Record<never, never>>,
     '/ForbiddenView': RouteRecordInfo<'/ForbiddenView', '/ForbiddenView', Record<never, never>, Record<never, never>>,
     '/Home': RouteRecordInfo<'/Home', '/Home', Record<never, never>, Record<never, never>>,
     '/NotFound': RouteRecordInfo<'/NotFound', '/NotFound', Record<never, never>, Record<never, never>>,

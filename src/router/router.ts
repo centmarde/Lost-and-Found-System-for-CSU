@@ -6,6 +6,7 @@ import Auth from '@/pages/Auth.vue';
 import Home from '@/pages/Home.vue';
 import NotFound from '@/pages/NotFound.vue';
 import ForbiddenView from '@/pages/ForbiddenView.vue';
+import BannedView from '@/pages/BannedView.vue';
 
 import DashboardView from '@/pages/admin/DashboardView.vue';
 import ProfilesView from '@/pages/ProfilesView.vue';
@@ -75,6 +76,10 @@ const routes = setupLayouts([
   {
     path: '/forbidden',
     component: ForbiddenView,
+  },
+  {
+    path: '/banned',
+    component: BannedView,
   },
   {
     path: '/:pathMatch(.*)*',
