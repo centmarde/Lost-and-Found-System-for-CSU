@@ -12,6 +12,10 @@ import ItemFilters from "@/components/common/ItemFilters.vue";
 import DirectAdminMessageCard from "@/components/common/DirectAdminMessageCard.vue";
 import ItemsDisplay from "@/components/common/ItemsDisplay.vue";
 import VersionLog from "@/components/common/VersionLog.vue";
+import WelcomeVersionDialog from "@/components/common/WelcomeVersionDialog.vue";
+import { useWelcomeVersion } from "@/composables/useWelcomeVersion";
+
+
 
 // Composables
 import { useAuth } from "@/pages/admin/components/composables/useAuth";
@@ -65,6 +69,15 @@ const {
 
 // View mode state
 const viewMode = ref('grid');
+
+// Welcome version dialog
+const {
+  showWelcomeVersionDialog,
+  showVersionDialog,
+  latestVersionData,
+  openWelcomeDialog,
+  openChangelogs,
+} = useWelcomeVersion();
 
 // User chat composable
 const {
@@ -201,6 +214,7 @@ watch(
 onMounted(async () => {
   await getCurrentUser();
   await fetchItems();
+  await openWelcomeDialog();
 });
 
 // Cleanup on component unmount
@@ -275,12 +289,7 @@ onUnmounted(() => {
           </v-col>
         </v-row>
 
-        <!-- Version Log Component -->
-        <v-row class="mb-4">
-          <v-col cols="12">
-            <VersionLog />
-          </v-col>
-        </v-row>
+
         <v-row class="mb-4">
           <v-col cols="12">
             <ItemFilters
@@ -367,6 +376,36 @@ onUnmounted(() => {
           @send-message="sendSupportMessage"
           @open-chat="openSupportChat"
         /> -->
+
+        <!-- Welcome Version Dialog -->
+        <WelcomeVersionDialog
+          v-model="showWelcomeVersionDialog"
+          :latest-version="latestVersionData"
+          @open-changelogs="openChangelogs"
+        />
+
+        <!-- Version History Dialog -->
+        <v-dialog v-model="showVersionDialog" max-width="1100" scrollable>
+          <v-card rounded="xl">
+            <v-card-title class="d-flex align-center justify-space-between pa-4">
+              <div class="d-flex align-center">
+                <v-icon color="primary" class="me-2">mdi-history</v-icon>
+                <span class="text-h6">What's New</span>
+              </div>
+              <v-btn icon="mdi-close" variant="text" size="small" @click="showVersionDialog = false" />
+            </v-card-title>
+            <v-divider />
+            <v-card-text class="pa-4">
+              <VersionLog />
+            </v-card-text>
+            <v-divider />
+            <v-card-actions class="pa-4 justify-end">
+              <v-btn color="primary" variant="tonal" @click="showVersionDialog = false">
+                Got it
+              </v-btn>
+            </v-card-actions>
+          </v-card>
+        </v-dialog>
       </v-container>
     </template>
   </InnerLayoutWrapper>

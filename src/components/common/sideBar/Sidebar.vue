@@ -8,6 +8,7 @@ import { useUserPagesStore } from "@/stores/pages";
 import { useSidebarStore } from "@/stores/sidebar";
 import { navigationConfig, individualNavItems } from "@/utils/navigation";
 import { supabase } from "@/lib/supabase";
+import axios from "axios";
 
 // Vuetify display composable for responsive design
 const { smAndDown } = useDisplay();
@@ -41,6 +42,21 @@ const currentUserRole = ref<any>(null);
 // Real-time subscription for messages
 let messagesSubscription: any = null;
 
+// Latest version from version.json
+const latestVersion = ref<string>('');
+
+const fetchLatestVersion = async () => {
+  try {
+    const response = await axios.get<{ versions: { version: string }[] }>('/data/version.json');
+    const versions = response.data.versions || [];
+    if (versions.length > 0) {
+      latestVersion.value = versions[0].version;
+    }
+  } catch (err) {
+    console.error('Error fetching version data:', err);
+  }
+};
+
 // Load user role and pages on mount
 onMounted(async () => {
   // Load roles if not already loaded
@@ -56,6 +72,9 @@ onMounted(async () => {
     await sidebarStore.updateUnreadMessageCount(authStore.userData.id);
     setupMessagesRealtimeSubscription();
   }
+
+  // Fetch latest version
+  await fetchLatestVersion();
 });
 
 // Function to load user role and pages
@@ -432,7 +451,7 @@ const handleLogout = async () => {
       <v-list-item class="pa-4">
         <v-list-item-content>
           <v-list-item-subtitle class="text-caption grey--text text-center">
-            CSU LOST AND FOUND v1.0
+            CSU LOST AND FOUND {{ latestVersion || 'v1.0' }}
           </v-list-item-subtitle>
         </v-list-item-content>
       </v-list-item>
