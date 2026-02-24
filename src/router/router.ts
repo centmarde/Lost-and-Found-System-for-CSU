@@ -10,6 +10,7 @@ import BannedView from '@/pages/BannedView.vue';
 
 import DashboardView from '@/pages/admin/DashboardView.vue';
 import ProfilesView from '@/pages/ProfilesView.vue';
+import VersionView from '@/pages/VersionView.vue';
 
 import UserManagement from '@/pages/admin/UserManagement.vue';
 import RolePagesView from '@/pages/admin/RolePagesView.vue';
@@ -58,6 +59,11 @@ const routes = setupLayouts([
   {
     path: '/admin/support-inbox',
     component: SupportInboxView,
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/version',
+    component: VersionView,
     meta: { requiresAuth: true }
   },
 

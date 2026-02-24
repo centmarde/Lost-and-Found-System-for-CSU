@@ -59,5 +59,6 @@ declare module 'vue-router/auto-routes' {
     '/student/components/ItemCard': RouteRecordInfo<'/student/components/ItemCard', '/student/components/ItemCard', Record<never, never>, Record<never, never>>,
     '/student/components/NotifDialog': RouteRecordInfo<'/student/components/NotifDialog', '/student/components/NotifDialog', Record<never, never>, Record<never, never>>,
     '/student/components/userChatDialog': RouteRecordInfo<'/student/components/userChatDialog', '/student/components/userChatDialog', Record<never, never>, Record<never, never>>,
+    '/VersionView': RouteRecordInfo<'/VersionView', '/VersionView', Record<never, never>, Record<never, never>>,
   }
 }
