@@ -1,3 +1,23 @@
+/**
+ * Fetch all direct messages for a user (as sender or receiver) from the Supabase view
+ * @param userId - The user's id (sender or receiver)
+ * @returns Array of direct conversation messages
+ */
+export async function getAllDirectMessagesForUser(userId: string) {
+  try {
+    const { data, error } = await supabase
+      .from("direct_conversation_messages")
+      .select("*")
+      .or(`conversation_sender_id.eq.${userId},conversation_receiver_id.eq.${userId}`)
+      .order("message_created_at", { ascending: true });
+
+    if (error) throw error;
+    return data;
+  } catch (error) {
+    console.error("Error fetching direct messages for user:", error);
+    return [];
+  }
+}
 // messages.ts
 import { supabase } from '@/lib/supabase'
 import type { Message } from '@/types/chat'
@@ -503,8 +523,8 @@ export async function getTotalUnreadMessageCount(currentUserId: string): Promise
       // Students: show conversations where they are involved
       conversationsQuery = conversationsQuery.or(`sender_id.eq.${currentUserId},receiver_id.eq.${currentUserId}`)
     } else {
-      // Admins: only show conversations where they are NOT the sender (i.e., they are receiving messages)
-      conversationsQuery = conversationsQuery.neq('sender_id', currentUserId)
+      // Admins: only show conversations where they are the receiver (i.e., intended for them)
+      conversationsQuery = conversationsQuery.eq('receiver_id', currentUserId)
     }
 
     const { data: conversations, error: convError } = await conversationsQuery
