@@ -22,11 +22,11 @@
               class="me-2"
             >
               <span class="text-white font-weight-bold">
-                {{ user.full_name.split(' ').map((n: string) => n[0]).join('').toUpperCase().substring(0, 2) }}
+                {{ user.full_name ? user.full_name.split(' ').map((n: string) => n[0]).join('').toUpperCase().substring(0, 2) : 'U' }}
               </span>
             </v-avatar>
             <div>
-              <div class="text-subtitle-1 font-weight-bold">{{ user.full_name }}</div>
+              <div class="text-subtitle-1 font-weight-bold">{{ user.full_name || 'Unknown User' }}</div>
             </div>
           </div>
           <div class="d-flex align-center gap-1">
