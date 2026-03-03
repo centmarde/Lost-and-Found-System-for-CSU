@@ -10,8 +10,26 @@ export async function getUserDetails(userId: string) {
     const { data: adminData, error: adminError } = await supabaseAdmin.auth.admin.getUserById(userId);
     console.log("Fetched user using supabase auth admin getUserById", JSON.stringify(adminData));
     if (adminError) throw adminError;
-    // Always return a user object with fallback
-    return adminData?.user
+
+    const user = adminData?.user;
+    if (!user) {
+      return {
+        full_name: "Unknown User",
+        email: "No email",
+      };
+    }
+
+    // Extract full_name from user metadata
+    const fullName = user.user_metadata?.full_name ||
+                     user.email?.split('@')[0] ||
+                     "Unknown User";
+
+    return {
+      id: user.id,
+      full_name: fullName,
+      email: user.email || "No email",
+      ...user.user_metadata
+    };
   } catch (error) {
     console.warn("Could not fetch user details for", userId);
     return {
@@ -252,7 +270,7 @@ export function setupAdminSupportConversationsSubscription(
   onNewConversation: (conversation: Conversation) => void
 ) {
   const channel = supabase.channel("admin_support_conversations")
-  
+
   return channel
     .on(
       "broadcast",

@@ -206,8 +206,8 @@ const filteredAndSortedUsers = computed(() => {
   if (searchQuery.value.trim()) {
     const query = searchQuery.value.toLowerCase();
     filtered = filtered.filter(user =>
-      user.full_name.toLowerCase().includes(query) ||
-      user.email.toLowerCase().includes(query)
+      (user.full_name || '').toLowerCase().includes(query) ||
+      (user.email || '').toLowerCase().includes(query)
     );
   }
 
@@ -215,9 +215,9 @@ const filteredAndSortedUsers = computed(() => {
   filtered = [...filtered].sort((a, b) => {
     switch (sortBy.value) {
       case 'name':
-        return a.full_name.localeCompare(b.full_name);
+        return (a.full_name || 'Unknown').localeCompare(b.full_name || 'Unknown');
       case 'name_desc':
-        return b.full_name.localeCompare(a.full_name);
+        return (b.full_name || 'Unknown').localeCompare(a.full_name || 'Unknown');
       case 'date':
         return new Date(b.latest_message_date).getTime() - new Date(a.latest_message_date).getTime();
       case 'date_asc':
@@ -413,7 +413,7 @@ const handleMarkUserAsRead = async (user: any) => {
     user.unread_count = 0;
 
     if (totalMarked > 0) {
-      toast.success(`✅ Marked ${totalMarked} message${totalMarked > 1 ? 's' : ''} as read from "${user.full_name}"`);
+      toast.success(`✅ Marked ${totalMarked} message${totalMarked > 1 ? 's' : ''} as read from "${user.full_name || 'Unknown User'}"`);
     } else {
       toast.info('No unread messages from this user');
     }
@@ -1194,6 +1194,351 @@ onBeforeUnmount(() => {
               </v-card>
             </div>
 
+            <!-- Show User Messages View -->
+            <div v-else-if="viewMode === 'user-messages' && selectedUser">
+              <v-card elevation="2" class="pa-4">
+                <!-- Back Button and User Info Header -->
+                <div class="d-flex align-center mb-4">
+                  <v-btn
+                    icon="mdi-arrow-left"
+                    variant="text"
+                    @click="backToUsers"
+                  />
+                  <div class="flex-grow-1">
+                    <div class="d-flex align-center">
+                      <v-avatar
+                        color="info"
+                        size="40"
+                        class="me-3"
+                      >
+                        <span class="text-white font-weight-bold">
+                          {{ selectedUser.full_name ? selectedUser.full_name.split(' ').map((n: string) => n[0]).join('').toUpperCase().substring(0, 2) : 'U' }}
+                        </span>
+                      </v-avatar>
+                      <div>
+                        <h2 class="text-h5 font-weight-bold">{{ selectedUser.full_name || 'Unknown User' }}</h2>
+                        <p class="text-body-2 text-grey-darken-1 mb-0">{{ selectedUser.email || 'No email' }}</p>
+                      </div>
+                      <v-chip
+                        color="info"
+                        size="small"
+                        variant="flat"
+                        class="ml-3"
+                      >
+                        <v-icon start>mdi-account-message</v-icon>
+                        DIRECT MESSAGES
+                      </v-chip>
+                    </div>
+                  </div>
+                </div>
+
+                <v-divider class="mb-4" />
+
+                <v-card-title class="text-h6 font-weight-bold mb-4 d-flex align-center px-0">
+                  <v-icon class="me-2" color="info">mdi-inbox</v-icon>
+                  Messages from {{ selectedUser.full_name || 'User' }}
+                  <v-spacer />
+                  <v-chip
+                    v-if="!loadingSupportConversations"
+                    color="info"
+                    variant="tonal"
+                    :size="$vuetify.display.xs ? 'x-small' : 'small'"
+                  >
+                    {{ filteredConversations.length }}
+                    {{ filteredConversations.length === 1 ? 'Conversation' : 'Conversations' }}
+                  </v-chip>
+                </v-card-title>
+
+                <!-- Loading State -->
+                <div v-if="loadingSupportConversations && supportConversations.length === 0" class="text-center py-12">
+                  <v-progress-circular indeterminate color="primary" size="48" />
+                  <p class="text-body-1 mt-4">Loading user messages...</p>
+                </div>
+
+                <!-- Empty State -->
+                <div
+                  v-else-if="!loadingSupportConversations && filteredConversations.length === 0"
+                  class="text-center py-12"
+                >
+                  <v-icon size="80" color="grey-lighten-1" class="mb-4">
+                    mdi-message-outline
+                  </v-icon>
+                  <h3 class="text-h5 text-grey-darken-1 mb-2">
+                    No Messages from {{ selectedUser.full_name || 'User' }}
+                  </h3>
+                  <p class="text-body-1 text-grey-darken-2 mb-4">
+                    This user hasn't sent any messages yet.
+                  </p>
+                  <v-btn
+                    color="info"
+                    variant="outlined"
+                    prepend-icon="mdi-arrow-left"
+                    @click="backToUsers"
+                  >
+                    Back to Users
+                  </v-btn>
+                </div>
+
+                <!-- User Messages Inbox -->
+                <div v-else>
+                  <div class="support-inbox-container">
+                    <!-- Conversations List -->
+                    <v-row>
+                      <v-col cols="12" md="4">
+                        <v-card variant="outlined" class="conversation-list">
+                          <v-card-title class="text-h6 py-3 px-4 border-b d-flex justify-space-between align-center">
+                            <div class="d-flex align-center">
+                              <v-icon class="me-2">mdi-forum</v-icon>
+                              Conversations
+                            </div>
+                          </v-card-title>
+
+                          <div v-if="loadingSupportConversations" class="pa-4 text-center">
+                            <v-progress-circular indeterminate color="primary" size="24" />
+                            <p class="text-caption mt-2">Loading...</p>
+                          </div>
+
+                          <v-list v-else class="pa-0">
+                            <v-list-item
+                              v-for="conversation in filteredConversations"
+                              :key="conversation.id"
+                              @click="selectSupportConversation(conversation)"
+                              :class="{ 'v-list-item--active': selectedSupportConversation?.id === conversation.id }"
+                              class="conversation-item py-3"
+                              lines="three"
+                            >
+                              <template v-slot:prepend>
+                                <v-avatar
+                                  color="info"
+                                  size="40"
+                                >
+                                  <span class="text-white font-weight-bold">
+                                    {{ getConversationInitials(conversation) }}
+                                  </span>
+                                </v-avatar>
+                              </template>
+
+                              <!-- Main Content -->
+                              <div class="d-flex flex-column">
+                                <div class="d-flex align-center justify-space-between mb-1">
+                                  <span class="text-subtitle-2 font-weight-bold">
+                                    Direct Message
+                                  </span>
+                                  <span class="text-caption text-grey">
+                                    {{ new Date(conversation.created_at).toLocaleDateString() }}
+                                  </span>
+                                </div>
+
+                                <div class="text-body-2 text-grey-darken-1 mb-1">
+                                  {{ conversation.latest_message?.message || 'No messages yet' }}
+                                </div>
+
+                                <div class="d-flex align-center text-caption text-grey">
+                                  <v-icon size="14" class="me-1">mdi-message</v-icon>
+                                  {{ conversation.message_count || 0 }} message{{ (conversation.message_count || 0) !== 1 ? 's' : '' }}
+                                </div>
+                              </div>
+
+                              <template v-slot:append>
+                                <div class="d-flex flex-column align-center">
+                                  <v-badge
+                                    v-if="conversationUnreadCounts[conversation.id] > 0"
+                                    :content="conversationUnreadCounts[conversation.id]"
+                                    color="error"
+                                    inline
+                                  >
+                                    <v-icon color="error" size="20">mdi-email-alert</v-icon>
+                                  </v-badge>
+                                  <div
+                                    v-if="conversationTypingStatus[conversation.id]"
+                                    class="typing-indicator mt-1"
+                                  >
+                                    <span class="text-caption text-info">typing...</span>
+                                  </div>
+                                </div>
+                              </template>
+                            </v-list-item>
+                          </v-list>
+
+                          <!-- Pagination Controls -->
+                          <v-divider />
+                          <div class="pa-3">
+                            <div class="d-flex justify-space-between align-center">
+                              <div class="text-caption text-grey">
+                                Page {{ currentPage }} of {{ totalPages }}
+                              </div>
+                              <div class="d-flex align-center">
+                                <span class="text-caption me-2">Per page:</span>
+                                <v-select
+                                  :model-value="pageSize"
+                                  @update:model-value="changePageSize"
+                                  :items="[10, 25, 50]"
+                                  density="compact"
+                                  variant="outlined"
+                                  hide-details
+                                  style="max-width: 80px;"
+                                />
+                              </div>
+                            </div>
+
+                            <div class="d-flex justify-center mt-2">
+                              <v-pagination
+                                :model-value="currentPage"
+                                @update:model-value="goToPage"
+                                :length="totalPages"
+                                :total-visible="5"
+                                size="small"
+                                :disabled="loadingSupportConversations"
+                              />
+                            </div>
+                          </div>
+                        </v-card>
+                      </v-col>
+
+                      <!-- Messages Area -->
+                      <v-col cols="12" md="8">
+                        <v-card variant="outlined" class="messages-area">
+                          <v-card-title v-if="selectedSupportConversation" class="py-4 px-4 border-b">
+                            <div class="d-flex flex-column w-100">
+                              <!-- User Info Header -->
+                              <div class="d-flex align-center mb-3">
+                                <v-avatar
+                                  color="info"
+                                  size="48"
+                                  class="me-3"
+                                >
+                                  <span class="text-white font-weight-bold">
+                                    {{ selectedUser.full_name ? selectedUser.full_name.split(' ').map((n: string) => n[0]).join('').toUpperCase().substring(0, 2) : 'U' }}
+                                  </span>
+                                </v-avatar>
+                                <div>
+                                  <h3 class="text-h6 font-weight-bold">{{ selectedUser.full_name || 'Unknown User' }}</h3>
+                                  <p class="text-body-2 text-grey-darken-1 mb-0">{{ selectedUser.email || 'No email' }}</p>
+                                </div>
+                              </div>
+
+                              <!-- General Support Card -->
+                              <v-card variant="tonal" color="info" class="pa-3">
+                                <div class="d-flex align-center">
+                                  <v-icon class="me-2" color="info">mdi-lifebuoy</v-icon>
+                                  <div>
+                                    <div class="text-subtitle-2 font-weight-bold">General Support</div>
+                                    <div class="text-body-2">Direct message conversation with student</div>
+                                  </div>
+                                </div>
+                              </v-card>
+                            </div>
+                          </v-card-title>
+
+                          <v-card-title v-else class="text-h6 py-3 px-4 border-b text-center text-grey">
+                            <v-icon class="me-2">mdi-message-outline</v-icon>
+                            Select a conversation to view messages
+                          </v-card-title>
+
+                          <!-- Content when conversation is selected -->
+                          <template v-if="selectedSupportConversation">
+                            <!-- Messages Display Container -->
+                            <div v-if="loadingSupportMessages" class="pa-4 text-center" style="height: 400px;">
+                              <v-progress-circular indeterminate color="primary" size="24" />
+                              <p class="text-caption mt-2">Loading messages...</p>
+                            </div>
+
+                            <div v-else class="pa-4" style="height: 400px; overflow-y: auto;">
+                              <div
+                                v-for="message in supportInboxMessages"
+                                :key="message.id"
+                                class="message-item mb-3"
+                                :class="{
+                                  'message-sent': message.user_id === currentUser?.id,
+                                  'message-received': message.user_id !== currentUser?.id
+                                }"
+                              >
+                                <v-card
+                                  variant="flat"
+                                  :color="message.user_id === currentUser?.id ? 'primary' : 'grey-lighten-4'"
+                                  :class="message.user_id === currentUser?.id ? 'ml-auto' : 'mr-auto'"
+                                  style="max-width: 75%;"
+                                >
+                                  <v-card-text class="py-2 px-3">
+                                    <p class="mb-1" :class="message.user_id === currentUser?.id ? 'text-white' : ''">
+                                      {{ message.message }}
+                                    </p>
+                                    <div
+                                      class="text-caption"
+                                      :class="message.user_id === currentUser?.id ? 'text-grey-lighten-1' : 'text-grey'"
+                                    >
+                                      {{ new Date(message.created_at).toLocaleString() }}
+                                    </div>
+                                  </v-card-text>
+                                </v-card>
+                              </div>
+
+                              <!-- Empty state when no messages -->
+                              <div v-if="supportInboxMessages.length === 0" class="text-center py-8">
+                                <v-icon size="48" color="grey-lighten-1" class="mb-3">mdi-message-outline</v-icon>
+                                <p class="text-body-1 text-grey">No messages in this conversation yet.</p>
+                              </div>
+                            </div>
+
+                            <!-- Typing Indicator -->
+                            <div v-if="isOtherUserTyping" class="px-4 pb-2">
+                              <div class="d-flex align-center">
+                                <v-avatar size="24" color="info" class="me-2">
+                                  <span class="text-caption text-white">{{ otherUserTypingName || 'User' }}</span>
+                                </v-avatar>
+                                <div class="typing-indicator">
+                                  <span class="text-caption text-grey me-2">{{ otherUserTypingName || 'User' }} is typing</span>
+                                  <div class="typing-dots">
+                                    <span class="dot"></span>
+                                    <span class="dot"></span>
+                                    <span class="dot"></span>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+
+                            <!-- Message Input - Always visible when conversation is selected -->
+                            <v-divider />
+                            <div class="pa-4">
+                              <v-form @submit.prevent="handleSendMessage">
+                                <v-textarea
+                                  v-model="newMessage"
+                                  placeholder="Type your message here..."
+                                  variant="outlined"
+                                  rows="2"
+                                  auto-grow
+                                  max-rows="4"
+                                  :loading="sendingSupportInboxMessage"
+                                  @input="handleTyping"
+                                >
+                                  <template v-slot:append-inner>
+                                    <v-btn
+                                      :disabled="!newMessage.trim() || sendingSupportInboxMessage"
+                                      color="primary"
+                                      variant="flat"
+                                      size="small"
+                                      icon="mdi-send"
+                                      @click="handleSendMessage"
+                                    />
+                                  </template>
+                                </v-textarea>
+                              </v-form>
+                            </div>
+                          </template>
+
+                          <!-- No conversation selected state -->
+                          <div v-else class="pa-8 text-center">
+                            <v-icon size="60" color="grey-lighten-2">mdi-message-outline</v-icon>
+                            <p class="text-h6 text-grey mt-4">Select a conversation to view messages</p>
+                          </div>
+                        </v-card>
+                      </v-col>
+                    </v-row>
+                  </div>
+                </div>
+              </v-card>
+            </div>
+
             <!-- Show Support Inbox when item is selected -->
             <v-card v-else-if="selectedItem && viewMode === 'items'" elevation="2" class="pa-4">
               <!-- Back Button and Item Info Header -->
@@ -1366,7 +1711,7 @@ onBeforeUnmount(() => {
                               </div>
 
                               <!-- Item Information - Made More Prominent -->
-                             
+
                             </div>
 
                             <template v-slot:append>
