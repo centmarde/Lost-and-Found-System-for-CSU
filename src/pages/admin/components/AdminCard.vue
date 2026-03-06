@@ -1,15 +1,18 @@
 <script lang="ts" setup>
+import { ref, onMounted } from 'vue'
 import { formatDate } from '@/utils/helpers'
+import { supabaseAdmin } from '@/lib/supabase'
 
 interface Item {
   id: number
   title: string
   description: string
-  status: 'lost' | 'found'
+  status: 'lost' | 'claimed'
   user_id: string
-  claimed_by: string
+  claimed_by: string | null
   created_at: string
   user_email?: string  // Add user email field
+  user_full_name?: string  // Add user full name field
 }
 
 interface Props {
@@ -17,7 +20,43 @@ interface Props {
   isUpdating: boolean
 }
 
-defineProps<Props>()
+const props = defineProps<Props>()
+
+// Reactive state for user information
+const userEmail = ref<string>('')
+const userFullName = ref<string>('')
+const loadingUserInfo = ref(false)
+
+// Function to fetch user information using supabaseAdmin
+const fetchUserInfo = async (userId: string) => {
+  if (!userId) return
+
+  loadingUserInfo.value = true
+  try {
+    const { data: userData, error } = await supabaseAdmin.auth.admin.getUserById(userId)
+
+    if (error) {
+      console.error('Error fetching user info:', error)
+      return
+    }
+
+    if (userData.user) {
+      userEmail.value = userData.user.email || ''
+      userFullName.value = userData.user.user_metadata?.full_name || ''
+    }
+  } catch (error) {
+    console.error('Unexpected error fetching user info:', error)
+  } finally {
+    loadingUserInfo.value = false
+  }
+}
+
+// Fetch user info when component mounts
+onMounted(() => {
+  if (props.item.user_id) {
+    fetchUserInfo(props.item.user_id)
+  }
+})
 
 defineEmits<{
   openConversations: [item: Item]
@@ -32,7 +71,7 @@ const getItemStatusColor = (item: Item) => {
 
 const getItemStatusText = (item: Item) => {
   if (item.claimed_by) return 'Claimed'
-  return item.status === 'lost' ? 'Lost' : 'Found'
+  return item.status === 'lost' ? 'Lost' : 'Claimed'
 }
 
 const getItemStatusIcon = (item: Item) => {
@@ -58,10 +97,13 @@ const getItemStatusIcon = (item: Item) => {
     <v-card-text>
       <p class="text-body-2 mb-3">{{ item.description }}</p>
 
-      <!-- User Email -->
+      <!-- User Info -->
       <div class="d-flex align-center text-caption text-grey-darken-1 mb-2">
         <v-icon size="16" class="me-1">mdi-account-circle</v-icon>
-        Posted by: {{ item.user_email || 'Unknown user' }}
+        <span v-if="loadingUserInfo">Loading user info...</span>
+        <span v-else>
+          Posted by: {{ userFullName || userEmail || item.user_full_name || item.user_email || 'Unknown user' }}
+        </span>
       </div>
 
       <!-- Created Date -->

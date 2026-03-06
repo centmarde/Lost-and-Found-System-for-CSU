@@ -6,14 +6,14 @@ const updatingItems = ref<Set<number>>(new Set())
 export interface NewItemForm {
   title: string
   description: string
-  status: 'lost' | 'found'
+  status: 'lost' | 'claimed'
 }
 
 export interface Item {
   id: number
   title: string
   description: string
-  status: 'lost' | 'found' | 'claimed'
+  status: 'lost' | 'claimed'
   user_id: string
   claimed_by: string | null
   created_at: string

@@ -36,11 +36,11 @@ const dateTo = ref('')
 const showClaimed = ref(false)
 const showAdvancedFilters = ref(false)
 
-// Status options for lost and found items
+// Status options for lost and claimed items
 const statusOptions = [
   { value: 'all', title: 'All Items' },
   { value: 'lost', title: 'Lost Items' },
-  { value: 'found', title: 'Found Items' },
+  { value: 'claimed', title: 'Items Claimed by Someone' },
 ]
 
 // Sort options for items
@@ -236,7 +236,7 @@ defineExpose({
             <v-col cols="12" md="4">
               <v-checkbox
                 v-model="showClaimed"
-                label="Show claimed items"
+                label="Include items claimed by someone"
                 density="compact"
                 hide-details
                 :disabled="loading"
@@ -322,7 +322,7 @@ defineExpose({
             variant="tonal"
           >
             <v-icon start size="16">mdi-check-circle</v-icon>
-            Show Claimed
+            Including Claimed Items
           </v-chip>
 
           <v-chip

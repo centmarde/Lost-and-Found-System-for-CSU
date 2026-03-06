@@ -9,9 +9,9 @@ interface Item {
   id: number
   title: string
   description: string
-  status: 'lost' | 'found'
+  status: 'lost' | 'claimed'
   user_id: string
-  claimed_by: string
+  claimed_by: string | null
   created_at: string
 }
 
@@ -63,36 +63,37 @@ export const useDashboardData = () => {
       items.value = itemsData || [];
 
       const totalItems = items.value.length;
-      
+
       // Items are resolved if they have claimed_by set (regardless of lost/found status)
       const resolvedItems = items.value.filter(
         item => item.claimed_by !== null && item.claimed_by !== ''
       ).length;
 
-      // Lost/Found items are only counted if they are NOT claimed (not resolved)
+      // Lost items are only counted if they are NOT claimed (not resolved)
       const lostItems = items.value.filter(
         item => item.status === 'lost' && (item.claimed_by === null || item.claimed_by === '')
       ).length;
-      
-      const foundItems = items.value.filter(
-        item => item.status === 'found' && (item.claimed_by === null || item.claimed_by === '')
+
+      // Claimed items are items with claimed_by set
+      const claimedItems = items.value.filter(
+        item => item.status === 'claimed' || (item.claimed_by !== null && item.claimed_by !== '')
       ).length;
 
       stats.value.totalItems = totalItems;
       stats.value.lostItems = lostItems;
-      stats.value.foundItems = foundItems;
+      stats.value.foundItems = claimedItems; // Reuse foundItems field for claimed items
       stats.value.resolvedItems = resolvedItems;
 
       stats.value.recentActivity = items.value.map(item => {
         const isClaimed = item.claimed_by !== null && item.claimed_by !== '';
-        
+
         return {
           id: String(item.id),
           type: isClaimed ? 'resolved' : item.status,
           title: item.title,
           user: item.user_id || 'Unknown User',
           timestamp: item.created_at,
-          status: isClaimed ? 'Claimed' : (item.status === 'lost' ? 'Lost' : 'Found'),
+          status: isClaimed ? 'Claimed' : (item.status === 'lost' ? 'Lost' : 'Claimed'),
         };
       });
     } catch (error) {

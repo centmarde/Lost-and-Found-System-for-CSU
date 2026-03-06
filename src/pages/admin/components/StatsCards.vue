@@ -41,7 +41,7 @@ defineProps<Props>();
         <div class="text-h4 font-weight-bold text-success">
           {{ stats.foundItems }}
         </div>
-        <div class="text-subtitle-1 text-grey-darken-1">Found Items</div>
+        <div class="text-subtitle-1 text-grey-darken-1">Claimed Items</div>
       </v-card>
     </v-col>
 

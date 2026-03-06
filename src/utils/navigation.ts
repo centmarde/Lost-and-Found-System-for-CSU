@@ -32,13 +32,13 @@ export const individualNavItems: NavigationItem[] = [
         icon: 'mdi-inbox',
         route: '/admin/support-inbox',
         permission: 'admin.support.manage'
-      },
-  {
+      }
+  /* {
     title: 'Version History',
     icon: 'mdi-history',
     route: '/version',
     permission: 'app.version.access'
-  }
+  } */
 ]
 
 // Grouped navigation items

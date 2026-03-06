@@ -12,8 +12,6 @@ import ItemFilters from "@/components/common/ItemFilters.vue";
 import DirectAdminMessageCard from "@/components/common/DirectAdminMessageCard.vue";
 import ItemsDisplay from "@/components/common/ItemsDisplay.vue";
 import VersionLog from "@/components/common/VersionLog.vue";
-import WelcomeVersionDialog from "@/components/common/WelcomeVersionDialog.vue";
-import { useWelcomeVersion } from "@/composables/useWelcomeVersion";
 
 
 
@@ -69,15 +67,6 @@ const {
 
 // View mode state
 const viewMode = ref('grid');
-
-// Welcome version dialog
-const {
-  showWelcomeVersionDialog,
-  showVersionDialog,
-  latestVersionData,
-  openWelcomeDialog,
-  openChangelogs,
-} = useWelcomeVersion();
 
 // User chat composable
 const {
@@ -214,7 +203,6 @@ watch(
 onMounted(async () => {
   await getCurrentUser();
   await fetchItems();
-  await openWelcomeDialog();
 });
 
 // Cleanup on component unmount
@@ -234,17 +222,15 @@ onUnmounted(() => {
             <div class="pa-6 pa-sm-8 pa-md-12 position-relative">
               <!-- Compact Header Content -->
               <div class="text-center mb-3 mb-md-4">
-                <h1 class="text-h4 text-sm-h3 font-weight-bold text-green-darken-4 mb-1">
-                  {{ pageTitle }}
+                <h1 class=" text-sm-h5 font-weight-bold text-green-darken-4 mb-1">
+                   {{ pageSubtitle }}
                 </h1>
-                <p class="text-body-1 text-sm-h6 text-grey-darken-1 mb-0">
-                  {{ pageSubtitle }}
-                </p>
+
               </div>
 
               <!-- Centered Notification Bell for Students -->
               <div v-if="showNotificationBell" class="text-center mb-2">
-                <v-btn
+             <!--    <v-btn
                   icon
                   @click="toggleNotifications"
                   :color="unreadCount > 0 ? 'primary' : 'grey-lighten-1'"
@@ -263,7 +249,7 @@ onUnmounted(() => {
                 </v-btn>
                 <div class="text-caption text-grey-darken-1 mt-1">
                   Notifications
-                </div>
+                </div> -->
               </div>
 
               <!-- Welcome Admin Text -->
@@ -377,14 +363,8 @@ onUnmounted(() => {
           @open-chat="openSupportChat"
         /> -->
 
-        <!-- Welcome Version Dialog -->
-        <WelcomeVersionDialog
-          v-model="showWelcomeVersionDialog"
-          :latest-version="latestVersionData"
-          @open-changelogs="openChangelogs"
-        />
-
-        <!-- Version History Dialog -->
+        <!-- Version History Dialog - Commented out for now -->
+        <!--
         <v-dialog v-model="showVersionDialog" max-width="1100" scrollable>
           <v-card rounded="xl">
             <v-card-title class="d-flex align-center justify-space-between pa-4">
@@ -406,6 +386,7 @@ onUnmounted(() => {
             </v-card-actions>
           </v-card>
         </v-dialog>
+        -->
       </v-container>
     </template>
   </InnerLayoutWrapper>

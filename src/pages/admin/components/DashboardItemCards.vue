@@ -6,9 +6,10 @@ interface Item {
   id: number
   title: string
   description: string
-  status: 'lost' | 'found'
+  status: 'lost' | 'claimed'
   user_id: string
-  claimed_by: string
+  claimed_by: string | null
+  claimed_by_email?: string
   created_at: string
 }
 
@@ -25,6 +26,7 @@ const emit = defineEmits<{
   deleteItem: [item: Item]
   updateDescription: [itemId: number, newDescription: string]
   updateTitle: [itemId: number, newTitle: string]
+  unclaimItem: [itemId: number]
 }>()
 
 // State for editing description
@@ -127,7 +129,7 @@ const getItemStatusColor = (item: Item) => {
 
 const getItemStatusText = (item: Item) => {
   if (item.claimed_by) return 'Claimed'
-  return item.status === 'lost' ? 'Lost' : 'Found'
+  return item.status === 'lost' ? 'Lost' : 'Claimed'
 }
 
 const getItemStatusIcon = (item: Item) => {
@@ -160,7 +162,7 @@ const getItemStatusIcon = (item: Item) => {
           <template #activator="{ props }">
             <v-chip
               v-bind="props"
-              color="primary"
+
               size="small"
               variant="tonal"
               prepend-icon="mdi-account-group"
@@ -218,15 +220,32 @@ const getItemStatusIcon = (item: Item) => {
       >
         Mark as Claimed
       </v-btn>
-      <v-chip
-        v-else
-        color="success"
-        variant="flat"
-        size="small"
-        prepend-icon="mdi-check-circle"
-      >
-        Item Claimed
-      </v-chip>
+      <div v-else class="d-flex flex-column gap-2">
+        <div class="d-flex align-center justify-space-between gap-2">
+          <v-chip
+            color="success"
+            variant="flat"
+            size="small"
+            prepend-icon="mdi-check-circle"
+          >
+            Item Claimed
+          </v-chip>
+          <v-btn
+            color="warning"
+            variant="outlined"
+            size="x-small"
+            prepend-icon="mdi-undo"
+            @click="$emit('unclaimItem', item.id)"
+            :loading="isUpdating"
+          >
+            Undo
+          </v-btn>
+        </div>
+        <div v-if="item.claimed_by_email" class="text-caption text-success d-flex align-center">
+          <v-icon size="12" class="me-1">mdi-account</v-icon>
+          {{ item.claimed_by_email }}
+        </div>
+      </div>
     </v-card-actions>
 
     <!-- Edit Dialog -->
