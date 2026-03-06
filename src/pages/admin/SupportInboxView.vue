@@ -609,10 +609,10 @@ onBeforeUnmount(() => {
         <v-row class="mb-6">
           <v-col cols="12">
             <div class="text-center mb-4 mb-md-6">
-              <h1 class="text-h2 text-sm-h1 font-weight-bold text-green-darken-4 mb-2">
+              <h1 class="text-h5 text-sm-h4 font-weight-bold text-green-darken-4 mb-2">
                 {{ pageTitle }}
               </h1>
-              <p class="text-h6 text-sm-h5 text-grey-darken-1 mb-0">
+              <p>
                 {{ pageDescription }}
               </p>
               <!-- Mark All as Read Button -->

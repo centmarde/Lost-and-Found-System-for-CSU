@@ -22,10 +22,10 @@ const handleViewPermissions = () => {
      <div class="pa-4 pa-md-6" >
       <!-- Page Header -->
       <div class="text-start mb-8">
-        <h1 class="text-h3 text-md-h2 font-weight-bold text-primary mb-2">
+        <h1 class="text-h4 text-md-h4 font-weight-bold text-primary mb-2">
           User Profile
         </h1>
-        <p class="text-h6 text-md-h5 text-medium-emphasis">
+        <p>
           View and manage your profile information
         </p>
       </div>
