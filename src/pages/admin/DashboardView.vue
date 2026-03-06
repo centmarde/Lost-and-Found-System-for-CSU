@@ -61,6 +61,11 @@ const currentFilters = ref<FilterData>({
 const applyFilters = () => {
   let filteredData = [...allItems.value]
 
+  // Filter out deleted user items
+  filteredData = filteredData.filter(item => {
+    return item.title !== '[Deleted User Item]'
+  })
+
   // Apply search filter
   if (currentFilters.value.search) {
     const searchTerm = currentFilters.value.search.toLowerCase()

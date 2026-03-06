@@ -29,6 +29,7 @@ declare module 'vue-router/auto-routes' {
     '/admin/components/dialogs/AdminUserRolesDialog': RouteRecordInfo<'/admin/components/dialogs/AdminUserRolesDialog', '/admin/components/dialogs/AdminUserRolesDialog', Record<never, never>, Record<never, never>>,
     '/admin/components/dialogs/ConfirmationDialog': RouteRecordInfo<'/admin/components/dialogs/ConfirmationDialog', '/admin/components/dialogs/ConfirmationDialog', Record<never, never>, Record<never, never>>,
     '/admin/components/dialogs/EditUserDialog': RouteRecordInfo<'/admin/components/dialogs/EditUserDialog', '/admin/components/dialogs/EditUserDialog', Record<never, never>, Record<never, never>>,
+    '/admin/components/dialogs/UnclaimConfirmationDialog': RouteRecordInfo<'/admin/components/dialogs/UnclaimConfirmationDialog', '/admin/components/dialogs/UnclaimConfirmationDialog', Record<never, never>, Record<never, never>>,
     '/admin/components/dialogs/UserDetailsDialog': RouteRecordInfo<'/admin/components/dialogs/UserDetailsDialog', '/admin/components/dialogs/UserDetailsDialog', Record<never, never>, Record<never, never>>,
     '/admin/components/FilterHeader': RouteRecordInfo<'/admin/components/FilterHeader', '/admin/components/FilterHeader', Record<never, never>, Record<never, never>>,
     '/admin/components/ItemsCardView': RouteRecordInfo<'/admin/components/ItemsCardView', '/admin/components/ItemsCardView', Record<never, never>, Record<never, never>>,

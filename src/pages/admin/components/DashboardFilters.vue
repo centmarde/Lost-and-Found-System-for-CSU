@@ -28,20 +28,13 @@ const emit = defineEmits<{
 
 // Reactive state
 const searchTerm = ref('')
-const selectedStatus = ref('all')
+const selectedStatus = ref('lost') // Default to lost items
 const sortBy = ref('created_at')
 const sortOrder = ref<'asc' | 'desc'>('desc')
 const dateFrom = ref('')
 const dateTo = ref('')
 const showClaimed = ref(false)
 const showAdvancedFilters = ref(false)
-
-// Status options for lost and claimed items
-const statusOptions = [
-  { value: 'all', title: 'All Items' },
-  { value: 'lost', title: 'Lost Items' },
-  { value: 'claimed', title: 'Items Claimed by Someone' },
-]
 
 // Sort options for items
 const sortOptions = [
@@ -72,7 +65,7 @@ const isAlphabeticalSort = computed(() => {
 const hasActiveFilters = computed(() => {
   return (
     searchTerm.value !== '' ||
-    selectedStatus.value !== 'all' ||
+    selectedStatus.value !== 'lost' ||
     dateFrom.value !== '' ||
     dateTo.value !== '' ||
     sortBy.value !== 'created_at' ||
@@ -86,10 +79,19 @@ watch(currentFilters, (newFilters) => {
   emit('update:filters', newFilters)
 }, { deep: true })
 
+// Watch for status changes and sync with showClaimed
+watch(selectedStatus, (newStatus) => {
+  if (newStatus === 'lost') {
+    showClaimed.value = false
+  } else if (newStatus === 'claimed') {
+    showClaimed.value = true
+  }
+})
+
 // Methods
 const clearAllFilters = () => {
   searchTerm.value = ''
-  selectedStatus.value = 'all'
+  selectedStatus.value = 'lost'
   sortBy.value = 'created_at'
   sortOrder.value = 'desc'
   dateFrom.value = ''
@@ -114,9 +116,9 @@ defineExpose({
   <v-card class="dashboard-filters mb-4" elevation="2">
     <v-card-text class="pb-2">
       <!-- Main Search Row -->
-      <v-row class="align-center mb-3">
+      <v-row class="align-center mb-2">
         <!-- Search Field -->
-        <v-col cols="12" md="5">
+        <v-col cols="12" md="8">
           <v-text-field
             v-model="searchTerm"
             prepend-inner-icon="mdi-magnify"
@@ -130,27 +132,8 @@ defineExpose({
           />
         </v-col>
 
-        <!-- Status Filter -->
-        <v-col cols="12" md="2">
-          <v-select
-            v-model="selectedStatus"
-            :items="statusOptions"
-            item-title="title"
-            item-value="value"
-            label="Filter by Status"
-            variant="outlined"
-            density="compact"
-            hide-details
-            :disabled="loading"
-          >
-            <template v-slot:prepend-inner>
-              <v-icon size="20">mdi-bookmark</v-icon>
-            </template>
-          </v-select>
-        </v-col>
-
         <!-- Sort Options -->
-        <v-col cols="12" md="3">
+        <v-col cols="12" md="2">
           <v-select
             v-model="sortBy"
             :items="sortOptions"
@@ -198,7 +181,6 @@ defineExpose({
           <v-btn
             icon="mdi-tune"
             size="small"
-
             color="primary"
             @click="showAdvancedFilters = !showAdvancedFilters"
             :disabled="loading"
@@ -226,6 +208,36 @@ defineExpose({
         </v-col>
       </v-row>
 
+      <!-- Status Filter Row -->
+      <v-row class="align-center mb-3">
+        <v-col cols="12" class="d-flex align-center gap-3">
+
+          <v-btn-toggle
+            v-model="selectedStatus"
+            mandatory
+            variant="text"
+            density="compact"
+            class="minimal-toggle"
+            :disabled="loading"
+          >
+            <v-btn
+              value="lost"
+              size="small"
+              class="minimal-btn"
+            >
+              Lost
+            </v-btn>
+            <v-btn
+              value="claimed"
+              size="small"
+              class="minimal-btn"
+            >
+              Claimed
+            </v-btn>
+          </v-btn-toggle>
+        </v-col>
+      </v-row>
+
       <!-- Advanced Filters (Collapsible) -->
       <v-expand-transition>
         <div v-show="showAdvancedFilters">
@@ -233,7 +245,7 @@ defineExpose({
 
           <v-row class="align-center">
             <!-- Show Claimed Toggle -->
-            <v-col cols="12" md="4">
+            <v-col v-if="selectedStatus === 'lost'" cols="12" md="4">
               <v-checkbox
                 v-model="showClaimed"
                 label="Include items claimed by someone"
@@ -302,15 +314,15 @@ defineExpose({
           </v-chip>
 
           <v-chip
-            v-if="selectedStatus !== 'all'"
+            v-if="selectedStatus !== 'lost'"
             size="small"
             closable
-            @click:close="selectedStatus = 'all'"
+            @click:close="selectedStatus = 'lost'"
             color="info"
             variant="tonal"
           >
-            <v-icon start size="16">mdi-bookmark</v-icon>
-            {{ statusOptions.find(s => s.value === selectedStatus)?.title }}
+            <v-icon start size="16">{{ selectedStatus === 'claimed' ? 'mdi-check-circle' : 'mdi-help-circle' }}</v-icon>
+            {{ selectedStatus === 'claimed' ? 'Items Claimed by Someone' : 'Lost Items' }}
           </v-chip>
 
           <v-chip
@@ -417,5 +429,47 @@ defineExpose({
 /* Checkbox styling */
 .v-checkbox {
   margin-top: 8px;
+}
+
+/* Minimal status toggle styling */
+.minimal-toggle {
+  border-radius: 6px;
+  background-color: rgba(var(--v-theme-surface-variant), 0.3);
+  padding: 2px;
+}
+
+.minimal-btn {
+  border-radius: 4px !important;
+  text-transform: none !important;
+  font-weight: 500 !important;
+  letter-spacing: normal !important;
+  transition: all 0.2s ease !important;
+  min-width: 60px !important;
+  height: 32px !important;
+  padding: 0 12px !important;
+}
+
+.minimal-btn.v-btn--active {
+  background-color: rgb(var(--v-theme-primary)) !important;
+  color: rgb(var(--v-theme-on-primary)) !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12) !important;
+}
+
+.minimal-btn:not(.v-btn--active) {
+  color: rgb(var(--v-theme-on-surface-variant)) !important;
+}
+
+.minimal-btn:not(.v-btn--active):hover {
+  background-color: rgba(var(--v-theme-primary), 0.08) !important;
+}
+
+/* Mobile responsive for minimal toggle */
+@media (max-width: 768px) {
+  .minimal-btn {
+    min-width: 50px !important;
+    height: 28px !important;
+    padding: 0 8px !important;
+    font-size: 0.875rem !important;
+  }
 }
 </style>

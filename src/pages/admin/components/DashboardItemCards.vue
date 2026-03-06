@@ -1,6 +1,7 @@
 <script lang="ts" setup>
 import { ref, watch } from 'vue'
 import { formatDate } from '@/utils/helpers'
+import UnclaimConfirmationDialog from './dialogs/UnclaimConfirmationDialog.vue'
 
 interface Item {
   id: number
@@ -43,6 +44,10 @@ const updatingTitle = ref(false)
 const showEditDialog = ref(false)
 const editingField = ref<'title' | 'description' | 'both'>('both')
 
+// State for unclaim confirmation dialog
+const showUnclaimDialog = ref(false)
+const unclaimingItem = ref(false)
+
 // Watch for changes in the item to reset editing state
 watch(() => props.item, (newItem) => {
   if (newItem) {
@@ -50,6 +55,12 @@ watch(() => props.item, (newItem) => {
     editedTitle.value = newItem.title
     isEditingDescription.value = false
     isEditingTitle.value = false
+
+    // Reset unclaim dialog state when item changes (e.g., after successful unclaim)
+    if (!newItem.claimed_by && showUnclaimDialog.value) {
+      showUnclaimDialog.value = false
+      unclaimingItem.value = false
+    }
   }
 }, { immediate: true })
 
@@ -135,6 +146,21 @@ const getItemStatusText = (item: Item) => {
 const getItemStatusIcon = (item: Item) => {
   if (item.claimed_by) return 'mdi-check-circle'
   return item.status === 'lost' ? 'mdi-alert-circle' : 'mdi-information'
+}
+
+// Handle unclaim confirmation
+const handleUnclaimClick = () => {
+  showUnclaimDialog.value = true
+}
+
+const handleUnclaimConfirm = (itemId: number) => {
+  unclaimingItem.value = true
+  emit('unclaimItem', itemId)
+}
+
+const handleUnclaimCancel = () => {
+  showUnclaimDialog.value = false
+  unclaimingItem.value = false
 }
 </script>
 
@@ -235,8 +261,8 @@ const getItemStatusIcon = (item: Item) => {
             variant="outlined"
             size="x-small"
             prepend-icon="mdi-undo"
-            @click="$emit('unclaimItem', item.id)"
-            :loading="isUpdating"
+            @click="handleUnclaimClick"
+            :loading="isUpdating || unclaimingItem"
           >
             Undo
           </v-btn>
@@ -309,6 +335,15 @@ const getItemStatusIcon = (item: Item) => {
         </v-card-actions>
       </v-card>
     </v-dialog>
+
+    <!-- Unclaim Confirmation Dialog -->
+    <UnclaimConfirmationDialog
+      v-model:show="showUnclaimDialog"
+      :item="item"
+      :loading="unclaimingItem"
+      @confirm="handleUnclaimConfirm"
+      @cancel="handleUnclaimCancel"
+    />
   </v-card>
 </template>
 
