@@ -52,7 +52,7 @@ export const useDashboardData = () => {
     try {
       const { data: itemsData, error: itemsError } = await supabase
         .from('items')
-        .select('id, title, description, status, claimed_by, user_id, created_at')
+        .select('id, title, description, status, claimed_by, found_by, user_id, created_at')
         .order('created_at', { ascending: false });
 
       if (itemsError) {

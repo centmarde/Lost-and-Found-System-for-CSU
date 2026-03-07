@@ -11,6 +11,7 @@ interface Item {
   user_id: string
   claimed_by: string | null
   claimed_by_email?: string
+  found_by?: string | null
   created_at: string
 }
 
@@ -225,6 +226,12 @@ const handleUnclaimCancel = () => {
           <p class="text-body-2 mb-0 flex-grow-1">{{ item.description }}</p>
 
         </div>
+      </div>
+
+      <!-- Found By Display -->
+      <div class="d-flex align-center text-caption text-grey-darken-1 mb-2">
+        <v-icon size="16" class="me-1">mdi-account-search</v-icon>
+        <span class="text-primary">Found by: {{ item.found_by || 'Anonymous' }}</span>
       </div>
 
       <div class="d-flex align-center text-caption text-grey-darken-1">
