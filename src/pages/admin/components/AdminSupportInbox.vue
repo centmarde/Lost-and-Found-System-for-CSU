@@ -24,7 +24,7 @@ interface Conversation {
     id: number
     title: string
     description?: string
-    status: 'lost' | 'found'
+    status: 'lost' | 'claimed'
   } | null
   latest_message?: {
     message: string

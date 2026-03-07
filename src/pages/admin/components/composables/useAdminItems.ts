@@ -28,6 +28,7 @@ export const useAdminItemActions = (refreshData: () => Promise<void>) => {
   const newItemForm = ref<NewItemForm>({
     title: '',
     description: '',
+    found_by: '',
     status: 'lost'
   })
 
@@ -94,6 +95,7 @@ export const useAdminItemActions = (refreshData: () => Promise<void>) => {
       newItemForm.value = {
         title: '',
         description: '',
+        found_by: '',
         status: 'lost'
       }
       showPostDialog.value = false
