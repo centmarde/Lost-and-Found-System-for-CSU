@@ -16,11 +16,13 @@ import {
   setupMessageSubscription
 } from '@/stores/messages'
 import { useNotifications } from '@/composables/useNotifications'
+import { useAuthUserStore } from '@/stores/authUser'
 import type { Message, Conversation } from '@/types/chat'
 
 export const useAdminItemActions = (refreshData: () => Promise<void>) => {
-  // Initialize notifications composable
-  const { broadcastNotification } = useNotifications()
+  // Initialize notifications composable and auth store
+  const { createAndSendNotification } = useNotifications()
+  const authStore = useAuthUserStore()
 
   // Item posting state
   const postingItem = ref(false)
@@ -72,23 +74,42 @@ export const useAdminItemActions = (refreshData: () => Promise<void>) => {
 
       await createItem(newItemForm.value, user.id)
 
-      // Send notification to all users about the new lost item
+      // Send notification to non-admin users about the new lost item
       try {
         const notificationTitle = `New Lost Item: ${newItemForm.value.title}`
         const notificationDescription = `A new lost item has been posted. Location: ${newItemForm.value.description}`
 
-        const notificationResult = await broadcastNotification(
-          notificationTitle,
-          notificationDescription
-        )
+        // Get all users and filter out admins (role ID 1)
+        const currentUserId = authStore.userData?.id
+        const usersResult = await authStore.getAllUsers()
 
-        if (notificationResult.error) {
-          console.warn('Failed to send notifications:', notificationResult.error)
-          // Don't throw error - item posting should still succeed even if notifications fail
+        if (usersResult.users) {
+          // Filter to non-admin users only (exclude role ID 1 and current user)
+          const nonAdminUsers = usersResult.users.filter(u => {
+            const roleId = u.raw_user_meta_data?.role || u.raw_app_meta_data?.role
+            return roleId !== 1 && u.id !== currentUserId // Exclude admins and the posting user
+          })
+
+          const userIds = nonAdminUsers.map(u => u.id).filter(Boolean)
+
+          if (userIds.length > 0) {
+            console.log(`📢 Sending item notification to ${userIds.length} non-admin users`)
+            const notificationResult = await createAndSendNotification(
+              notificationTitle,
+              notificationDescription,
+              userIds
+            )
+
+            if (notificationResult.error) {
+              console.warn('Failed to send item notifications:', notificationResult.error)
+            } else {
+              console.log('✅ Item notifications sent successfully')
+            }
+          }
         }
       } catch (notifError) {
-        console.warn('Error sending notifications:', notifError)
-        // Continue with normal flow even if notifications fail
+        console.warn('Error sending item notifications:', notifError)
+        // Don't fail item creation if notification fails
       }
 
       // Reset form

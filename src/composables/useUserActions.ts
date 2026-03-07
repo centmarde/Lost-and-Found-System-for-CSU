@@ -1,6 +1,7 @@
 import { ref } from 'vue'
 import { useAuthUserStore } from '@/stores/authUser'
 import { useToast } from 'vue-toastification'
+import { createRoleChangeNotification } from '@/utils/roleChangeNotifications'
 
 interface User {
   id: string
@@ -131,6 +132,12 @@ export function useUserActions() {
     editingUser.value = true
 
     try {
+      // Capture old role for notification comparison
+      const oldRoleId = selectedUser.value.raw_user_meta_data?.role ||
+                        selectedUser.value.raw_app_meta_data?.role || null
+      const newRoleId = editForm.value.role!
+      const hasRoleChange = oldRoleId !== newRoleId
+
       // Update user metadata (name AND role)
       const userMetadataResult = await authStore.updateUserMetadata(
         selectedUser.value.id,
@@ -160,6 +167,48 @@ export function useUserActions() {
           ? appMetadataResult.error
           : (appMetadataResult.error as AuthError)?.message || 'Failed to update user role'
         throw new Error(errorMsg)
+      }
+
+      // Send role change notification if role was changed (but not to the admin making the change)
+      if (hasRoleChange && selectedUser.value.email) {
+        try {
+          console.log(`Role changed for ${selectedUser.value.email}: ${oldRoleId} → ${newRoleId}`)
+
+          // Get current admin's email and ID
+          const currentAdminEmail = authStore.userData?.email || 'Administrator'
+          const currentAdminId = authStore.userData?.id
+
+          // Don't send notification if the admin is changing their own role
+          if (currentAdminId === selectedUser.value.id) {
+            console.log('🚫 Skipping notification - admin is changing their own role')
+            toast.info(`Role updated successfully (no notification sent to yourself)`, {
+              timeout: 3000
+            })
+          } else {
+            const notificationResult = await createRoleChangeNotification({
+              userId: selectedUser.value.id,
+              userEmail: selectedUser.value.email,
+              oldRoleId,
+              newRoleId,
+              adminEmail: currentAdminEmail
+            })
+
+            if (notificationResult.success) {
+              console.log('Role change notification sent successfully')
+              toast.info(`📧 Notification sent to ${selectedUser.value.email} about their role change`, {
+                timeout: 4000
+              })
+            } else {
+              console.warn('Failed to send role change notification:', notificationResult.error)
+              toast.warning(`⚠️ User updated successfully, but notification failed to send`, {
+                timeout: 5000
+              })
+            }
+          }
+        } catch (notificationError) {
+          console.error('Error sending role change notification:', notificationError)
+          // Don't fail the entire update if notification fails
+        }
       }
 
       toast.success(`Successfully updated ${selectedUser.value.email}`)

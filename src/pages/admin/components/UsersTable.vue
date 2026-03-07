@@ -442,7 +442,7 @@ onMounted(() => {
             <!-- Refresh button -->
             <v-btn
               color="primary"
-              variant="tonal"
+
               @click="refreshUsers"
               :loading="loading"
               class="refresh-btn"

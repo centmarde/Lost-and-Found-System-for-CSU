@@ -75,15 +75,62 @@ export function useNotifications() {
 
   // Quick actions for current user
   async function loadMyNotifications() {
-    if (!currentUserId.value) return { error: new Error('User not authenticated') }
+    if (!currentUserId.value) {
+      console.warn('Cannot load notifications: User not authenticated')
+      return { error: new Error('User not authenticated') }
+    }
 
-    return await userNotificationsStore.getUserNotifications(currentUserId.value)
+    console.log(`🔄 Loading notifications for user: ${currentUserId.value}`)
+    console.log(`📊 Current store state before loading:`, {
+      storeNotificationCount: userNotificationsStore.userNotifications.length,
+      storeLoading: userNotificationsStore.loading
+    })
+
+    const result = await userNotificationsStore.getUserNotifications(currentUserId.value)
+
+    if (result.data) {
+      console.log(`✅ Loaded ${result.data.length} notifications for user`)
+      console.log(`📊 Store state after loading:`, {
+        storeNotificationCount: userNotificationsStore.userNotifications.length,
+        unreadCount: userNotificationsStore.unreadCount,
+        firstNotification: userNotificationsStore.userNotifications[0]
+      })
+    } else {
+      console.warn('❌ Failed to load notifications:', result.error)
+    }
+
+    return result
   }
 
   async function markAllMyNotificationsAsRead() {
     if (!currentUserId.value) return { error: new Error('User not authenticated') }
 
     return await userNotificationsStore.markAllAsRead(currentUserId.value)
+  }
+
+  async function deleteAllMyNotifications() {
+    if (!currentUserId.value) {
+      return { error: new Error('User not authenticated') }
+    }
+
+    console.log(`🗑️ Deleting all notifications for user: ${currentUserId.value}`)
+    const result = await userNotificationsStore.deleteAllUserNotifications(currentUserId.value)
+
+    if (result.success) {
+      console.log('✅ Successfully deleted all user notifications')
+      toast.success('All notifications cleared', {
+        position: POSITION.TOP_RIGHT,
+        timeout: 3000
+      })
+    } else {
+      console.error('❌ Failed to delete notifications:', result.error)
+      toast.error('Failed to clear notifications', {
+        position: POSITION.TOP_RIGHT,
+        timeout: 4000
+      })
+    }
+
+    return result
   }
 
   async function getMyUnreadCount() {
@@ -152,12 +199,32 @@ export function useNotifications() {
         (payload) => {
           console.log('New notification received!', payload)
 
-          // Add to local store
+          // Check if this is a user-specific notification that shouldn't be broadcast globally
+          const isUserSpecificNotification =
+            // Role change notifications
+            payload.new?.title?.includes('promoted') ||
+            payload.new?.title?.includes('demoted') ||
+            payload.new?.title?.includes('role') ||
+            payload.new?.title?.includes('Congratulations') ||
+            payload.new?.description?.includes('role') ||
+            // Item-related notifications (should be targeted, not broadcast to all users)
+            payload.new?.title?.includes('New Lost Item') ||
+            payload.new?.title?.includes('New Found Item') ||
+            payload.new?.title?.includes('Item Claimed') ||
+            payload.new?.title?.includes('Lost Item') ||
+            payload.new?.title?.includes('Found Item')
+
+          if (isUserSpecificNotification) {
+            console.log('🚫 Skipping global broadcast for user-specific notification:', payload.new?.title)
+            return
+          }
+
+          // Add to local store (only for truly global notifications)
           if (payload.new) {
             notificationsStore.notifications.unshift(payload.new)
           }
 
-          // Show toast notification for new broadcasts
+          // Show toast notification for new broadcasts (only for truly global notifications)
           if (payload.new?.title) {
             toast.info(`📢 ${payload.new.title}`, {
               position: POSITION.TOP_RIGHT,
@@ -181,15 +248,29 @@ export function useNotifications() {
           filter: `user_id=eq.${currentUserId.value}`
         },
         async (payload) => {
-          console.log('New user notification received!', payload)
+          console.log('🔔 New user notification received!', payload)
 
           if (payload.new) {
+            console.log(`📊 Store state before adding real-time notification:`, {
+              currentCount: userNotificationsStore.userNotifications.length,
+              newNotificationId: payload.new.id
+            })
+
+            // Check if notification already exists to prevent duplicates
+            const existingNotification = userNotificationsStore.userNotifications.find(n => n.id === payload.new.id)
+            if (existingNotification) {
+              console.log('⚠️ Notification already exists, skipping duplicate')
+              return
+            }
+
             // Fetch the complete notification with joined data
             const result = await userNotificationsStore.getUserNotificationById(payload.new.id)
 
             if (result.data) {
               // Add to local store
               userNotificationsStore.userNotifications.unshift(result.data)
+
+              console.log(`✅ Added real-time notification. New count: ${userNotificationsStore.userNotifications.length}`)
 
               // Show toast notification
               const title = result.data.notification?.title || 'New Notification'
@@ -242,6 +323,7 @@ export function useNotifications() {
     broadcastNotification,
     loadMyNotifications,
     markAllMyNotificationsAsRead,
+    deleteAllMyNotifications,
     getMyUnreadCount,
 
     // Utilities

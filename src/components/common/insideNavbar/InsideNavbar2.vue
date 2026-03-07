@@ -24,6 +24,8 @@
   const isAdmin = computed(() => {
     const roleId = authStore.userData?.user_metadata?.role ||
                    authStore.userData?.app_metadata?.role;
+    console.log('Debug - User role ID:', roleId, 'Is Admin:', roleId === 1);
+    console.log('Debug - Auth user data:', authStore.userData);
     return roleId === 1; // Assuming role ID 1 is admin
   });
 
@@ -51,6 +53,7 @@
     unreadCount,
     hasUnreadNotifications,
     loadMyNotifications,
+    deleteAllMyNotifications,
     setupRealtimeNotifications,
     teardownRealtimeNotifications,
     userNotificationsStore
@@ -67,11 +70,9 @@
     userNotificationsStore.markAsRead(id)
   }
 
-  const handleClearAllNotifications = () => {
-    // Mark all notifications as read for current user
-    if (authStore.userData?.id) {
-      userNotificationsStore.markAllAsRead(authStore.userData.id)
-    }
+  const handleClearAllNotifications = async () => {
+    // Delete all notifications for current user
+    await deleteAllMyNotifications()
   }
 
   // Scroll detection for mobile drawer auto-close
@@ -102,7 +103,7 @@
     // Fetch roles for role description
     rolesStore.fetchRoles()
 
-    // Setup notifications if user is authenticated
+    // Setup notifications if user is authenticated and not admin
     if (authStore.userData && !isAdmin.value) {
       loadMyNotifications()
       setupRealtimeNotifications()
@@ -117,12 +118,33 @@
   // Watch for auth changes to setup/cleanup notifications
   watch(
     () => authStore.userData,
-    async (userData) => {
+    async (userData, oldUserData) => {
+      console.log('🔄 Auth state changed:', {
+        hasUser: !!userData,
+        userId: userData?.id,
+        hadPreviousUser: !!oldUserData,
+        previousUserId: oldUserData?.id,
+        isRealChange: userData?.id !== oldUserData?.id,
+        isAdmin: isAdmin.value
+      })
+
       if (userData && !isAdmin.value) {
-        await loadMyNotifications()
-        setupRealtimeNotifications()
+        // Only reload if it's a real change (not just a reactive update)
+        if (!oldUserData || userData.id !== oldUserData.id) {
+          // User is authenticated and not admin - load their notifications
+          await new Promise(resolve => setTimeout(resolve, 100)) // Small delay for auth to settle
+          console.log('📧 Loading notifications for authenticated non-admin user')
+          await loadMyNotifications()
+          setupRealtimeNotifications()
+        } else {
+          console.log('📧 Auth data updated but same user, skipping reload')
+        }
       } else {
+        // User logged out or is admin
+        console.log('👋 User logged out or is admin, cleaning up notifications')
         teardownRealtimeNotifications()
+        // Clear notification state when user logs out or is admin
+        userNotificationsStore.userNotifications = []
       }
     },
     { immediate: true }
@@ -316,8 +338,9 @@
             </v-badge>
 
             <!-- Notification Bell for Students - beside theme toggle -->
+            <!-- Debug: isAdmin = {{ isAdmin }}, userData = {{ !!authStore.userData }} -->
             <v-btn
-              v-if="!isAdmin"
+              v-if="authStore.userData && !isAdmin"
               icon
               @click="toggleNotifications"
               :color="hasUnreadNotifications ? 'warning' : 'white'"
@@ -517,7 +540,7 @@
 
         <!-- Notification Bell for Students (Mobile) -->
         <v-list-item
-          v-if="!isAdmin"
+          v-if="authStore.userData && !isAdmin"
           @click="toggleNotifications; drawer = false"
           class="ma-2 rounded-lg"
           prepend-icon="mdi-bell"
@@ -603,7 +626,7 @@
 
     <!-- Notification Dialog -->
     <NotificationDialog
-      v-if="!isAdmin"
+      v-if="authStore.userData && !isAdmin"
       v-model="showNotificationDialog"
       :notifications="[]"
       :global-notifications="userNotificationsStore.userNotifications.filter(n => n.id != null).map(n => ({ ...n, type: 'global' }))"
