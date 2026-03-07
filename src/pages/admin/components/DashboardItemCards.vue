@@ -1,14 +1,17 @@
 <script lang="ts" setup>
 import { ref, watch } from 'vue'
 import { formatDate } from '@/utils/helpers'
+import UnclaimConfirmationDialog from './dialogs/UnclaimConfirmationDialog.vue'
 
 interface Item {
   id: number
   title: string
   description: string
-  status: 'lost' | 'found'
+  status: 'lost' | 'claimed'
   user_id: string
-  claimed_by: string
+  claimed_by: string | null
+  claimed_by_email?: string
+  found_by?: string | null
   created_at: string
 }
 
@@ -25,6 +28,7 @@ const emit = defineEmits<{
   deleteItem: [item: Item]
   updateDescription: [itemId: number, newDescription: string]
   updateTitle: [itemId: number, newTitle: string]
+  unclaimItem: [itemId: number]
 }>()
 
 // State for editing description
@@ -41,6 +45,10 @@ const updatingTitle = ref(false)
 const showEditDialog = ref(false)
 const editingField = ref<'title' | 'description' | 'both'>('both')
 
+// State for unclaim confirmation dialog
+const showUnclaimDialog = ref(false)
+const unclaimingItem = ref(false)
+
 // Watch for changes in the item to reset editing state
 watch(() => props.item, (newItem) => {
   if (newItem) {
@@ -48,6 +56,12 @@ watch(() => props.item, (newItem) => {
     editedTitle.value = newItem.title
     isEditingDescription.value = false
     isEditingTitle.value = false
+
+    // Reset unclaim dialog state when item changes (e.g., after successful unclaim)
+    if (!newItem.claimed_by && showUnclaimDialog.value) {
+      showUnclaimDialog.value = false
+      unclaimingItem.value = false
+    }
   }
 }, { immediate: true })
 
@@ -127,12 +141,27 @@ const getItemStatusColor = (item: Item) => {
 
 const getItemStatusText = (item: Item) => {
   if (item.claimed_by) return 'Claimed'
-  return item.status === 'lost' ? 'Lost' : 'Found'
+  return item.status === 'lost' ? 'Lost' : 'Claimed'
 }
 
 const getItemStatusIcon = (item: Item) => {
   if (item.claimed_by) return 'mdi-check-circle'
   return item.status === 'lost' ? 'mdi-alert-circle' : 'mdi-information'
+}
+
+// Handle unclaim confirmation
+const handleUnclaimClick = () => {
+  showUnclaimDialog.value = true
+}
+
+const handleUnclaimConfirm = (itemId: number) => {
+  unclaimingItem.value = true
+  emit('unclaimItem', itemId)
+}
+
+const handleUnclaimCancel = () => {
+  showUnclaimDialog.value = false
+  unclaimingItem.value = false
 }
 </script>
 
@@ -160,7 +189,7 @@ const getItemStatusIcon = (item: Item) => {
           <template #activator="{ props }">
             <v-chip
               v-bind="props"
-              color="primary"
+
               size="small"
               variant="tonal"
               prepend-icon="mdi-account-group"
@@ -199,6 +228,12 @@ const getItemStatusIcon = (item: Item) => {
         </div>
       </div>
 
+      <!-- Found By Display -->
+      <div class="d-flex align-center text-caption text-grey-darken-1 mb-2">
+        <v-icon size="16" class="me-1">mdi-account-search</v-icon>
+        <span class="text-primary">Found by: {{ item.found_by || 'Anonymous' }}</span>
+      </div>
+
       <div class="d-flex align-center text-caption text-grey-darken-1">
         <v-icon size="16" class="me-1">mdi-clock-outline</v-icon>
         {{ formatDate(item.created_at) }}
@@ -218,15 +253,32 @@ const getItemStatusIcon = (item: Item) => {
       >
         Mark as Claimed
       </v-btn>
-      <v-chip
-        v-else
-        color="success"
-        variant="flat"
-        size="small"
-        prepend-icon="mdi-check-circle"
-      >
-        Item Claimed
-      </v-chip>
+      <div v-else class="d-flex flex-column gap-2">
+        <div class="d-flex align-center justify-space-between gap-2">
+          <v-chip
+            color="success"
+            variant="flat"
+            size="small"
+            prepend-icon="mdi-check-circle"
+          >
+            Item Claimed
+          </v-chip>
+          <v-btn
+            color="warning"
+            variant="outlined"
+            size="x-small"
+            prepend-icon="mdi-undo"
+            @click="handleUnclaimClick"
+            :loading="isUpdating || unclaimingItem"
+          >
+            Undo
+          </v-btn>
+        </div>
+        <div v-if="item.claimed_by_email" class="text-caption text-success d-flex align-center">
+          <v-icon size="12" class="me-1">mdi-account</v-icon>
+          {{ item.claimed_by_email }}
+        </div>
+      </div>
     </v-card-actions>
 
     <!-- Edit Dialog -->
@@ -290,6 +342,15 @@ const getItemStatusIcon = (item: Item) => {
         </v-card-actions>
       </v-card>
     </v-dialog>
+
+    <!-- Unclaim Confirmation Dialog -->
+    <UnclaimConfirmationDialog
+      v-model:show="showUnclaimDialog"
+      :item="item"
+      :loading="unclaimingItem"
+      @confirm="handleUnclaimConfirm"
+      @cancel="handleUnclaimCancel"
+    />
   </v-card>
 </template>
 

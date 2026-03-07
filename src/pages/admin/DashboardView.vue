@@ -13,21 +13,16 @@ import DashboardFilters from '@/pages/admin/components/DashboardFilters.vue'
 import { useDashboardData } from '@/pages/admin/components/composables/useDashboardData'
 import { useAdminItemActions } from '@/pages/admin/components/composables/useAdminItems'
 // import { handleClaimItem } from '@/stores/items'
-import { markItemAsClaimed, updateItemDescription } from '@/stores/items'
+import { markItemAsClaimed, markItemAsUnclaimed, updateItemDescription, type Item as ItemType } from '@/stores/items'
 import { getMultipleItemsConversationCounts } from '@/stores/conversation'
+import { useAuthUserStore } from '@/stores/authUser'
 
+// Extended item interface with claimed user email
+interface ExtendedItem extends ItemType {
+  claimed_by_email?: string
+}
 
 import '@/styles/dashboardview.css'
-
-interface Item {
-  id: number
-  title: string
-  description: string
-  status: 'lost' | 'found'
-  user_id: string
-  claimed_by: string
-  created_at: string
-}
 
 const {
   loading,
@@ -36,6 +31,8 @@ const {
   fetchDashboardStats,
   getTotalUsersCount
 } = useDashboardData()
+
+const authStore = useAuthUserStore()
 
 // Filter state
 interface FilterData {
@@ -48,7 +45,7 @@ interface FilterData {
   showClaimed: boolean
 }
 
-const allItems = ref<Item[]>([]) // Store all items for filtering
+const allItems = ref<ExtendedItem[]>([]) // Store all items for filtering
 const conversationCounts = ref<Record<number, number>>({}) // Store conversation counts per item
 const currentFilters = ref<FilterData>({
   search: '',
@@ -64,6 +61,11 @@ const currentFilters = ref<FilterData>({
 const applyFilters = () => {
   let filteredData = [...allItems.value]
 
+  // Filter out deleted user items
+  filteredData = filteredData.filter(item => {
+    return item.title !== '[Deleted User Item]'
+  })
+
   // Apply search filter
   if (currentFilters.value.search) {
     const searchTerm = currentFilters.value.search.toLowerCase()
@@ -77,12 +79,22 @@ const applyFilters = () => {
   // Apply status filter
   if (currentFilters.value.statusFilter !== 'all') {
     filteredData = filteredData.filter(item => {
-      return item.status === currentFilters.value.statusFilter
+      if (currentFilters.value.statusFilter === 'claimed') {
+        // For "claimed" filter, show items that have been claimed (have claimed_by set)
+        // But exclude items where claimed_by_email is undefined (deleted user)
+        return item.claimed_by !== null &&
+               item.claimed_by !== '' &&
+               item.claimed_by_email !== undefined
+      } else {
+        // For other statuses, filter by the actual status field
+        return item.status === currentFilters.value.statusFilter
+      }
     })
   }
 
-  // Apply claimed filter
-  if (!currentFilters.value.showClaimed) {
+  // Apply "Show Claimed" toggle (this is separate from status filter)
+  // When showClaimed is false, hide items that have been claimed by someone
+  if (!currentFilters.value.showClaimed && currentFilters.value.statusFilter === 'all') {
     filteredData = filteredData.filter(item => {
       return !item.claimed_by || item.claimed_by === ''
     })
@@ -173,7 +185,64 @@ const applyFilters = () => {
 // Enhanced fetch function that stores all items
 const fetchAndApplyFilters = async () => {
   await fetchDashboardStats()
-  allItems.value = [...items.value] // Store all items before filtering
+
+  // Fetch user data for all relevant users (item creators and claimers)
+  const itemsWithEmails: ExtendedItem[] = []
+
+  if (items.value.length > 0) {
+    // Get all unique user IDs (both item creators and claimers)
+    const allUserIds = [...new Set([
+      ...items.value.map(item => item.user_id),
+      ...items.value
+        .filter(item => item.claimed_by)
+        .map(item => item.claimed_by!)
+    ])]
+
+    // Fetch all user data
+    let userEmailMap = new Map<string, string>()
+    let deletedUserIds = new Set<string>()
+
+    if (allUserIds.length > 0) {
+      try {
+        const { users, error: usersError } = await authStore.getAllUsers()
+        if (!usersError && users) {
+          users.forEach(user => {
+            if (user.email) {
+              userEmailMap.set(user.id, user.email)
+            }
+            // Check if user is deleted
+            const isDeleted = user.raw_app_meta_data?.deleted || user.raw_user_meta_data?.deleted || false
+            if (isDeleted) {
+              deletedUserIds.add(user.id)
+            }
+          })
+        }
+      } catch (error) {
+        console.error('Error fetching user data:', error)
+      }
+    }
+
+    // Filter out items from deleted users and add email data
+    items.value.forEach(item => {
+      // Skip items from deleted users (original poster is deleted)
+      if (deletedUserIds.has(item.user_id)) {
+        return
+      }
+
+      // Skip items claimed by deleted users when showing claimed items
+      if (item.claimed_by && deletedUserIds.has(item.claimed_by)) {
+        return
+      }
+
+      const extendedItem: ExtendedItem = {
+        ...item,
+        claimed_by_email: item.claimed_by ? userEmailMap.get(item.claimed_by) : undefined
+      }
+      itemsWithEmails.push(extendedItem)
+    })
+  }
+
+  allItems.value = itemsWithEmails // Store all items with emails before filtering
 
   // Load conversation counts for all items
   if (allItems.value.length > 0) {
@@ -202,15 +271,15 @@ const {
 
 // Claim dialog state
 const showClaimDialog = ref(false)
-const selectedItemForClaim = ref<Item | null>(null)
+const selectedItemForClaim = ref<ExtendedItem | null>(null)
 
 // Delete confirmation dialog state
 const showDeleteDialog = ref(false)
-const selectedItemForDelete = ref<Item | null>(null)
+const selectedItemForDelete = ref<ExtendedItem | null>(null)
 const deletingItem = ref(false)
 
 // Handle showing claim dialog
-const handleShowClaimDialog = (item: Item) => {
+const handleShowClaimDialog = (item: ExtendedItem) => {
   selectedItemForClaim.value = item
   showClaimDialog.value = true
 }
@@ -233,8 +302,20 @@ const handleUpdateDescription = async (itemId: number, newDescription: string) =
   }
 }
 
+// Handle unclaim item (undo claim)
+const handleUnclaimItem = async (itemId: number) => {
+  try {
+    await markItemAsUnclaimed(itemId)
+    // Refresh the items to show the updated status
+    await fetchAndApplyFilters()
+  } catch (error) {
+    console.error('Failed to unclaim item:', error)
+    // You could show an error dialog here if needed
+  }
+}
+
 // Handle delete item with confirmation
-const handleDeleteItem = async (item: Item) => {
+const handleDeleteItem = async (item: ExtendedItem) => {
   selectedItemForDelete.value = item
   showDeleteDialog.value = true
 }
@@ -385,6 +466,7 @@ onMounted(async () => {
                       @show-claim-dialog="handleShowClaimDialog"
                       @delete-item="handleDeleteItem"
                       @update-description="handleUpdateDescription"
+                      @unclaim-item="handleUnclaimItem"
                     />
                   </v-col>
                 </v-row>

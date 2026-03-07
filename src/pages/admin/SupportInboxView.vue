@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { onMounted, onBeforeUnmount, computed, ref } from "vue";
+import { useRouter } from "vue-router";
 import InnerLayoutWrapper from "@/layouts/InnerLayoutWrapper.vue";
 import AdminSupportInbox from "@/pages/admin/components/AdminSupportInbox.vue";
 import FilterHeader from "@/pages/admin/components/FilterHeader.vue";
@@ -19,6 +20,9 @@ import { useAdminSupportInbox } from "@/pages/admin/components/composables/useAd
 
 // Auth composable
 const { currentUser, isCurrentUserAdmin, getCurrentUser } = useAuth();
+
+// Router
+const router = useRouter();
 // Admin Support Inbox composable
 const {
   showInbox: showAdminSupportInbox,
@@ -302,11 +306,9 @@ const loadItems = async () => {
   }
 };
 
-// Select an item to view its support conversations
-const selectItem = async (item: any) => {
-  selectedItem.value = item;
-  viewMode.value = 'items';
-  await loadSupportConversations(1);
+// Select an item to view its support conversations — navigates to the dedicated page
+const selectItem = (item: any) => {
+  router.push(`/admin/support-inbox/item/${item.id}`);
 };
 
 // Select a user to view their direct messages
@@ -609,10 +611,10 @@ onBeforeUnmount(() => {
         <v-row class="mb-6">
           <v-col cols="12">
             <div class="text-center mb-4 mb-md-6">
-              <h1 class="text-h2 text-sm-h1 font-weight-bold text-green-darken-4 mb-2">
+              <h1 class="text-h5 text-sm-h4 font-weight-bold text-green-darken-4 mb-2">
                 {{ pageTitle }}
               </h1>
-              <p class="text-h6 text-sm-h5 text-grey-darken-1 mb-0">
+              <p>
                 {{ pageDescription }}
               </p>
               <!-- Mark All as Read Button -->
@@ -1539,384 +1541,6 @@ onBeforeUnmount(() => {
               </v-card>
             </div>
 
-            <!-- Show Support Inbox when item is selected -->
-            <v-card v-else-if="selectedItem && viewMode === 'items'" elevation="2" class="pa-4">
-              <!-- Back Button and Item Info Header -->
-              <div class="d-flex align-center mb-4">
-                <v-btn
-                  icon="mdi-arrow-left"
-                  variant="text"
-                  @click="backToItems"
-                  class="me-3"
-                />
-                <div class="flex-grow-1">
-                  <div class="d-flex align-center">
-                    <v-icon class="me-2" color="primary">mdi-package-variant</v-icon>
-                    <h2 class="text-h5 font-weight-bold">{{ selectedItem.title }}</h2>
-                    <v-chip
-                      :color="selectedItem.status === 'lost' ? 'error' : 'success'"
-                      size="small"
-                      variant="flat"
-                      class="ml-3"
-                    >
-                      <v-icon start>
-                        {{ selectedItem.status === 'lost' ? 'mdi-help' : 'mdi-check-circle' }}
-                      </v-icon>
-                      {{ selectedItem.status.toUpperCase() }} ITEM
-                    </v-chip>
-                  </div>
-                  <p class="text-body-2 text-grey-darken-1 mt-2 mb-0">
-                    {{ selectedItem.description }}
-                  </p>
-                </div>
-              </div>
-
-              <v-divider class="mb-4" />
-
-              <v-card-title class="text-h6 font-weight-bold mb-4 d-flex align-center px-0">
-                <v-icon class="me-2" color="primary">mdi-inbox</v-icon>
-                Support Conversations for this Item
-                <v-spacer />
-                <v-chip
-                  v-if="!loadingSupportConversations"
-                  color="info"
-                  variant="tonal"
-                  :size="$vuetify.display.xs ? 'x-small' : 'small'"
-                >
-                  {{ filteredConversations.length }}
-                  {{ filteredConversations.length === 1 ? 'Conversation' : 'Conversations' }}
-                </v-chip>
-              </v-card-title>
-
-              <!-- Loading State -->
-              <div v-if="loadingSupportConversations && supportConversations.length === 0" class="text-center py-12">
-                <v-progress-circular indeterminate color="primary" size="48" />
-                <p class="text-body-1 mt-4">Loading support conversations...</p>
-              </div>
-
-              <!-- Empty State -->
-              <div
-                v-else-if="!loadingSupportConversations && filteredConversations.length === 0"
-                class="text-center py-12"
-              >
-                <v-icon size="80" color="grey-lighten-1" class="mb-4">
-                  mdi-inbox-outline
-                </v-icon>
-                <h3 class="text-h5 text-grey-darken-1 mb-2">
-                  No Support Messages for this Item
-                </h3>
-                <p class="text-body-1 text-grey-darken-2 mb-4">
-                  No students have contacted support about this item yet.
-                </p>
-                <v-btn
-                  color="primary"
-                  variant="outlined"
-                  prepend-icon="mdi-arrow-left"
-                  @click="backToItems"
-                >
-                  Back to Items
-                </v-btn>
-              </div>
-
-              <!-- Support Inbox Component -->
-              <div v-else>
-                <!-- Embedded Support Inbox without dialog wrapper -->
-                <div class="support-inbox-container">
-                  <!-- Conversations List -->
-                  <v-row>
-                    <v-col cols="12" md="4">
-                      <v-card variant="outlined" class="conversation-list">
-                        <v-card-title class="text-h6 py-3 px-4 border-b d-flex justify-space-between align-center">
-                          <div class="d-flex align-center">
-                            <v-icon class="me-2">mdi-forum</v-icon>
-                            Conversations
-                            <v-btn
-                              icon="mdi-refresh"
-                              variant="text"
-                              size="small"
-                              class="ml-2"
-                              :loading="loadingSupportConversations"
-                              @click="loadSupportConversations(currentPage)"
-                            />
-                          </div>
-                        </v-card-title>
-
-                        <div v-if="loadingSupportConversations" class="pa-4 text-center">
-                          <v-progress-circular indeterminate color="primary" size="24" />
-                          <p class="text-caption mt-2">Loading...</p>
-                        </div>
-
-                        <v-list v-else class="pa-0">
-                          <v-list-item
-                            v-for="conversation in filteredConversations"
-                            :key="conversation.id"
-                            @click="selectSupportConversation(conversation)"
-                            :class="{ 'v-list-item--active': selectedSupportConversation?.id === conversation.id }"
-                            class="conversation-item py-3"
-                            lines="three"
-                          >
-                            <template v-slot:prepend>
-                              <v-badge
-                                v-if="conversationUnreadCounts[conversation.id] > 0"
-                                :content="conversationUnreadCounts[conversation.id]"
-                                color="error"
-                                overlap
-                              >
-                                <v-avatar
-                                  :color="conversation.item ? (conversation.item.status === 'lost' ? 'error' : 'success') : 'primary'"
-                                  size="45"
-                                  class="me-3"
-                                >
-                                  <span class="text-white font-weight-bold">
-                                    {{ getConversationInitials(conversation) }}
-                                  </span>
-                                </v-avatar>
-                              </v-badge>
-                              <v-avatar
-                                v-else
-                                :color="conversation.item ? (conversation.item.status === 'lost' ? 'error' : 'success') : 'primary'"
-                                size="45"
-                                class="me-3"
-                              >
-                                <span class="text-white font-weight-bold">
-                                  {{ getConversationInitials(conversation) }}
-                                </span>
-                              </v-avatar>
-                            </template>
-
-                            <!-- Main Content -->
-                            <div class="d-flex flex-column">
-                              <!-- User Info with unread indicator and typing indicator -->
-                              <div class="d-flex align-center justify-space-between mb-1">
-                                <div class="d-flex align-center">
-                                  <v-list-item-title class="font-weight-bold">
-                                    {{ conversationDisplayNames[conversation.id] || 'Loading...' }}
-                                  </v-list-item-title>
-                                  <!-- Typing indicator in conversation list -->
-                                  <span
-                                    v-if="conversationTypingStatus[conversation.id]?.isTyping"
-                                    class="text-caption text-primary ml-2"
-                                  >
-                                    typing...
-                                  </span>
-                                </div>
-                                <v-icon
-                                  v-if="conversationUnreadCounts[conversation.id] > 0"
-                                  color="error"
-                                  size="20"
-                                  class="ml-2"
-                                >
-                                  mdi-email-alert
-                                </v-icon>
-                              </div>
-
-                              <!-- Item Information - Made More Prominent -->
-
-                            </div>
-
-                            <template v-slot:append>
-                              <div class="text-caption text-grey">
-                                {{ new Date(conversation.created_at).toLocaleDateString() }}
-                              </div>
-                            </template>
-                          </v-list-item>
-                        </v-list>
-
-                        <!-- Pagination Controls -->
-                        <v-divider />
-                        <div class="pa-3">
-                          <div class="d-flex justify-space-between align-center">
-                            <!-- Page Info -->
-                            <div class="text-caption text-grey">
-                              Showing {{ Math.min((currentPage - 1) * pageSize + 1, totalCount) }} -
-                              {{ Math.min(currentPage * pageSize, totalCount) }} of {{ totalCount }} conversations
-                            </div>
-
-                            <!-- Page Size Selector -->
-                            <div class="d-flex align-center">
-                              <span class="text-caption me-2">Per page:</span>
-                              <v-select
-                                :model-value="pageSize"
-                                @update:model-value="changePageSize"
-                                :items="[5, 10, 20, 50]"
-                                variant="outlined"
-                                density="compact"
-                                style="max-width: 80px;"
-                                hide-details
-                                :disabled="loadingSupportConversations"
-                              />
-                            </div>
-                          </div>
-
-                          <!-- Pagination Buttons -->
-                          <div class="d-flex justify-center mt-2">
-                            <v-pagination
-                              v-if="totalPages > 1"
-                              :model-value="currentPage"
-                              @update:model-value="goToPage"
-                              :length="totalPages"
-                              :total-visible="5"
-                              size="small"
-                              :disabled="loadingSupportConversations"
-                            />
-                          </div>
-                        </div>
-                      </v-card>
-                    </v-col>
-
-                    <!-- Messages Area -->
-                    <v-col cols="12" md="8">
-                      <v-card variant="outlined" class="messages-area">
-                        <v-card-title v-if="selectedSupportConversation" class="py-4 px-4 border-b">
-                          <div class="d-flex flex-column w-100">
-                            <!-- User Info Header -->
-                            <div class="d-flex align-center mb-3">
-                              <v-avatar
-                                :color="selectedSupportConversation.item ? (selectedSupportConversation.item.status === 'lost' ? 'error' : 'success') : 'primary'"
-                                size="40"
-                                class="me-3"
-                              >
-                                <span class="text-white font-weight-bold">
-                                  {{ getConversationInitials(selectedSupportConversation) }}
-                                </span>
-                              </v-avatar>
-                              <div>
-                                <div class="text-h6 font-weight-bold">
-                                  {{ conversationDisplayNames[selectedSupportConversation?.id] || 'Loading...' }}
-                                </div>
-                              </div>
-                            </div>
-
-                            <!-- Item Information Card -->
-                            <v-card v-if="selectedSupportConversation.item" variant="tonal" :color="selectedSupportConversation.item.status === 'lost' ? 'error' : 'success'" class="pa-3">
-                              <div class="d-flex align-center">
-                                <v-chip
-                                  :color="selectedSupportConversation.item.status === 'lost' ? 'error' : 'success'"
-                                  variant="elevated"
-                                  class="me-3 font-weight-bold"
-                                >
-                                  <v-icon start>
-                                    {{ selectedSupportConversation.item.status === 'lost' ? 'mdi-help' : 'mdi-check-circle' }}
-                                  </v-icon>
-                                  {{ selectedSupportConversation.item.status.toUpperCase() }} ITEM
-                                </v-chip>
-                              </div>
-                              <div class="text-h6 font-weight-bold mt-2 mb-1">
-                                📦 {{ selectedSupportConversation.item.title }}
-                              </div>
-                              <div v-if="selectedSupportConversation.item.description" class="text-body-2">
-                                {{ selectedSupportConversation.item.description }}
-                              </div>
-                            </v-card>
-
-                            <!-- General Support Card -->
-                            <v-card v-else variant="tonal" color="info" class="pa-3">
-                              <div class="d-flex align-center">
-                                <v-chip color="info" variant="elevated" class="font-weight-bold">
-                                  <v-icon start>mdi-lifebuoy</v-icon>
-                                  GENERAL SUPPORT
-                                </v-chip>
-                              </div>
-                              <div class="text-body-2 mt-2">
-                                General support conversation - No specific item involved
-                              </div>
-                            </v-card>
-                          </div>
-                        </v-card-title>
-
-                        <v-card-title v-else class="text-h6 py-3 px-4 border-b text-center text-grey">
-                          <v-icon class="me-2">mdi-message-outline</v-icon>
-                          Select a conversation to view messages
-                        </v-card-title>
-
-                        <!-- Content when conversation is selected -->
-                        <template v-if="selectedSupportConversation">
-                          <!-- Messages Display Container -->
-                          <div v-if="loadingSupportMessages" class="pa-4 text-center" style="height: 400px;">
-                            <v-progress-circular indeterminate color="primary" size="24" />
-                            <p class="text-caption mt-2">Loading messages...</p>
-                          </div>
-
-                          <div v-else class="pa-4" style="height: 400px; overflow-y: auto;">
-                            <div
-                              v-for="message in supportInboxMessages"
-                              :key="message.id"
-                              class="message-item mb-3"
-                              :class="{
-                                'message-sent': message.user_id === currentUser?.id,
-                                'message-received': message.user_id !== currentUser?.id
-                              }"
-                            >
-                              <v-card
-                                variant="flat"
-                                :color="message.user_id === currentUser?.id ? 'primary' : 'grey-lighten-4'"
-                                :class="message.user_id === currentUser?.id ? 'ml-auto' : 'mr-auto'"
-                                style="max-width: 75%;"
-                              >
-                                <v-card-text class="py-2 px-3">
-                                  <p class="mb-1" :class="message.user_id === currentUser?.id ? 'text-white' : ''">
-                                    {{ message.message }}
-                                  </p>
-                                  <div
-                                    class="text-caption"
-                                    :class="message.user_id === currentUser?.id ? 'text-grey-lighten-1' : 'text-grey'"
-                                  >
-                                    {{ new Date(message.created_at).toLocaleString() }}
-                                  </div>
-                                </v-card-text>
-                              </v-card>
-                            </div>
-                          </div>
-
-                          <!-- Typing Indicator -->
-                          <div v-if="isOtherUserTyping" class="px-4 pb-2">
-                            <div class="d-flex align-center">
-                              <v-avatar size="24" color="primary" class="me-2">
-                                <v-icon size="14" color="white">mdi-account</v-icon>
-                              </v-avatar>
-                              <div class="typing-indicator">
-                                <span class="text-caption text-grey-darken-1">
-                                  {{ otherUserTypingName }} is typing
-                                </span>
-                                <span class="typing-dots">
-                                  <span class="dot"></span>
-                                  <span class="dot"></span>
-                                  <span class="dot"></span>
-                                </span>
-                              </div>
-                            </div>
-                          </div>
-
-                          <!-- Message Input - Always visible when conversation is selected -->
-                          <v-divider />
-                          <div class="pa-4">
-                            <v-form @submit.prevent="handleSendMessage">
-                              <v-text-field
-                                v-model="newMessage"
-                                label="Type your message..."
-                                variant="outlined"
-                                density="comfortable"
-                                :disabled="sendingSupportInboxMessage"
-                                append-inner-icon="mdi-send"
-                                @click:append-inner="handleSendMessage"
-                                @keyup.enter="handleSendMessage"
-                                @input="handleTyping"
-                              />
-                            </v-form>
-                          </div>
-                        </template>
-
-                        <!-- No conversation selected state -->
-                        <div v-else class="pa-8 text-center">
-                          <v-icon size="60" color="grey-lighten-2">mdi-message-outline</v-icon>
-                          <p class="text-h6 text-grey mt-4">Select a conversation to start messaging</p>
-                        </div>
-                      </v-card>
-                    </v-col>
-                  </v-row>
-                </div>
-              </div>
-            </v-card>
           </v-col>
         </v-row>
       </v-container>

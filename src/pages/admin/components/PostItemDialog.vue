@@ -2,6 +2,7 @@
 type NewItemForm = {
   title: string;
   description: string;
+  found_by?: string;
 }
 
 type Props = {
@@ -51,6 +52,15 @@ const handleSubmit = () => {
             variant="outlined"
             placeholder="Location where the item was lost"
             rows="4"
+          />
+
+          <v-text-field
+            v-model="form.found_by"
+            label="Found By"
+            prepend-inner-icon="mdi-account-search"
+            variant="outlined"
+            placeholder="Name or ID of person who found the item"
+            class="mb-3"
           />
 
           <v-alert type="info" variant="tonal" class="mt-3">

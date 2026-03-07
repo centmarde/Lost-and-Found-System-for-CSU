@@ -9,9 +9,9 @@ interface Item {
   id: number;
   title: string;
   description: string;
-  status: "lost" | "found";
+  status: "lost" | "claimed";
   user_id: string;
-  claimed_by: string;
+  claimed_by: string | null;
   created_at: string;
 }
 
@@ -68,7 +68,7 @@ const handleAwardItem = async (conversation: Conversation) => {
 
   try {
     await markAsClaimedBy(props.item.id, conversation.sender_id);
-    
+
     // Close dialogs and refresh
     dialogValue.value = false;
     // You might want to emit an event here to refresh the parent component
@@ -82,7 +82,7 @@ watch(
   () => props.modelValue,
   (newValue) => {
     if (newValue && props.item) {
-      fetchConversations(props.item.id); 
+      fetchConversations(props.item.id);
     }
   }
 );

@@ -15,6 +15,7 @@ import VersionView from '@/pages/VersionView.vue';
 import UserManagement from '@/pages/admin/UserManagement.vue';
 import RolePagesView from '@/pages/admin/RolePagesView.vue';
 import SupportInboxView from '@/pages/admin/SupportInboxView.vue';
+import ItemSupportInboxView from '@/pages/admin/ItemSupportInboxView.vue';
 // TODO: Add these components when they're created
 // import UserManagementView from '@/pages/admin/UserManagementView.vue';
 // import RolePagesView from '@/pages/admin/RolePagesView.vue';
@@ -60,6 +61,11 @@ const routes = setupLayouts([
     path: '/admin/support-inbox',
     component: SupportInboxView,
     meta: { requiresAuth: true }
+  },
+  {
+    path: '/admin/support-inbox/item/:itemId',
+    component: ItemSupportInboxView,
+    meta: { requiresAuth: true, noRoleCheck: true }
   },
   {
     path: '/version',

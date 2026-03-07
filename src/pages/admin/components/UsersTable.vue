@@ -428,10 +428,10 @@ onMounted(() => {
       <v-col cols="12">
         <div class="d-flex flex-column flex-sm-row justify-center justify-sm-space-between align-center gap-3 gap-sm-0">
           <div class="flex-grow-1 text-center text-sm-start">
-            <h1 class="text-h5 text-sm-h4 text-md-h3 text-lg-h2 font-weight-bold text-primary mb-1 mb-sm-2 user-management-title">
+            <h1 class="text-h5 text-sm-h5 text-md-h5 text-lg-h5 font-weight-bold text-primary mb-1 mb-sm-2 user-management-title">
               User Management
             </h1>
-            <p class="text-body-2 text-sm-body-1 text-grey-darken-1 mb-0">
+            <p >
               Manage system users and details
             </p>
           </div>

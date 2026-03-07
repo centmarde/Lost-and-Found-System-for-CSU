@@ -8,9 +8,9 @@ interface Item {
   id: number
   title: string
   description: string
-  status: 'lost' | 'found'
+  status: 'lost' | 'claimed'
   user_id: string
-  claimed_by: string
+  claimed_by: string | null
   created_at: string
 }
 
