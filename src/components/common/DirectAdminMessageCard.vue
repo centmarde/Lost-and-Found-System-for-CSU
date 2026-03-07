@@ -288,36 +288,49 @@ watch(showChatDialog, (newVal) => {
     v-if="!isCurrentUserAdmin && currentUser"
     elevation="3"
     class="direct-admin-card mb-4"
+    min-height="220"
     @click="handleContactAdmin"
   >
-    <v-card-text class="pa-4">
-      <div class="d-flex align-center">
-        <v-avatar color="primary" class="me-3" size="40">
-          <v-icon color="white" size="24">mdi-headset</v-icon>
-        </v-avatar>
-        <div class="flex-grow-1">
-          <h3 class="text-h6 font-weight-bold text-primary mb-1">
-            Contact Admin Support
-          </h3>
-          <p class="text-body-2 text-grey-darken-1 mb-0">
-            Need help? Send a direct message to our admin team
-          </p>
-        </div>
-        <v-icon color="primary" size="24">mdi-chevron-right</v-icon>
-      </div>
-    </v-card-text>
+    <v-row no-gutters class="h-100">
+      <!-- Left Column - Image -->
+      <v-col cols="4" class="d-flex align-center justify-center bg-primary-lighten-4 pa-3">
+        <img
+          src="/public/Worried-bro.png"
+          alt="Admin Support"
+          class="support-image"
+        />
+      </v-col>
 
-    <v-card-actions class="pa-4 pt-0">
-      <v-btn
-        color="primary"
-        variant="outlined"
-        block
-        prepend-icon="mdi-message-text"
-        @click.stop="handleContactAdmin"
-      >
-        Start Conversation
-      </v-btn>
-    </v-card-actions>
+      <!-- Right Column - Content -->
+      <v-col cols="8" class="d-flex flex-column">
+        <v-card-text class="pa-4 flex-grow-1 d-flex flex-column justify-center">
+          <div class="text-center mb-3">
+            <h3 class="text-h6 font-weight-bold text-primary mb-2">
+              Contact Admin Support
+            </h3>
+            <p class="text-body-2 text-grey-darken-1 mb-0">
+              Lost an item or found something? Need help with your report?<br>
+              Get instant assistance from our admin team
+            </p>
+          </div>
+          <div class="d-flex justify-end">
+            <v-icon color="primary" size="24">mdi-chevron-right</v-icon>
+          </div>
+        </v-card-text>
+
+        <v-card-actions class="pa-4 pt-0">
+          <v-btn
+            color="primary"
+            variant="outlined"
+            block
+            prepend-icon="mdi-message-text"
+            @click.stop="handleContactAdmin"
+          >
+            Start Conversation
+          </v-btn>
+        </v-card-actions>
+      </v-col>
+    </v-row>
   </v-card>
 
   <!-- Admin Selection Dialog -->
@@ -589,15 +602,29 @@ watch(showChatDialog, (newVal) => {
   transform: translateX(4px);
 }
 
+.support-image {
+  width: 200px;
+  height: 200px;
+  object-fit: contain;
+  border-radius: 16px;
+  max-width: 100%;
+}
+
 /* Mobile responsive */
 @media (max-width: 600px) {
   .direct-admin-card {
     margin-bottom: 16px;
+    min-height: 180px;
   }
 
   .message-content {
     max-width: 85%;
     padding: 10px 14px;
+  }
+
+  .support-image {
+    width: 140px;
+    height: 140px;
   }
 }
 </style>
