@@ -232,46 +232,23 @@ export const useAuthUserStore = defineStore("authUser", () => {
   async function getAllUsers() {
     loading.value = true;
     try {
-      let allUsers: any[] = [];
-      let page = 1;
-      const perPage = 1000; // Maximum allowed by Supabase
-      let hasMore = true;
+      // First, get all users from Supabase Auth using service role
+      const { data: authData, error: authError } = await supabaseAdmin.auth.admin.listUsers();
 
-      // Fetch all users with pagination
-      while (hasMore) {
-        const { data: authData, error: authError } = await supabaseAdmin.auth.admin.listUsers({
-          page,
-          perPage
-        });
-
-        if (authError) {
-          console.error(`Error fetching users page ${page}:`, authError);
-          return { error: authError };
-        }
-
-        // Map auth users to consistent format
-        const pageUsers = authData.users.map(user => {
-          return {
-            id: user.id,
-            email: user.email,
-            created_at: user.created_at,
-            raw_user_meta_data: user.user_metadata,
-            raw_app_meta_data: user.app_metadata,
-          };
-        });
-
-        allUsers = [...allUsers, ...pageUsers];
-
-        // Check if we got fewer users than requested, meaning we've reached the end
-        hasMore = authData.users.length === perPage;
-        page++;
-
-        // Safety check to prevent infinite loops
-        if (page > 100) {
-          console.warn('Stopped pagination after 100 pages to prevent infinite loop');
-          break;
-        }
+      if (authError) {
+        return { error: authError };
       }
+
+      // Map auth users to consistent format
+      const allUsers = authData.users.map(user => {
+        return {
+          id: user.id,
+          email: user.email,
+          created_at: user.created_at,
+          raw_user_meta_data: user.user_metadata,
+          raw_app_meta_data: user.app_metadata,
+        };
+      });
 
       return { users: allUsers };
     } catch (error) {
