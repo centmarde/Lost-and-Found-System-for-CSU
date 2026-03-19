@@ -214,16 +214,15 @@ const applyFilters = () => {
 
   // Apply status filter
   filteredUsers = filteredUsers.filter(user => {
-    const isBanned = user.raw_app_meta_data?.banned || user.raw_app_meta_data?.deleted
+    const isBanned = Boolean(user.raw_app_meta_data?.banned) || Boolean(user.raw_app_meta_data?.deleted)
+
     if (currentFilters.value.statusFilter === 'banned') {
       return isBanned
     } else {
       // For 'all' and 'active' status, exclude banned/deleted users
       return !isBanned
     }
-  })
-
-  // Apply date filters
+  })  // Apply date filters
   if (currentFilters.value.dateFrom) {
     const fromDate = new Date(currentFilters.value.dateFrom)
     filteredUsers = filteredUsers.filter(user => {
@@ -442,7 +441,7 @@ onMounted(() => {
             <!-- Refresh button -->
             <v-btn
               color="primary"
-              variant="tonal"
+
               @click="refreshUsers"
               :loading="loading"
               class="refresh-btn"
