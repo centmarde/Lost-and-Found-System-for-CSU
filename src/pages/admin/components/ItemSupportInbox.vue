@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed, ref, onMounted, watch } from 'vue';
 import { useDisplay } from 'vuetify';
+import { useAuthUserStore } from '@/stores/authUser';
 
 // Props
 const props = defineProps<{
@@ -37,9 +38,13 @@ const emit = defineEmits<{
 }>();
 
 const { xs } = useDisplay();
+const authStore = useAuthUserStore();
 
 // Local new message model (v-model synced with parent via emit)
 const newMessage = defineModel<string>('newMessage', { default: '' });
+
+// Store for user email mapping
+const userEmailMap = ref<Record<string, string>>({});
 
 const getConversationInitials = (conversation: any) => {
   if (props.currentUser && conversation.sender_id === props.currentUser.id) {
@@ -48,6 +53,107 @@ const getConversationInitials = (conversation: any) => {
   const name = conversation.sender_profile?.full_name || 'U';
   return name.split(' ').map((n: string) => n[0]).join('').toUpperCase().substring(0, 2);
 };
+
+// Get user email by user ID
+const getUserEmail = (userId: string) => {
+  const email = userEmailMap.value[userId];
+  if (email) {
+    return email;
+  }
+  
+  console.log(`Email not found for user ID: ${userId}`);
+  console.log('Available email mappings:', userEmailMap.value);
+  console.log('Total mappings available:', Object.keys(userEmailMap.value).length);
+  
+  // Fallback: check if this user is the current user
+  if (props.currentUser && userId === props.currentUser.id) {
+    const currentUserEmail = props.currentUser.email || props.currentUser.user_metadata?.email;
+    if (currentUserEmail) {
+      console.log(`Using current user email for ${userId}: ${currentUserEmail}`);
+      return currentUserEmail;
+    }
+  }
+  
+  // Check if the user is in supportInboxMessages sender data
+  const messageFromThisUser = props.supportInboxMessages?.find(msg => msg.user_id === userId);
+  if (messageFromThisUser && messageFromThisUser.user_email) {
+    console.log(`Found email from message data for ${userId}: ${messageFromThisUser.user_email}`);
+    return messageFromThisUser.user_email;
+  }
+  
+  // If email not found and we haven't loaded emails yet, try to reload
+  if (Object.keys(userEmailMap.value).length === 0) {
+    console.log('No emails loaded, attempting to reload...');
+    loadUserEmails();
+    return 'Loading email...';
+  }
+  
+  return `User ${userId.substring(0, 8)}...`;
+};
+
+// Load all users and create email mapping
+const loadUserEmails = async () => {
+  try {
+    console.log('Loading user emails...');
+    const response = await authStore.getAllUsers();
+    
+    console.log('getAllUsers response:', response);
+    
+    if (response.error) {
+      console.error('Error loading users:', response.error);
+      return;
+    }
+    
+    if (response.users && response.users.length > 0) {
+      const emailMapping: Record<string, string> = {};
+      response.users.forEach(user => {
+        console.log('Processing user:', user);
+        if (user.id && user.email) {
+          emailMapping[user.id] = user.email;
+          console.log(`✓ Mapped user ${user.id} -> ${user.email}`);
+        } else {
+          console.warn(`⚠ User missing id or email:`, { id: user.id, email: user.email });
+        }
+      });
+      userEmailMap.value = emailMapping;
+      console.log('✓ Email mapping completed. Total users mapped:', Object.keys(emailMapping).length);
+      console.log('Email mapping object:', emailMapping);
+    } else {
+      console.warn('No users returned from getAllUsers(). Response:', response);
+    }
+  } catch (error) {
+    console.error('Error loading user emails:', error);
+  }
+};
+
+// Watch for changes in supportInboxMessages to ensure emails are loaded
+watch(
+  () => props.supportInboxMessages,
+  (newMessages) => {
+    if (newMessages && newMessages.length > 0 && Object.keys(userEmailMap.value).length === 0) {
+      console.log('Messages loaded but no email mapping, loading emails...');
+      loadUserEmails();
+    }
+  },
+  { immediate: true }
+);
+
+// Also watch for changes in selectedSupportConversation
+watch(
+  () => props.selectedSupportConversation,
+  (newConversation) => {
+    if (newConversation && Object.keys(userEmailMap.value).length === 0) {
+      console.log('Conversation selected but no email mapping, loading emails...');
+      loadUserEmails();
+    }
+  },
+  { immediate: true }
+);
+
+// Initialize user emails when component mounts
+onMounted(() => {
+  loadUserEmails();
+});
 </script>
 
 <template>
@@ -373,6 +479,28 @@ const getConversationInitials = (conversation: any) => {
                           :class="message.user_id === currentUser?.id ? 'text-grey-lighten-1' : 'text-grey'"
                         >
                           {{ new Date(message.created_at).toLocaleString() }}
+                        </div>
+                        <div
+                          class="text-caption mt-1"
+                          :class="message.user_id === currentUser?.id ? 'text-grey-lighten-2' : 'text-grey-darken-1'"
+                        >
+                          <v-icon 
+                            size="12" 
+                            :class="message.user_id === currentUser?.id ? 'text-grey-lighten-2' : 'text-grey-darken-1'"
+                            class="me-1"
+                          >
+                            mdi-email-outline
+                          </v-icon>
+                          delivered by {{ getUserEmail(message.user_id) }}
+                          <v-btn
+                            v-if="!userEmailMap[message.user_id] && Object.keys(userEmailMap).length === 0"
+                            icon="mdi-refresh"
+                            size="x-small"
+                            variant="text"
+                            class="ml-2"
+                            @click="loadUserEmails"
+                            :class="message.user_id === currentUser?.id ? 'text-grey-lighten-2' : 'text-grey-darken-1'"
+                          />
                         </div>
                       </v-card-text>
                     </v-card>

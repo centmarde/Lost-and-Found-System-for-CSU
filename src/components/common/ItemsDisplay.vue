@@ -37,8 +37,48 @@ const emit = defineEmits<{
 }>()
 
 // Computed properties
+// Filter out deleted user items from claimed category
+const filteredItems = computed(() => {
+  return props.items.filter(item => !(item.title === "[Deleted User Item]" && item.claimed_by))
+})
+
+const filteredAndSortedItemsWithoutDeleted = computed(() => {
+  return props.filteredAndSortedItems.filter(item => !(item.title === "[Deleted User Item]" && item.claimed_by))
+})
+
+const paginatedItemsWithoutDeleted = computed(() => {
+  return props.paginatedItems.filter(item => !(item.title === "[Deleted User Item]" && item.claimed_by))
+})
+
+// Check if we're showing claimed items only
+const isClaimedItemsOnly = computed(() => {
+  return filteredAndSortedItemsWithoutDeleted.value.length > 0 && 
+         filteredAndSortedItemsWithoutDeleted.value.every(item => item.claimed_by)
+})
+
+// Check if we're showing all items (mix of claimed and unclaimed, or showing all available items)
+const isAllItemsView = computed(() => {
+  const hasClaimedItems = filteredAndSortedItemsWithoutDeleted.value.some(item => item.claimed_by)
+  const hasUnclaimedItems = filteredAndSortedItemsWithoutDeleted.value.some(item => !item.claimed_by)
+  
+  // If we have both claimed and unclaimed items, or if we're showing most/all available items
+  return (hasClaimedItems && hasUnclaimedItems) || 
+         (filteredAndSortedItemsWithoutDeleted.value.length === filteredItems.value.length && filteredItems.value.length > 0)
+})
+
+// Dynamic section title
+const displaySectionTitle = computed(() => {
+  if (isClaimedItemsOnly.value) {
+    return 'Claimed Items'
+  } else if (isAllItemsView.value) {
+    return 'All Items'
+  } else {
+    return props.emptyStateConfig.sectionTitle
+  }
+})
+
 const showingStart = computed(() => (props.page - 1) * props.itemsPerPage + 1)
-const showingEnd = computed(() => Math.min(props.page * props.itemsPerPage, props.filteredAndSortedItems.length))
+const showingEnd = computed(() => Math.min(props.page * props.itemsPerPage, filteredAndSortedItemsWithoutDeleted.value.length))
 
 // Data table headers
 const tableHeaders = computed(() => [
@@ -98,7 +138,7 @@ const getItemStatusText = (item: any) => {
   <v-card elevation="2" class="pa-4">
     <v-card-title class="text-h5 font-weight-bold mb-4 d-flex align-center">
       <v-icon class="me-2" color="primary">mdi-package-variant-closed</v-icon>
-      {{ emptyStateConfig.sectionTitle }}
+      {{ displaySectionTitle }}
       <v-spacer />
       <v-chip
         v-if="!itemsLoading"
@@ -108,11 +148,11 @@ const getItemStatusText = (item: any) => {
       >
         <!-- Mobile view: shorter text -->
         <span class="d-sm-none">
-          {{ filteredAndSortedItems.length }}/{{ items.length }}
+          {{ filteredAndSortedItemsWithoutDeleted.length }}/{{ filteredItems.length }}
         </span>
         <!-- Desktop view: full text -->
         <span class="d-none d-sm-inline">
-          {{ filteredAndSortedItems.length }} of {{ items.length }} items
+          {{ filteredAndSortedItemsWithoutDeleted.length }} of {{ filteredItems.length }} items
         </span>
       </v-chip>
     </v-card-title>
@@ -125,7 +165,7 @@ const getItemStatusText = (item: any) => {
 
     <!-- Empty state -->
     <div
-      v-else-if="filteredAndSortedItems.length === 0"
+      v-else-if="filteredAndSortedItemsWithoutDeleted.length === 0"
       class="text-center py-12"
     >
       <v-icon size="80" color="grey-lighten-1" class="mb-4">
@@ -133,20 +173,20 @@ const getItemStatusText = (item: any) => {
       </v-icon>
       <h3 class="text-h5 text-grey-darken-1 mb-2">
         {{
-          items.length === 0
+          filteredItems.length === 0
             ? emptyStateConfig.noItemsTitle
             : "No items match your filters"
         }}
       </h3>
       <p class="text-body-1 text-grey-darken-2 mb-4">
         {{
-          items.length === 0
+          filteredItems.length === 0
             ? emptyStateConfig.noItemsMessage
             : "Try adjusting your search or filters to see more items."
         }}
       </p>
       <v-btn
-        v-if="items.length === 0"
+        v-if="filteredItems.length === 0"
         color="primary"
         variant="outlined"
         prepend-icon="mdi-refresh"
@@ -170,7 +210,7 @@ const getItemStatusText = (item: any) => {
       <!-- Grid View -->
       <v-row v-if="viewMode === 'grid'" class="items-grid">
         <v-col
-          v-for="item in paginatedItems"
+          v-for="item in paginatedItemsWithoutDeleted"
           :key="item.id"
           cols="12"
           sm="6"
@@ -201,7 +241,7 @@ const getItemStatusText = (item: any) => {
       <v-data-table
         v-else-if="viewMode === 'table'"
         :headers="tableHeaders"
-        :items="paginatedItems"
+        :items="paginatedItemsWithoutDeleted"
         :loading="itemsLoading"
         item-key="id"
         class="elevation-1"
@@ -288,7 +328,7 @@ const getItemStatusText = (item: any) => {
 
             <div class="text-caption text-grey-darken-1 ml-4">
               Showing {{ showingStart }}-{{ showingEnd }}
-              of {{ filteredAndSortedItems.length }}
+              of {{ filteredAndSortedItemsWithoutDeleted.length }}
             </div>
           </div>
         </v-col>
