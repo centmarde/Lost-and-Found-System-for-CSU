@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { ref, toRefs, watchEffect } from "vue";
+import { ref, toRefs, watchEffect, onMounted, computed } from "vue";
 import { formatDate } from "@/utils/helpers";
 import { supabase } from "@/lib/supabase";
+import { useAuthUserStore } from '@/stores/authUser';
 import type { Conversation, Message, Item } from "@/types/chat"; 
 
 const props = defineProps<{
@@ -34,6 +35,90 @@ const {
 
 const newMessage = ref("");
 const currentUser = ref<any>(null);
+const authStore = useAuthUserStore();
+
+// Store for user email mapping
+const userEmailMap = ref<Record<string, string>>({});
+
+// Filter out conversations from deleted users
+const activeConversations = computed(() => {
+  return conversations.value.filter(conversation => {
+    const userEmail = getUserEmail(conversation.sender_id);
+    return userEmail !== 'Deleted User';
+  });
+});
+
+// Load all users and create email mapping
+const loadUserEmails = async () => {
+  try {
+    console.log('AdminChatDialog: Loading user emails...');
+    const response = await authStore.getAllUsers();
+    
+    if (response?.error) {
+      console.error('AdminChatDialog: Error loading users:', response.error);
+      return;
+    }
+    
+    // Handle different possible response structures
+    let users = null;
+    if (response?.users) {
+      users = response.users;
+    } else if (Array.isArray(response)) {
+      users = response;
+    } else if (response && 'data' in response) {
+      users = (response as any).data;
+    }
+    
+    if (users && users.length > 0) {
+      const emailMapping: Record<string, string> = {};
+      users.forEach((user: any) => {
+        // Handle different possible user object structures
+        const userId = user.id || user.user_id || user.uuid;
+        const userEmail = user.email || user.user_email;
+        
+        if (userId && userEmail) {
+          emailMapping[userId] = userEmail;
+        }
+      });
+      userEmailMap.value = emailMapping;
+      console.log('AdminChatDialog: ✓ Email mapping completed. Total users mapped:', Object.keys(emailMapping).length);
+    } else {
+      console.warn('AdminChatDialog: No users found. Response structure:', response);
+    }
+  } catch (error) {
+    console.error('AdminChatDialog: Error loading user emails:', error);
+   
+  }
+};
+
+// Get user email by user ID
+const getUserEmail = (userId: string) => {
+  if (!userId) {
+    return 'No user ID';
+  }
+  
+  const email = userEmailMap.value[userId];
+  if (email) {
+    return email;
+  }
+  
+  // Fallback: check if this user is the current user
+  if (currentUser.value && userId === currentUser.value.id) {
+    const currentUserEmail = currentUser.value.email;
+    if (currentUserEmail) {
+      return currentUserEmail;
+    }
+  }
+  
+  // If email not found and we haven't loaded emails yet, try to reload
+  if (Object.keys(userEmailMap.value).length === 0) {
+    loadUserEmails();
+    return 'Loading email...';
+  }
+  
+  // User not found in mapping (likely deleted user)
+  return 'Deleted User';
+};
 
 // Get the current user on mount
 watchEffect(async () => {
@@ -42,7 +127,17 @@ watchEffect(async () => {
       data: { user },
     } = await supabase.auth.getUser();
     currentUser.value = user;
+    
+    // Load user emails when dialog opens
+    if (Object.keys(userEmailMap.value).length === 0) {
+      await loadUserEmails();
+    }
   }
+});
+
+// Initialize user emails when component mounts
+onMounted(() => {
+  loadUserEmails();
 });
 
 const handleKeyPress = (event: KeyboardEvent) => {
@@ -114,24 +209,24 @@ const closeDialog = () => {
           >
             <v-progress-circular indeterminate color="primary" size="32" />
           </div>
-          <div v-else-if="conversations.length === 0" class="text-center pa-8">
+          <div v-else-if="activeConversations.length === 0" class="text-center pa-8">
             <v-icon size="48" color="grey-lighten-1"
               >mdi-message-outline</v-icon
             >
             <div class="text-body-2 text-grey-darken-1 mt-2">
-              No conversations yet
+              No active conversations
             </div>
           </div>
           <v-list v-else class="pa-0">
             <v-list-item
-              v-for="conversation in conversations"
+              v-for="conversation in activeConversations"
               :key="conversation.id"
               @click="emit('select-conversation', conversation)"
               :active="selectedConversation?.id === conversation.id"
-              class="conversation-item"
+             
             >
               <v-list-item-title class="text-subtitle-2">{{
-                conversation.sender?.email
+                getUserEmail(conversation.sender_id)
               }}</v-list-item-title>
               <v-list-item-subtitle class="text-caption">{{
                 formatDate(conversation.created_at)
@@ -181,6 +276,10 @@ const closeDialog = () => {
                     <div class="message-text">{{ message.message }}</div>
                     <div class="message-time">
                       {{ formatDate(message.created_at) }}
+                    </div>
+                    <div class="message-email text-caption mt-1" style="opacity: 0.8;">
+                      <v-icon size="10" class="me-1">mdi-email-outline</v-icon>
+                      delivered by {{ getUserEmail(message.user_id) }}
                     </div>
                   </div>
                 </div>
@@ -240,7 +339,7 @@ background-color: rgb(var(--v-theme-primary) / 0.08);}
  max-width: 70%;
  padding: 12px 16px;
  border-radius: 18px;
- background-color: #f1f3f4;
+
  /* 💡 FIX 1: Set text color for non-user message to a dark color */
  color: #212121;
 }
@@ -266,6 +365,14 @@ background-color: rgb(var(--v-theme-primary) / 0.08);}
 .my-message .message-time {
  /* 💡 FIX 3: Set timestamp color for user message (dark green bubble) to a light color */
  color: rgba(255, 255, 255, 0.7);
+}
+
+.message-email {
+ color: #616161;
+}
+
+.my-message .message-email {
+ color: rgba(255, 255, 255, 0.6);
 }
 
 .admin-messages-container {
